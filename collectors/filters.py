@@ -1,3 +1,5 @@
+import re
+
 KEYWORDS = [
     "designer",
     "design",
@@ -7,7 +9,12 @@ KEYWORDS = [
     "user research",
 ]
 
+# "ui"/"ux" as plain substrings false-positive on words like "recruiter" and
+# "acquisition" (both contain "ui"). Word-boundary matching avoids that.
+_PATTERN = re.compile(
+    r"\b(" + "|".join(re.escape(k) for k in KEYWORDS) + r")\b", re.IGNORECASE
+)
+
 
 def is_design_role(title: str) -> bool:
-    t = title.lower()
-    return any(k in t for k in KEYWORDS)
+    return bool(_PATTERN.search(title))
