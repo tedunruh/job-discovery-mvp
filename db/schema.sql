@@ -23,11 +23,8 @@ CREATE TABLE IF NOT EXISTS postings (
     first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     linkedin_seen_at TIMESTAMPTZ,
-    days_ahead_of_linkedin INTEGER GENERATED ALWAYS AS (
-        CASE WHEN linkedin_seen_at IS NOT NULL
-        THEN (linkedin_seen_at::date - first_seen_at::date)
-        END
-    ) STORED,
+    -- days_ahead_of_linkedin is computed at query time (see get_open_postings) rather
+    -- than stored: a generated column can't use a timezone-dependent ::date cast.
     -- dedupe on the ATS's own stable posting id, not title/url (those drift)
     UNIQUE (company_id, ats_posting_id)
 );
