@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Job Discovery</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #ddd; }
+    th { background: #f5f5f5; }
+    .btn { font-size: 0.85rem; padding: 0.25rem 0.6rem; cursor: pointer; }
+    .seen { color: #666; font-size: 0.85rem; }
+    .count { color: #666; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Job Discovery</h1>
+  <p class="count">{{ postings|length }} open design roles</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Company</th>
+        <th>Location</th>
+        <th>First Seen</th>
+        <th>Days Ahead of LinkedIn</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in postings %}
+      <tr>
+        <td><a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.title }}</a></td>
+        <td>{{ p.company_name }}</td>
+        <td>{{ p.location or "" }}</td>
+        <td>{{ p.first_seen_at.strftime("%Y-%m-%d") }}</td>
+        <td>{{ p.days_ahead_of_linkedin if p.days_ahead_of_linkedin is not none else "" }}</td>
+        <td>
+          {% if p.linkedin_seen_at %}
+            <span class="seen">seen on LinkedIn</span>
+          {% else %}
+            <form method="post" action="/mark_seen/{{ p.id }}">
+              <button class="btn" type="submit">Mark seen on LinkedIn</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
