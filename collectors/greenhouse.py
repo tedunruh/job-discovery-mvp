@@ -18,6 +18,8 @@ def _normalize(job: dict) -> dict:
         "location": (job.get("location") or {}).get("name"),
         "remote_type": None,
         "url": job.get("absolute_url"),
-        "ats_posted_at": job.get("updated_at"),
+        # first_published is the true original post date; updated_at bumps on any
+        # edit/republish and can make a months-old posting look freshly posted.
+        "ats_posted_at": job.get("first_published") or job.get("updated_at"),
         "raw_json": job,
     }
