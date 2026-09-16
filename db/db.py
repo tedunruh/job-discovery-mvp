@@ -72,14 +72,14 @@ def get_open_postings(conn):
         cur.execute(
             """
             SELECT p.id, c.name AS company_name, p.title, p.location, p.remote_type,
-                   p.url, p.first_seen_at, p.linkedin_seen_at,
+                   p.url, p.ats_posted_at, p.first_seen_at, p.linkedin_seen_at,
                    CASE WHEN p.linkedin_seen_at IS NOT NULL
                         THEN (p.linkedin_seen_at::date - p.first_seen_at::date)
                    END AS days_ahead_of_linkedin
             FROM postings p
             JOIN companies c ON c.id = p.company_id
             WHERE p.status = 'open'
-            ORDER BY p.first_seen_at DESC
+            ORDER BY p.ats_posted_at DESC NULLS LAST
             """
         )
         return cur.fetchall()

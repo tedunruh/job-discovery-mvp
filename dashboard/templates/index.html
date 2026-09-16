@@ -23,7 +23,7 @@
         <th>Title</th>
         <th>Company</th>
         <th>Location</th>
-        <th>First Seen</th>
+        <th>Posted</th>
         <th>Days Ahead of LinkedIn</th>
         <th></th>
       </tr>
@@ -34,7 +34,7 @@
         <td><a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.title }}</a></td>
         <td>{{ p.company_name }}</td>
         <td>{{ p.location or "" }}</td>
-        <td>{{ p.first_seen_at.strftime("%Y-%m-%d") }}</td>
+        <td>{{ p.ats_posted_at.strftime("%Y-%m-%d") if p.ats_posted_at else "" }}</td>
         <td>{{ p.days_ahead_of_linkedin if p.days_ahead_of_linkedin is not none else "" }}</td>
         <td>
           {% if p.linkedin_seen_at %}
