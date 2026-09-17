@@ -2,7 +2,7 @@ name: Collect job postings
 
 on:
   schedule:
-    - cron: "0 */4 * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch: {}
 
 jobs:
@@ -17,3 +17,4 @@ jobs:
       - run: python scheduler/run_collectors.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NTFY_TOPIC: ${{ vars.NTFY_TOPIC }}

@@ -7,6 +7,7 @@ from collectors import ashby, greenhouse, lever
 from collectors.company_list import COMPANIES
 from collectors.filters import is_design_role
 from db.db import get_conn, mark_stale_postings_closed, upsert_company, upsert_posting
+from scheduler.notify import notify_new_postings
 
 COLLECTORS = {
     "greenhouse": greenhouse.fetch,
@@ -17,6 +18,7 @@ COLLECTORS = {
 
 def run():
     conn = get_conn()
+    new_postings = []
     try:
         for company in COMPANIES:
             fetch = COLLECTORS[company["ats_type"]]
@@ -34,7 +36,15 @@ def run():
                 conn, company["name"], company["ats_type"], company["ats_identifier"]
             )
             for posting in design_postings:
-                upsert_posting(conn, company_id, posting)
+                is_new = upsert_posting(conn, company_id, posting)
+                if is_new:
+                    new_postings.append(
+                        {
+                            "company": company["name"],
+                            "title": posting["title"],
+                            "url": posting["url"],
+                        }
+                    )
 
             mark_stale_postings_closed(
                 conn, company_id, [p["ats_posting_id"] for p in design_postings]
@@ -42,6 +52,10 @@ def run():
             conn.commit()
     finally:
         conn.close()
+
+    if new_postings:
+        print(f"{len(new_postings)} new posting(s) — sending notification")
+        notify_new_postings(new_postings)
 
 
 if __name__ == "__main__":

@@ -23,6 +23,13 @@ def upsert_company(conn, name, ats_type, ats_identifier):
 
 
 def upsert_posting(conn, company_id, posting):
+    """Insert or update a posting. Returns True if this was a brand-new posting
+    (never seen before), False if it already existed and was just refreshed.
+
+    Uses the `xmax = 0` trick: xmax is unset (0) on a freshly inserted row
+    version and gets set by the UPDATE path of ON CONFLICT DO UPDATE, so it
+    reliably distinguishes insert from update within the same statement.
+    """
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -40,6 +47,7 @@ def upsert_posting(conn, company_id, posting):
                 raw_json = EXCLUDED.raw_json,
                 last_seen_at = now(),
                 status = 'open'
+            RETURNING (xmax = 0) AS is_new
             """,
             (
                 company_id,
@@ -52,6 +60,7 @@ def upsert_posting(conn, company_id, posting):
                 psycopg2.extras.Json(posting.get("raw_json") or {}),
             ),
         )
+        return cur.fetchone()[0]
 
 
 def mark_stale_postings_closed(conn, company_id, seen_ats_posting_ids):
