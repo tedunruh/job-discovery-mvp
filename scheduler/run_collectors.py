@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from collectors import ashby, greenhouse, lever
+from collectors import ashby, greenhouse, lever, workday
 from collectors.company_list import COMPANIES
 from collectors.filters import is_design_role
 from db.db import get_conn, mark_stale_postings_closed, upsert_company, upsert_posting
@@ -13,6 +13,7 @@ COLLECTORS = {
     "greenhouse": greenhouse.fetch,
     "lever": lever.fetch,
     "ashby": ashby.fetch,
+    "workday": workday.fetch,
 }
 
 

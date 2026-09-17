@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS companies (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
-    ats_type TEXT NOT NULL CHECK (ats_type IN ('greenhouse', 'lever', 'ashby')),
+    ats_type TEXT NOT NULL CHECK (ats_type IN ('greenhouse', 'lever', 'ashby', 'workday')),
     ats_identifier TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (ats_type, ats_identifier)
