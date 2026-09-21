@@ -1,8 +1,13 @@
 name: Collect job postings
 
 on:
+  # GitHub's own schedule trigger is unreliable at sub-hourly intervals - it gets
+  # silently deprioritized and delayed (observed 2-6 hour gaps in practice despite
+  # this being set to run every 30 min). The real 30-min cadence comes from an
+  # external cron (cron-job.org) calling workflow_dispatch via the GitHub API
+  # instead. This schedule is kept only as a low-frequency fallback.
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "0 */6 * * *"
   workflow_dispatch: {}
 
 jobs:
