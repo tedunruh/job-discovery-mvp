@@ -1,12 +1,11 @@
-import requests
+from collectors.http import request_with_retries
 
 BOARD_URL = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs"
 
 
 def fetch(ats_identifier: str) -> list[dict]:
     url = BOARD_URL.format(token=ats_identifier)
-    resp = requests.get(url, params={"content": "true"}, timeout=30)
-    resp.raise_for_status()
+    resp = request_with_retries("GET", url, params={"content": "true"}, timeout=30)
     jobs = resp.json().get("jobs", [])
     return [_normalize(job) for job in jobs]
 

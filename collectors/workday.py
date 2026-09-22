@@ -1,9 +1,8 @@
 import re
 from datetime import datetime, timedelta, timezone
 
-import requests
-
 from collectors.filters import KEYWORDS
+from collectors.http import request_with_retries
 
 CXS_URL = "https://{tenant}.{instance}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs"
 BASE_URL = "https://{tenant}.{instance}.myworkdayjobs.com/en-US/{site}"
@@ -35,7 +34,8 @@ def fetch(ats_identifier: str) -> list[dict]:
     for keyword in KEYWORDS:
         offset = 0
         for _ in range(MAX_PAGES):
-            resp = requests.post(
+            resp = request_with_retries(
+                "POST",
                 cxs_url,
                 json={
                     "appliedFacets": {},
@@ -46,7 +46,6 @@ def fetch(ats_identifier: str) -> list[dict]:
                 headers={"Content-Type": "application/json"},
                 timeout=30,
             )
-            resp.raise_for_status()
             data = resp.json()
             jobs = data.get("jobPostings", [])
             if not jobs:

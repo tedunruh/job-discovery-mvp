@@ -1,14 +1,13 @@
 from datetime import datetime, timezone
 
-import requests
+from collectors.http import request_with_retries
 
 POSTINGS_URL = "https://api.lever.co/v0/postings/{company}"
 
 
 def fetch(ats_identifier: str) -> list[dict]:
     url = POSTINGS_URL.format(company=ats_identifier)
-    resp = requests.get(url, params={"mode": "json"}, timeout=30)
-    resp.raise_for_status()
+    resp = request_with_retries("GET", url, params={"mode": "json"}, timeout=30)
     postings = resp.json()
     return [_normalize(p) for p in postings]
 

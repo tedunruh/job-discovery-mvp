@@ -1,12 +1,11 @@
-import requests
+from collectors.http import request_with_retries
 
 WIDGET_URL = "https://apply.workable.com/api/v1/widget/accounts/{account}"
 
 
 def fetch(ats_identifier: str) -> list[dict]:
     url = WIDGET_URL.format(account=ats_identifier)
-    resp = requests.get(url, timeout=30)
-    resp.raise_for_status()
+    resp = request_with_retries("GET", url, timeout=30)
     jobs = resp.json().get("jobs", [])
 
     # Multi-location postings appear once per location with the same shortcode;

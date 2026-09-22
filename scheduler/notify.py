@@ -33,3 +33,24 @@ def notify_new_postings(new_postings):
         requests.post(NTFY_URL, json=payload, timeout=10)
     except requests.RequestException as e:
         print(f"Notification failed (non-fatal): {e}")
+
+
+def notify_health_alerts(alerts):
+    """Push pipeline health/ops alerts via a separate ntfy topic from job
+    matches - mixing them in would undermine "notification = new job" as a
+    mental model. No-ops silently if NTFY_HEALTH_TOPIC isn't set.
+
+    alerts: list of plain-text alert strings.
+    """
+    topic = os.environ.get("NTFY_HEALTH_TOPIC")
+    if not topic or not alerts:
+        return
+
+    title = f"{len(alerts)} pipeline health alerts" if len(alerts) > 1 else "Pipeline health alert"
+    message = "\n\n".join(alerts[:10])
+    payload = {"topic": topic, "title": title, "message": message, "priority": 4, "tags": ["warning"]}
+
+    try:
+        requests.post(NTFY_URL, json=payload, timeout=10)
+    except requests.RequestException as e:
+        print(f"Health alert notification failed (non-fatal): {e}")

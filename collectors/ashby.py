@@ -1,4 +1,4 @@
-import requests
+from collectors.http import request_with_retries
 
 BOARD_URL = "https://api.ashbyhq.com/posting-api/job-board/{org}"
 
@@ -6,8 +6,7 @@ BOARD_URL = "https://api.ashbyhq.com/posting-api/job-board/{org}"
 def fetch(ats_identifier: str) -> list[dict]:
     # Note: not every org exposes this public board endpoint — some disable it.
     url = BOARD_URL.format(org=ats_identifier)
-    resp = requests.get(url, timeout=30)
-    resp.raise_for_status()
+    resp = request_with_retries("GET", url, timeout=30)
     jobs = resp.json().get("jobs", [])
     return [_normalize(job) for job in jobs]
 

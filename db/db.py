@@ -3,6 +3,11 @@ import os
 import psycopg2
 import psycopg2.extras
 
+# Health-tracking thresholds (see source_health table).
+FAILURE_THRESHOLD = 3  # consecutive transient failures before marking 'degraded'
+ZERO_RESULT_THRESHOLD = 3  # consecutive anomalous zero-result cycles before 'isolated'
+EMA_ALPHA = 0.3  # weight given to the newest observation in the rolling baseline
+
 
 def get_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
@@ -107,4 +112,123 @@ def set_applied(conn, posting_id, applied):
         cur.execute(
             "UPDATE postings SET applied = %s WHERE id = %s",
             (applied, posting_id),
+        )
+
+
+def get_source_health(conn, company_id):
+    """Fetch (creating if needed) this company's health row."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "INSERT INTO source_health (company_id) VALUES (%s) ON CONFLICT (company_id) DO NOTHING",
+            (company_id,),
+        )
+        cur.execute("SELECT * FROM source_health WHERE company_id = %s", (company_id,))
+        return cur.fetchone()
+
+
+def record_fetch_success(conn, company_id, design_role_count):
+    """Call when a fetch succeeds with a non-anomalous (non-empty) result.
+    Updates the rolling baseline and clears failure/zero-result streaks.
+    Caller must not call this while the source is 'isolated' - see run_collectors.py.
+    """
+    health = get_source_health(conn, company_id)
+    old_avg = health["typical_posting_count"]
+    new_avg = (
+        design_role_count
+        if old_avg is None
+        else (old_avg * (1 - EMA_ALPHA) + design_role_count * EMA_ALPHA)
+    )
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE source_health
+            SET last_success_at = now(), last_checked_at = now(),
+                consecutive_failures = 0, consecutive_zero_results = 0,
+                status = 'healthy', typical_posting_count = %s
+            WHERE company_id = %s
+            """,
+            (new_avg, company_id),
+        )
+
+
+def record_zero_result(conn, company_id):
+    """Call when a fetch succeeds but returns 0 design-role postings.
+
+    If this source has no established baseline (or has always been zero), this
+    is treated as a normal healthy check-in, not an anomaly. If it normally
+    returns postings, consecutive zero-result cycles accumulate and cross
+    ZERO_RESULT_THRESHOLD flips status to 'isolated'.
+
+    Returns (is_new_isolation, consecutive_zero_results).
+    """
+    health = get_source_health(conn, company_id)
+    baseline = health["typical_posting_count"]
+    if baseline is None or baseline <= 0:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE source_health
+                SET last_success_at = now(), last_checked_at = now(),
+                    consecutive_failures = 0, consecutive_zero_results = 0
+                WHERE company_id = %s
+                """,
+                (company_id,),
+            )
+        return False, 0
+
+    new_streak = health["consecutive_zero_results"] + 1
+    is_new_isolation = new_streak >= ZERO_RESULT_THRESHOLD
+    new_status = "isolated" if is_new_isolation else health["status"]
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE source_health
+            SET last_checked_at = now(), consecutive_failures = 0,
+                consecutive_zero_results = %s, status = %s
+            WHERE company_id = %s
+            """,
+            (new_streak, new_status, company_id),
+        )
+    return is_new_isolation, new_streak
+
+
+def record_fetch_failure(conn, company_id):
+    """Call when a fetch raises after retries are exhausted (transient failure).
+    Returns (is_new_degradation, consecutive_failures)."""
+    health = get_source_health(conn, company_id)
+    new_streak = health["consecutive_failures"] + 1
+    is_new_degradation = new_streak >= FAILURE_THRESHOLD and health["status"] != "degraded"
+    new_status = "degraded" if new_streak >= FAILURE_THRESHOLD else health["status"]
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE source_health
+            SET last_checked_at = now(), consecutive_failures = %s, status = %s
+            WHERE company_id = %s
+            """,
+            (new_streak, new_status, company_id),
+        )
+    return is_new_degradation, new_streak
+
+
+def touch_source_health(conn, company_id):
+    """Record that an isolated source was checked this cycle, without letting
+    the result silently clear isolation - that needs a manual reset."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE source_health SET last_checked_at = now() WHERE company_id = %s",
+            (company_id,),
+        )
+
+
+def reset_source_health(conn, company_id):
+    """Manually clear a source back to healthy after reviewing an isolation."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE source_health
+            SET status = 'healthy', consecutive_failures = 0, consecutive_zero_results = 0
+            WHERE company_id = %s
+            """,
+            (company_id,),
         )

@@ -23,3 +23,4 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NTFY_TOPIC: ${{ vars.NTFY_TOPIC }}
+          NTFY_HEALTH_TOPIC: ${{ vars.NTFY_HEALTH_TOPIC }}

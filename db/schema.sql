@@ -32,3 +32,16 @@ CREATE TABLE IF NOT EXISTS postings (
 
 CREATE INDEX IF NOT EXISTS idx_postings_first_seen ON postings (first_seen_at DESC);
 CREATE INDEX IF NOT EXISTS idx_postings_status ON postings (status);
+
+-- Per-company collector health, one row per company. 'isolated' is sticky and
+-- only cleared by manual review (see db.reset_source_health) - a source coming
+-- back non-zero on its own doesn't prove a schema issue is actually fixed.
+CREATE TABLE IF NOT EXISTS source_health (
+    company_id INTEGER PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+    last_success_at TIMESTAMPTZ,
+    last_checked_at TIMESTAMPTZ,
+    consecutive_failures INTEGER NOT NULL DEFAULT 0,
+    consecutive_zero_results INTEGER NOT NULL DEFAULT 0,
+    typical_posting_count DOUBLE PRECISION,
+    status TEXT NOT NULL DEFAULT 'healthy' CHECK (status IN ('healthy', 'degraded', 'isolated'))
+);
