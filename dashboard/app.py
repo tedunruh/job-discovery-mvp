@@ -4,9 +4,9 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, redirect, render_template, url_for
+from flask import Flask, redirect, render_template, request, url_for
 
-from db.db import get_conn, get_open_postings, mark_linkedin_seen
+from db.db import get_conn, get_open_postings, mark_linkedin_seen, set_applied
 
 app = Flask(__name__)
 
@@ -45,6 +45,18 @@ def mark_seen(posting_id):
     conn = get_conn()
     try:
         mark_linkedin_seen(conn, posting_id)
+        conn.commit()
+    finally:
+        conn.close()
+    return redirect(url_for("index"))
+
+
+@app.route("/set_applied/<int:posting_id>", methods=["POST"])
+def set_applied_route(posting_id):
+    applied = request.form.get("applied") == "true"
+    conn = get_conn()
+    try:
+        set_applied(conn, posting_id, applied)
         conn.commit()
     finally:
         conn.close()

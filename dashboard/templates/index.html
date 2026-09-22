@@ -26,6 +26,7 @@
         <th>Posted</th>
         <th>Days Ahead of LinkedIn</th>
         <th></th>
+        <th>Applied</th>
       </tr>
     </thead>
     <tbody>
@@ -44,6 +45,12 @@
               <button class="btn" type="submit">Mark seen on LinkedIn</button>
             </form>
           {% endif %}
+        </td>
+        <td>
+          <form method="post" action="/set_applied/{{ p.id }}">
+            <input type="hidden" name="applied" value="{{ 'false' if p.applied else 'true' }}">
+            <button class="btn" type="submit">{{ "✓ Applied" if p.applied else "Mark applied" }}</button>
+          </form>
         </td>
       </tr>
       {% endfor %}

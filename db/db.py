@@ -81,7 +81,7 @@ def get_open_postings(conn):
         cur.execute(
             """
             SELECT p.id, c.name AS company_name, p.title, p.location, p.remote_type,
-                   p.url, p.ats_posted_at, p.first_seen_at, p.linkedin_seen_at,
+                   p.url, p.ats_posted_at, p.first_seen_at, p.linkedin_seen_at, p.applied,
                    CASE WHEN p.linkedin_seen_at IS NOT NULL
                         THEN (p.linkedin_seen_at::date - p.first_seen_at::date)
                    END AS days_ahead_of_linkedin
@@ -99,4 +99,12 @@ def mark_linkedin_seen(conn, posting_id):
         cur.execute(
             "UPDATE postings SET linkedin_seen_at = now() WHERE id = %s AND linkedin_seen_at IS NULL",
             (posting_id,),
+        )
+
+
+def set_applied(conn, posting_id, applied):
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE postings SET applied = %s WHERE id = %s",
+            (applied, posting_id),
         )
