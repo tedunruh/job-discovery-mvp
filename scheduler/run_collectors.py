@@ -4,17 +4,16 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from collectors import ashby, greenhouse, lever, workable, workday
-from collectors.company_list import COMPANIES
 from collectors.filters import is_design_role
 from db.db import (
     get_conn,
     get_source_health,
+    get_tracked_companies,
     mark_stale_postings_closed,
     record_fetch_failure,
     record_fetch_success,
     record_zero_result,
     touch_source_health,
-    upsert_company,
     upsert_posting,
 )
 from scheduler.notify import notify_health_alerts, notify_new_postings
@@ -33,11 +32,13 @@ def run():
     new_postings = []
     health_alerts = []
     try:
-        for company in COMPANIES:
+        companies = get_tracked_companies(conn)
+        if not companies:
+            print("No companies tracked by any user (user_companies is empty) — nothing to do.")
+            return
+        for company in companies:
             fetch = COLLECTORS[company["ats_type"]]
-            company_id = upsert_company(
-                conn, company["name"], company["ats_type"], company["ats_identifier"]
-            )
+            company_id = company["id"]
             label = f"{company['name']} ({company['ats_type']})"
             print(f"Fetching {label}...")
 
@@ -105,7 +106,4 @@ def run():
 
 
 if __name__ == "__main__":
-    if not COMPANIES:
-        print("collectors/company_list.py is empty — add companies before running.")
-        sys.exit(1)
     run()

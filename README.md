@@ -25,9 +25,17 @@ Lever, Ashby) and tracks how many days ahead of LinkedIn they showed up.
    psql "$DATABASE_URL" -f db/schema.sql
    ```
 
-5. **Add companies to track.** Edit [`collectors/company_list.py`](collectors/company_list.py) —
-   it's empty by default. Each entry needs a verified `ats_type` and
-   `ats_identifier`; the file explains how to check them.
+5. **Add companies to track.** Companies live in the `companies` table (the
+   shared directory) plus a `user_companies` row per user who tracks them —
+   the scraper only fetches companies with at least one `user_companies` row
+   (`db.get_tracked_companies`). Verify a candidate's `ats_type` and
+   `ats_identifier` against the live API before adding it (see the format
+   notes that used to live in `collectors/company_list.py`, now folded into
+   `db/schema.sql`'s comments), then insert both rows directly, e.g.:
+   ```sql
+   INSERT INTO companies (name, ats_type, ats_identifier) VALUES ('Figma', 'greenhouse', 'figma') RETURNING id;
+   INSERT INTO user_companies (user_id, company_id) VALUES (1, <id from above>);
+   ```
 
 6. **Run the collectors once, manually.**
    ```bash

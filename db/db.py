@@ -81,38 +81,71 @@ def mark_stale_postings_closed(conn, company_id, seen_ats_posting_ids):
         )
 
 
-def get_open_postings(conn):
+def get_open_postings(conn, user_id):
+    """Open postings from companies this user tracks (user_companies), with
+    this user's own applied/linkedin_seen_at relevance joined in from
+    user_postings - a posting no other user has touched simply has no row
+    there, hence the LEFT JOIN + COALESCE."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
             SELECT p.id, c.name AS company_name, p.title, p.location, p.remote_type,
-                   p.url, p.ats_posted_at, p.first_seen_at, p.linkedin_seen_at, p.applied,
-                   CASE WHEN p.linkedin_seen_at IS NOT NULL
-                        THEN (p.linkedin_seen_at::date - p.first_seen_at::date)
+                   p.url, p.ats_posted_at, p.first_seen_at,
+                   up.linkedin_seen_at,
+                   COALESCE(up.applied, false) AS applied,
+                   CASE WHEN up.linkedin_seen_at IS NOT NULL
+                        THEN (up.linkedin_seen_at::date - p.first_seen_at::date)
                    END AS days_ahead_of_linkedin
             FROM postings p
             JOIN companies c ON c.id = p.company_id
+            JOIN user_companies uc ON uc.company_id = c.id AND uc.user_id = %s
+            LEFT JOIN user_postings up ON up.posting_id = p.id AND up.user_id = %s
             WHERE p.status = 'open'
             ORDER BY p.ats_posted_at DESC NULLS LAST
-            """
+            """,
+            (user_id, user_id),
         )
         return cur.fetchall()
 
 
-def mark_linkedin_seen(conn, posting_id):
+def mark_linkedin_seen(conn, posting_id, user_id):
     with conn.cursor() as cur:
         cur.execute(
-            "UPDATE postings SET linkedin_seen_at = now() WHERE id = %s AND linkedin_seen_at IS NULL",
-            (posting_id,),
+            """
+            INSERT INTO user_postings (user_id, posting_id, linkedin_seen_at)
+            VALUES (%s, %s, now())
+            ON CONFLICT (user_id, posting_id) DO UPDATE SET
+                linkedin_seen_at = COALESCE(user_postings.linkedin_seen_at, EXCLUDED.linkedin_seen_at)
+            """,
+            (user_id, posting_id),
         )
 
 
-def set_applied(conn, posting_id, applied):
+def set_applied(conn, posting_id, applied, user_id):
     with conn.cursor() as cur:
         cur.execute(
-            "UPDATE postings SET applied = %s WHERE id = %s",
-            (applied, posting_id),
+            """
+            INSERT INTO user_postings (user_id, posting_id, applied)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (user_id, posting_id) DO UPDATE SET applied = EXCLUDED.applied
+            """,
+            (user_id, posting_id, applied),
         )
+
+
+def get_tracked_companies(conn):
+    """Companies at least one user actually tracks - the scraper only fetches
+    these, not every row ever added to the shared companies directory."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT DISTINCT c.id, c.name, c.ats_type, c.ats_identifier
+            FROM companies c
+            JOIN user_companies uc ON uc.company_id = c.id
+            ORDER BY c.name
+            """
+        )
+        return cur.fetchall()
 
 
 def get_source_health(conn, company_id):

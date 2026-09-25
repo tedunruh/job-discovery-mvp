@@ -1,5 +1,32 @@
 -- Job Discovery MVP schema (Postgres)
 
+-- ats_identifier's format depends on ats_type. Verify each one before relying
+-- on it - board tokens don't always match the company's public name:
+--
+--   greenhouse: board token, e.g. "figma"
+--               https://boards-api.greenhouse.io/v1/boards/{ats_identifier}/jobs
+--   lever:      company slug, e.g. "palantir"
+--               https://api.lever.co/v0/postings/{ats_identifier}?mode=json
+--   ashby:      org slug, e.g. "notion"
+--               https://api.ashbyhq.com/posting-api/job-board/{ats_identifier}
+--   workday:    "{tenant}.{instance}/{site}", e.g. "workhuman.wd1/WorkhumanCareers"
+--               Unlike the other four, there's no guessable URL pattern - tenant,
+--               instance (wd1/wd3/wd5/...), and site vary per company and can
+--               change over time (tenants get migrated between instances). Find
+--               them by opening the company's Workday careers page, opening
+--               browser devtools' Network tab, and reading them off a request to
+--               .../wday/cxs/<tenant>/<site>/jobs. Also note: Workday's public API
+--               only exposes a relative posted date ("Posted 3 Days Ago"), so
+--               ats_posted_at for Workday postings is day-precision at best -
+--               less accurate than the other four collectors.
+--   workable:   account slug, e.g. "airhelp"
+--               https://apply.workable.com/api/v1/widget/accounts/{ats_identifier}
+--               Gives a real published_on date (day precision, no time) - more
+--               reliable than Workday's relative text, though still less precise
+--               than greenhouse/lever/ashby's full timestamps. Watch for accounts
+--               that are recruiting agencies/talent marketplaces rather than a
+--               single company (e.g. one account with 2000+ jobs across many
+--               employers) - skip those, they're not what this directory is for.
 CREATE TABLE IF NOT EXISTS companies (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
@@ -22,8 +49,8 @@ CREATE TABLE IF NOT EXISTS postings (
     raw_json JSONB,
     first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    linkedin_seen_at TIMESTAMPTZ,
-    applied BOOLEAN NOT NULL DEFAULT false,
+    -- applied/linkedin_seen_at live in user_postings, not here - a posting
+    -- isn't user-specific, but whether *you* applied to it is.
     -- days_ahead_of_linkedin is computed at query time (see get_open_postings) rather
     -- than stored: a generated column can't use a timezone-dependent ::date cast.
     -- dedupe on the ATS's own stable posting id, not title/url (those drift)
@@ -46,11 +73,11 @@ CREATE TABLE IF NOT EXISTS source_health (
     status TEXT NOT NULL DEFAULT 'healthy' CHECK (status IN ('healthy', 'degraded', 'isolated'))
 );
 
--- --- Multi-tenancy foundation (Sprint 1, Story 2, Stage A) ---
--- Schema + data migration only in this stage. The app layer still reads/writes
--- postings.applied/linkedin_seen_at and the static company_list.py directly -
--- that cutover, and auth, are later stages. This stage just gets the new
--- model in place and backfilled so nothing has to migrate twice.
+-- --- Multi-tenancy foundation (Sprint 1, Story 2) ---
+-- Stage A (schema + data migration) and Stage B (app layer cutover) are both
+-- done: the dashboard and scraper now read/write through these tables,
+-- hardcoded to one user's id pending auth (dashboard/app.py CURRENT_USER_ID).
+-- Auth and hosting are still separate later stages.
 
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,

@@ -15,6 +15,12 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-only-not-for-production")
 app.permanent_session_lifetime = timedelta(days=90)
 
+# Hardcoded pending auth (Sprint 1, Story 2 Stage C). Every route below should
+# read the user id from here, not inline, so swapping this for a real
+# session-derived current_user is a one-line change to this constant's
+# definition, not a hunt through every route.
+CURRENT_USER_ID = 1
+
 
 def humanize_posted_at(dt):
     if dt is None:
@@ -39,7 +45,7 @@ app.jinja_env.filters["humanize"] = humanize_posted_at
 def index():
     conn = get_conn()
     try:
-        postings = get_open_postings(conn)
+        postings = get_open_postings(conn, CURRENT_USER_ID)
     finally:
         conn.close()
 
@@ -61,7 +67,7 @@ def toggle_remote_us():
 def mark_seen(posting_id):
     conn = get_conn()
     try:
-        mark_linkedin_seen(conn, posting_id)
+        mark_linkedin_seen(conn, posting_id, CURRENT_USER_ID)
         conn.commit()
     finally:
         conn.close()
@@ -73,7 +79,7 @@ def set_applied_route(posting_id):
     applied = request.form.get("applied") == "true"
     conn = get_conn()
     try:
-        set_applied(conn, posting_id, applied)
+        set_applied(conn, posting_id, applied, CURRENT_USER_ID)
         conn.commit()
     finally:
         conn.close()
