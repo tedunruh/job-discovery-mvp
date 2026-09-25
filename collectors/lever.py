@@ -23,7 +23,10 @@ def _normalize(p: dict) -> dict:
         "ats_posting_id": p.get("id"),
         "title": p.get("text", ""),
         "location": categories.get("location"),
-        "remote_type": categories.get("commitment"),
+        # workplaceType (remote/hybrid/onsite) is the actual remote signal - not
+        # categories.commitment, which is employment type ("Full-time"). Found
+        # this was wired to the wrong field while building the remote/US filter.
+        "remote_type": p.get("workplaceType"),
         "url": p.get("hostedUrl"),
         "ats_posted_at": posted_at,
         "raw_json": p,

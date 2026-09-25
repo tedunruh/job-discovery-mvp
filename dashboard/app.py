@@ -1,14 +1,19 @@
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, redirect, render_template, request, session, url_for
 
 from db.db import get_conn, get_open_postings, mark_linkedin_seen, set_applied
+from filters import is_remote_us
 
 app = Flask(__name__)
+# Falls back to a fixed dev value locally; set a real SECRET_KEY once this is
+# deployed off localhost (Story 2) so session cookies can't be forged.
+app.secret_key = os.environ.get("SECRET_KEY", "dev-only-not-for-production")
+app.permanent_session_lifetime = timedelta(days=90)
 
 
 def humanize_posted_at(dt):
@@ -37,7 +42,19 @@ def index():
         postings = get_open_postings(conn)
     finally:
         conn.close()
-    return render_template("index.html", postings=postings)
+
+    remote_us_only = session.get("remote_us_only", False)
+    if remote_us_only:
+        postings = [p for p in postings if is_remote_us(p["location"], p["remote_type"])]
+
+    return render_template("index.html", postings=postings, remote_us_only=remote_us_only)
+
+
+@app.route("/toggle_remote_us", methods=["POST"])
+def toggle_remote_us():
+    session.permanent = True
+    session["remote_us_only"] = request.form.get("remote_us_only") == "true"
+    return redirect(url_for("index"))
 
 
 @app.route("/mark_seen/<int:posting_id>", methods=["POST"])

@@ -12,11 +12,22 @@
     .btn { font-size: 0.85rem; padding: 0.25rem 0.6rem; cursor: pointer; }
     .seen { color: #666; font-size: 0.85rem; }
     .count { color: #666; margin-bottom: 1rem; }
+    .toolbar { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem; }
+    .toolbar label { font-size: 0.9rem; color: #333; display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
   </style>
 </head>
 <body>
   <h1>Job Discovery</h1>
-  <p class="count">{{ postings|length }} open design roles</p>
+  <div class="toolbar">
+    <form method="post" action="/toggle_remote_us">
+      <input type="hidden" name="remote_us_only" value="{{ 'false' if remote_us_only else 'true' }}">
+      <label>
+        <input type="checkbox" onchange="this.form.submit()" {{ "checked" if remote_us_only else "" }}>
+        Remote US only
+      </label>
+    </form>
+  </div>
+  <p class="count">{{ postings|length }} open design roles{{ " (Remote US only)" if remote_us_only else "" }}</p>
   <table>
     <thead>
       <tr>
