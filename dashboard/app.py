@@ -1,11 +1,13 @@
 import os
 import sys
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, redirect, render_template, request, session, url_for
 
+from auth import create_magic_link, get_user_by_email, send_magic_link_email, verify_magic_link
 from db.db import get_conn, get_open_postings, mark_linkedin_seen, set_applied
 from filters import is_remote_us
 
@@ -15,11 +17,15 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-only-not-for-production")
 app.permanent_session_lifetime = timedelta(days=90)
 
-# Hardcoded pending auth (Sprint 1, Story 2 Stage C). Every route below should
-# read the user id from here, not inline, so swapping this for a real
-# session-derived current_user is a one-line change to this constant's
-# definition, not a hunt through every route.
-CURRENT_USER_ID = 1
+
+def require_login(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not session.get("user_id"):
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+
+    return wrapped
 
 
 def humanize_posted_at(dt):
@@ -41,11 +47,60 @@ def humanize_posted_at(dt):
 app.jinja_env.filters["humanize"] = humanize_posted_at
 
 
-@app.route("/")
-def index():
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "GET":
+        return render_template("login.html", sent=False, error=None)
+
+    email = request.form.get("email", "").strip().lower()
     conn = get_conn()
     try:
-        postings = get_open_postings(conn, CURRENT_USER_ID)
+        user = get_user_by_email(conn, email)
+        if user:
+            token = create_magic_link(conn, user["id"])
+            conn.commit()
+            link_url = url_for("verify", token=token, _external=True)
+            send_magic_link_email(email, link_url)
+        # Same response whether or not the email is registered - don't leak
+        # which emails exist. This is a hand-invited beta list, not
+        # self-serve signup: an unrecognized email just doesn't get a link.
+    finally:
+        conn.close()
+    return render_template("login.html", sent=True, error=None)
+
+
+@app.route("/verify")
+def verify():
+    token = request.args.get("token", "")
+    conn = get_conn()
+    try:
+        user_id = verify_magic_link(conn, token)
+        conn.commit()
+    finally:
+        conn.close()
+
+    if not user_id:
+        return render_template("login.html", sent=False, error="That link is invalid, expired, or already used.")
+
+    session.clear()
+    session.permanent = True
+    session["user_id"] = user_id
+    return redirect(url_for("index"))
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+@app.route("/")
+@require_login
+def index():
+    user_id = session["user_id"]
+    conn = get_conn()
+    try:
+        postings = get_open_postings(conn, user_id)
     finally:
         conn.close()
 
@@ -57,6 +112,7 @@ def index():
 
 
 @app.route("/toggle_remote_us", methods=["POST"])
+@require_login
 def toggle_remote_us():
     session.permanent = True
     session["remote_us_only"] = request.form.get("remote_us_only") == "true"
@@ -64,10 +120,11 @@ def toggle_remote_us():
 
 
 @app.route("/mark_seen/<int:posting_id>", methods=["POST"])
+@require_login
 def mark_seen(posting_id):
     conn = get_conn()
     try:
-        mark_linkedin_seen(conn, posting_id, CURRENT_USER_ID)
+        mark_linkedin_seen(conn, posting_id, session["user_id"])
         conn.commit()
     finally:
         conn.close()
@@ -75,11 +132,12 @@ def mark_seen(posting_id):
 
 
 @app.route("/set_applied/<int:posting_id>", methods=["POST"])
+@require_login
 def set_applied_route(posting_id):
     applied = request.form.get("applied") == "true"
     conn = get_conn()
     try:
-        set_applied(conn, posting_id, applied, CURRENT_USER_ID)
+        set_applied(conn, posting_id, applied, session["user_id"])
         conn.commit()
     finally:
         conn.close()

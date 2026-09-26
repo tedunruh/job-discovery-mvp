@@ -50,6 +50,23 @@ Lever, Ashby) and tracks how many days ahead of LinkedIn they showed up.
    # open http://localhost:5000
    ```
 
+## Adding a user (beta invites)
+
+No self-serve signup — this is a hand-invited beta. Add a user directly:
+```sql
+INSERT INTO users (email, ntfy_topic) VALUES ('alpha-tester@example.com', 'jobdiscovery-<random topic string>');
+```
+Give them companies to track the same way (`INSERT INTO user_companies ...`),
+same pattern as step 5 above. Once the row exists, they can request a
+sign-in link from `/login` with that email — an unrecognized email gets the
+same generic "if that email is on the list..." response either way, so
+adding someone is the only step, nothing else to configure per user.
+
+Sign-in itself is magic-link email, sent via [Resend](https://resend.com)
+(`RESEND_API_KEY` env var). Without that key set, the link is printed to
+the server log instead of emailed — fine for local dev, not for anyone
+who isn't reading your terminal.
+
 ## Automating collection
 
 `.github/workflows/collect.yml` runs the collectors every 4 hours via GitHub
