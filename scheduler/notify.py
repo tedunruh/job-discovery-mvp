@@ -17,18 +17,19 @@ def _format_discovered_at(dt):
     return dt.astimezone(LOCAL_TZ).strftime("%b %-d, %-I:%M %p %Z")
 
 
-def notify_new_postings(new_postings, discovered_at=None):
-    """Push a phone notification via ntfy.sh for genuinely new postings.
+def notify_new_postings(new_postings, ntfy_topic, discovered_at=None):
+    """Push a phone notification via ntfy.sh for genuinely new postings, to
+    one user's own topic - each user has their own ntfy_topic (users table),
+    so this is called once per user with their matching subset of postings.
 
     new_postings: list of {"company": str, "title": str, "url": str}
-    No-ops silently if NTFY_TOPIC isn't set, so this stays optional.
 
     Includes an explicit "Discovered <time>" line in the message itself -
     this is when *we* found it, which can differ by hours from the ATS's own
     claimed posting date the dashboard shows in its "Posted" column. Labeling
     it directly in the notification avoids the two being confused later.
     """
-    topic = os.environ.get("NTFY_TOPIC")
+    topic = ntfy_topic
     if not topic or not new_postings:
         return
 

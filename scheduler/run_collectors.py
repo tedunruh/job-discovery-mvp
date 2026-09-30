@@ -9,6 +9,8 @@ from db.db import (
     get_conn,
     get_source_health,
     get_tracked_companies,
+    get_users_tracking_company,
+    mark_notified,
     mark_stale_postings_closed,
     record_fetch_failure,
     record_fetch_success,
@@ -29,7 +31,8 @@ COLLECTORS = {
 
 def run():
     conn = get_conn()
-    new_postings = []
+    new_postings_count = 0
+    new_postings_by_user = {}  # user_id -> {"ntfy_topic": str, "postings": [...]}
     health_alerts = []
     try:
         companies = get_tracked_companies(conn)
@@ -67,16 +70,28 @@ def run():
 
             if design_postings:
                 record_fetch_success(conn, company_id, len(design_postings))
+                users_tracking = None
                 for posting in design_postings:
-                    is_new = upsert_posting(conn, company_id, posting)
+                    posting_id, is_new = upsert_posting(conn, company_id, posting)
                     if is_new:
-                        new_postings.append(
-                            {
-                                "company": company["name"],
-                                "title": posting["title"],
-                                "url": posting["url"],
-                            }
-                        )
+                        new_postings_count += 1
+                        if users_tracking is None:
+                            # Looked up once per company (not per posting) -
+                            # every posting from this company fans out to the
+                            # same set of users.
+                            users_tracking = get_users_tracking_company(conn, company_id)
+                        for user in users_tracking:
+                            bucket = new_postings_by_user.setdefault(
+                                user["id"], {"ntfy_topic": user["ntfy_topic"], "postings": []}
+                            )
+                            bucket["postings"].append(
+                                {
+                                    "company": company["name"],
+                                    "title": posting["title"],
+                                    "url": posting["url"],
+                                }
+                            )
+                            mark_notified(conn, user["id"], posting_id)
                 mark_stale_postings_closed(
                     conn, company_id, [p["ats_posting_id"] for p in design_postings]
                 )
@@ -96,9 +111,10 @@ def run():
     finally:
         conn.close()
 
-    if new_postings:
-        print(f"{len(new_postings)} new posting(s) — sending notification")
-        notify_new_postings(new_postings)
+    if new_postings_count:
+        print(f"{new_postings_count} new posting(s) across {len(new_postings_by_user)} user(s) — sending notifications")
+        for bucket in new_postings_by_user.values():
+            notify_new_postings(bucket["postings"], bucket["ntfy_topic"])
 
     if health_alerts:
         print(f"{len(health_alerts)} health alert(s) — sending")

@@ -28,8 +28,9 @@ def upsert_company(conn, name, ats_type, ats_identifier):
 
 
 def upsert_posting(conn, company_id, posting):
-    """Insert or update a posting. Returns True if this was a brand-new posting
-    (never seen before), False if it already existed and was just refreshed.
+    """Insert or update a posting. Returns (posting_id, is_new) where is_new is
+    True if this was a brand-new posting (never seen before), False if it
+    already existed and was just refreshed.
 
     Uses the `xmax = 0` trick: xmax is unset (0) on a freshly inserted row
     version and gets set by the UPDATE path of ON CONFLICT DO UPDATE, so it
@@ -52,7 +53,7 @@ def upsert_posting(conn, company_id, posting):
                 raw_json = EXCLUDED.raw_json,
                 last_seen_at = now(),
                 status = 'open'
-            RETURNING (xmax = 0) AS is_new
+            RETURNING id, (xmax = 0) AS is_new
             """,
             (
                 company_id,
@@ -65,7 +66,7 @@ def upsert_posting(conn, company_id, posting):
                 psycopg2.extras.Json(posting.get("raw_json") or {}),
             ),
         )
-        return cur.fetchone()[0]
+        return cur.fetchone()
 
 
 def mark_stale_postings_closed(conn, company_id, seen_ats_posting_ids):
@@ -146,6 +147,35 @@ def get_tracked_companies(conn):
             """
         )
         return cur.fetchall()
+
+
+def get_users_tracking_company(conn, company_id):
+    """Users who track this company (user_companies), for per-user notification
+    fan-out - each gets notified only about companies they actually follow."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT u.id, u.ntfy_topic
+            FROM users u
+            JOIN user_companies uc ON uc.user_id = u.id
+            WHERE uc.company_id = %s
+            """,
+            (company_id,),
+        )
+        return cur.fetchall()
+
+
+def mark_notified(conn, user_id, posting_id):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO user_postings (user_id, posting_id, notified_at)
+            VALUES (%s, %s, now())
+            ON CONFLICT (user_id, posting_id) DO UPDATE SET
+                notified_at = COALESCE(user_postings.notified_at, EXCLUDED.notified_at)
+            """,
+            (user_id, posting_id),
+        )
 
 
 def get_source_health(conn, company_id):
