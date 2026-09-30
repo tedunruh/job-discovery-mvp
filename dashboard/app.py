@@ -7,9 +7,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, redirect, render_template, request, session, url_for
 
-from auth import create_magic_link, get_user_by_email, send_magic_link_email, verify_magic_link
+from dashboard.auth import create_magic_link, get_user_by_email, send_magic_link_email, verify_magic_link
+from dashboard.filters import is_remote_us
 from db.db import get_conn, get_open_postings, mark_linkedin_seen, set_applied
-from filters import is_remote_us
 
 app = Flask(__name__)
 # Falls back to a fixed dev value locally; set a real SECRET_KEY once this is
