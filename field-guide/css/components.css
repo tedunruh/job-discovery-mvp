@@ -165,6 +165,7 @@
   font-size: var(--fg-font-size-sm);
   line-height: var(--fg-font-line-height-body);
   color: var(--fg-color-text-primary);
+  text-align: left;
 }
 .fg-message--success   { background: var(--fg-color-signal-progress-subtle);  border-left-color: var(--fg-color-action-primary); }
 .fg-message--attention { background: var(--fg-color-signal-attention-subtle); border-left-color: var(--fg-color-signal-attention); }
