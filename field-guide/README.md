@@ -85,4 +85,7 @@ Scale: 12 / 14 / 15 (body) / 16 / 20 / 24 / 28 / 36, plus 96 for the sign-in wor
    or Sage element also has text or an icon.
 2. **Hierarchy from contrast and opacity, not more colors.** No new grays.
 3. **Most of Scout is calm.** Semantic colors are for moments, not decoration.
-4. Ask: does this feel calm, human, purposeful, like someone looking out for me?
+4. **Free text is always left-aligned.** A container can be centered on the page, but
+   wrapping text inside it (messages, descriptions, body copy) aligns left. Only short
+   single-line headings or wordmarks may center.
+5. Ask: does this feel calm, human, purposeful, like someone looking out for me?
