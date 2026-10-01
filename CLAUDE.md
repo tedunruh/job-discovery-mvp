@@ -25,3 +25,12 @@ Rules:
 
 Design intent lives in Figma file `w7hKbZWJIgb74guqh5uGUF` (Foundations `127:22`,
 Color + Text `126:11`). If code and Figma disagree, ask before changing either.
+
+## Before calling UI work done
+
+Read `QUALITY_LOG.md` and run its **Standing checks** - each exists because it
+caught a real bug that already shipped once; don't relearn the lesson the hard
+way a second time. After finishing a change, log it there: what shipped, how
+many corrections it took to get right, and why (a named root cause, not "bug
+fixed"). If a rework cause is new and mechanically preventable, add a check for
+it so it catches the next one automatically instead of relying on memory.
