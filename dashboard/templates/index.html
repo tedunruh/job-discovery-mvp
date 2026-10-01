@@ -5,7 +5,7 @@
   <title>Scout</title>
   {% include "_field_guide_head.html" %}
   <style>
-    body { padding: var(--fg-space-6) var(--fg-space-12); }
+    body { padding: var(--fg-space-6) var(--fg-space-4); }
     h1 { font-size: var(--fg-font-size-4xl); }
     header {
       display: flex;
@@ -27,10 +27,17 @@
       align-items: center;
       gap: var(--fg-space-5);
     }
+    /* The form exists only to submit the checkbox - display:contents drops
+       its own box so the label centers as a direct flex child of
+       .toolbar-left, instead of being pushed off-center by the phantom
+       line-box space a block container adds below inline-flex content. */
+    .toolbar-left form { display: contents; }
     .toolbar-left .fg-check,
+    .toolbar-left .fg-link,
     .role-count {
       margin: 0;
       font-size: var(--fg-font-size-sm);
+      line-height: var(--fg-font-line-height-snug, normal);
       color: var(--fg-color-text-secondary);
     }
     .toolbar-left .fg-check { font-weight: var(--fg-font-weight-demibold); }
