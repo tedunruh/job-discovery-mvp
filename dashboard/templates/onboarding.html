@@ -3,126 +3,65 @@
 <head>
   <meta charset="utf-8">
   <title>What are you looking for? — Job Discovery</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,100..900,0..100,0..1&display=swap" rel="stylesheet">
+  {% include "_field_guide_head.html" %}
   <style>
-    :root { color-scheme: light; }
     body {
-      margin: 0;
       min-height: 100vh;
       box-sizing: border-box;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 48px;
-      background: #f6f2e9;
-      color: #292824;
-      font-family: "Avenir Next", Avenir, -apple-system, "Segoe UI", Roboto, sans-serif;
+      padding: var(--fg-space-12);
     }
     .card {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 32px;
+      gap: var(--fg-space-8);
       width: 100%;
       max-width: 420px;
     }
     h1 {
-      font-family: "Fraunces", serif;
-      font-variation-settings: "SOFT" 0, "WONK" 1;
-      font-weight: 400;
-      font-size: 36px;
-      letter-spacing: -0.36px;
-      margin: 0;
-      color: #292824;
+      font-size: var(--fg-font-size-4xl);
       text-align: center;
     }
     .subtext {
-      margin: -16px 0 0;
-      font-size: 14px;
-      line-height: 1.5;
-      color: rgba(41, 40, 36, 0.7);
-      text-align: center;
+      margin: calc(-1 * var(--fg-space-4)) 0 0;
+      font-size: var(--fg-font-size-sm);
     }
     form {
       display: flex;
       flex-direction: column;
       align-items: stretch;
-      gap: 24px;
+      gap: var(--fg-space-6);
       width: 100%;
     }
     .categories {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: var(--fg-space-4);
     }
-    .categories label {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 500;
-      font-size: 16px;
-      color: #292824;
-      cursor: pointer;
+    .categories .fg-check {
+      gap: var(--fg-space-3);
+      font-weight: var(--fg-font-weight-medium);
+      font-size: var(--fg-font-size-lg);
     }
-    .categories input[type="checkbox"] {
-      appearance: none;
-      -webkit-appearance: none;
-      width: 20px;
-      height: 20px;
-      flex-shrink: 0;
-      margin: 0;
-      border: 1.5px solid rgba(41, 40, 36, 0.7);
-      border-radius: 4px;
-      cursor: pointer;
-      position: relative;
-    }
-    .categories input[type="checkbox"]:checked {
-      background: #355447;
-      border-color: #355447;
-    }
-    .categories input[type="checkbox"]:checked::after {
-      content: "";
-      position: absolute;
-      left: 6px;
-      top: 2px;
-      width: 5px;
-      height: 10px;
-      border: solid white;
-      border-width: 0 1.5px 1.5px 0;
-      transform: rotate(45deg);
-    }
-    .continue-btn {
-      width: 100%;
-      box-sizing: border-box;
-      font-family: inherit;
-      font-weight: 600;
-      font-size: 14px;
-      color: #292824;
-      background: rgba(41, 40, 36, 0.1);
-      border: 1px solid #94918c;
-      border-radius: 8px;
-      padding: 10px 13px;
-      cursor: pointer;
-    }
-    .continue-btn:hover { background: rgba(41, 40, 36, 0.16); }
   </style>
 </head>
-<body>
+<body class="fg-page">
   <div class="card">
-    <h1>What are you looking for?</h1>
-    <p class="subtext">Select any that interest you — leave them all unchecked to see every role we find. You can change this anytime from "Edit roles" on the dashboard.</p>
+    <h1 class="fg-display">What are you looking for?</h1>
+    <p class="subtext fg-text-secondary">Select any that interest you — leave them all unchecked to see every role we find. You can change this anytime from "Edit roles" on the dashboard.</p>
     <form method="post" action="/onboarding">
       <div class="categories">
         {% for key, cat in categories.items() %}
-        <label>
-          <input type="checkbox" name="categories" value="{{ key }}" {{ "checked" if key in selected else "" }}>
+        <label class="fg-check">
+          <input class="fg-checkbox" type="checkbox" name="categories" value="{{ key }}" {{ "checked" if key in selected else "" }}>
           {{ cat.label }}
         </label>
         {% endfor %}
       </div>
-      <button class="continue-btn" type="submit">Continue to dashboard</button>
+      <button class="fg-button fg-button--primary fg-button--block" type="submit">Continue to dashboard</button>
     </form>
   </div>
 </body>

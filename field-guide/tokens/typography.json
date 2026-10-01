@@ -1,0 +1,41 @@
+{
+  "$description": "Two typefaces with distinct roles (Figma 'Foundations' > Typography). Fraunces is Scout's personality; Avenir Next is Scout's clarity.",
+  "font": {
+    "family": {
+      "$type": "fontFamily",
+      "display": { "$value": ["Fraunces", "Georgia", "serif"], "$description": "Wordmark, editorial headlines, introductions, discovery moments, brand storytelling." },
+      "ui":      { "$value": ["Avenir Next", "Avenir", "-apple-system", "Segoe UI", "Roboto", "sans-serif"], "$description": "Navigation, body, buttons, forms, labels, metadata, product UI." }
+    },
+    "display-variation": { "$type": "string", "$value": "\"SOFT\" 0, \"WONK\" 1", "$description": "Fraunces axis settings used throughout the Figma file." },
+    "weight": {
+      "$type": "fontWeight",
+      "regular":  { "$value": 400 },
+      "medium":   { "$value": 500 },
+      "demibold": { "$value": 600 }
+    },
+    "size": {
+      "$type": "dimension",
+      "$description": "12-28 from the Foundations frame (15 is intentional, not rounded); 24 from Color + Text; 36 and 96 are the existing page-title and sign-in wordmark sizes.",
+      "xs":       { "$value": "12px", "$description": "Metadata, source labels" },
+      "sm":       { "$value": "14px", "$description": "Secondary text, buttons, links" },
+      "md":       { "$value": "15px", "$description": "Body copy" },
+      "lg":       { "$value": "16px", "$description": "Item titles, form input text" },
+      "xl":       { "$value": "20px", "$description": "Section titles" },
+      "2xl":      { "$value": "24px", "$description": "Fraunces discovery headline" },
+      "3xl":      { "$value": "28px", "$description": "Page titles" },
+      "4xl":      { "$value": "36px", "$description": "Fraunces page headline / header wordmark" },
+      "wordmark": { "$value": "96px", "$description": "Sign-in wordmark" }
+    },
+    "line-height": {
+      "$type": "number",
+      "tight": { "$value": 1.2 },
+      "snug":  { "$value": 1.35 },
+      "body":  { "$value": 1.5 }
+    },
+    "letter-spacing": {
+      "$type": "dimension",
+      "tight": { "$value": "-0.01em", "$description": "Figma tracking -1%, used on Fraunces and UI text in Color + Text." },
+      "none":  { "$value": "0" }
+    }
+  }
+}

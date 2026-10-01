@@ -1,0 +1,53 @@
+{
+  "$description": "Field Guide color. Palette values come from Figma 'Color + Text' (node 126:11); roles come from 'Foundations' (node 127:22). Components use the semantic layer only.",
+  "color": {
+    "palette": {
+      "$type": "color",
+      "parchment": { "$value": "#f6f2e9", "$description": "Scout's canvas. The dominant color across the experience." },
+      "ink":       { "$value": "#292824", "$description": "Scout's voice. Text, icons, high-emphasis content." },
+      "forest":    { "$value": "#355447", "$description": "Scout's direction. Primary actions, links, active and selected states, progress." },
+      "goldenrod": { "$value": "#d6a84f", "$description": "Scout's discovery. 'Hey, I found something.' Never the only thing carrying meaning." },
+      "clay":      { "$value": "#c9785b", "$description": "Scout's attention. Warnings, time-sensitive info. Use sparingly." },
+      "sage":      { "$value": "#a8b39c", "$description": "Scout's support. Tags, secondary statuses, subtle backgrounds." },
+      "white":     { "$value": "#ffffff", "$description": "Input field fill only." }
+    },
+    "surface": {
+      "$type": "color",
+      "page":  { "$value": "{color.palette.parchment}" },
+      "field": { "$value": "{color.palette.white}" }
+    },
+    "text": {
+      "$type": "color",
+      "$description": "Hierarchy comes from Ink opacity, not extra neutrals.",
+      "primary":   { "$value": "{color.palette.ink}" },
+      "secondary": { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.7 } },
+      "tertiary":  { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.45 } },
+      "on-action": { "$value": "{color.palette.parchment}" }
+    },
+    "border": {
+      "$type": "color",
+      "subtle":  { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.18 } },
+      "default": { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.4 } },
+      "strong":  { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.6 } }
+    },
+    "action": {
+      "$type": "color",
+      "primary":         { "$value": "{color.palette.forest}" },
+      "secondary-fill":  { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.06 } },
+      "secondary-hover": { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.12 } },
+      "selected":        { "$value": "{color.palette.forest}" },
+      "focus-ring":      { "$value": "{color.palette.forest}", "$extensions": { "fieldguide.alpha": 0.35 } }
+    },
+    "signal": {
+      "$type": "color",
+      "$description": "Goldenrod, Clay and Sage are fills, borders and markers, not text colors. Pair with Ink text or an icon.",
+      "discovery":        { "$value": "{color.palette.goldenrod}" },
+      "discovery-subtle": { "$value": "{color.palette.goldenrod}", "$extensions": { "fieldguide.alpha": 0.18 } },
+      "attention":        { "$value": "{color.palette.clay}" },
+      "attention-subtle": { "$value": "{color.palette.clay}", "$extensions": { "fieldguide.alpha": 0.14 } },
+      "support":          { "$value": "{color.palette.sage}" },
+      "support-subtle":   { "$value": "{color.palette.sage}", "$extensions": { "fieldguide.alpha": 0.25 } },
+      "progress-subtle":  { "$value": "{color.palette.forest}", "$extensions": { "fieldguide.alpha": 0.12 } }
+    }
+  }
+}

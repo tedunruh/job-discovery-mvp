@@ -1,0 +1,20 @@
+{
+  "$description": "4px-based spacing, rounded from the Foundations frame.",
+  "space": {
+    "$type": "dimension",
+    "1":  { "$value": "4px" },
+    "2":  { "$value": "8px" },
+    "3":  { "$value": "12px" },
+    "4":  { "$value": "16px" },
+    "5":  { "$value": "20px" },
+    "6":  { "$value": "24px" },
+    "8":  { "$value": "32px" },
+    "12": { "$value": "48px" },
+    "16": { "$value": "64px" }
+  },
+  "size": {
+    "$type": "dimension",
+    "touch-target": { "$value": "44px", "$description": "Minimum hit area for icon buttons." },
+    "control":      { "$value": "18px", "$description": "Checkbox box." }
+  }
+}
