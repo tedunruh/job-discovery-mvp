@@ -1,0 +1,25 @@
+# Scout (job-discovery-mvp)
+
+Python app: ATS collectors, Neon Postgres, Flask dashboard (`dashboard/`), deployed on Render
+with a pip-only build.
+
+## UI work: use Field Guide
+
+All UI is styled through **Field Guide**, the design system in `field-guide/`. Read
+`field-guide/README.md` before touching any template or CSS.
+
+Rules:
+- Never hard-code a color, font, font size, spacing or radius value in a template or component.
+  Use a `var(--fg-…)` semantic token. Layout widths and breakpoints are fine as raw px.
+- Reuse `.fg-*` components from `field-guide/css/components.css` before writing new CSS.
+  A new reusable pattern goes there, not inline in one template.
+- Every template includes `{% include "_field_guide_head.html" %}` and uses `<body class="fg-page">`.
+- To change a token: edit `field-guide/tokens/*.json`, run `python field-guide/build.py`,
+  commit the JSON and `field-guide/dist/tokens.css` together. Never edit `dist/` by hand.
+- Fonts are Fraunces (display) and Avenir Next (UI) only.
+- Goldenrod, Clay and Sage are never text colors on Parchment, and never the only signal of
+  meaning. Pair them with Ink text or an icon.
+- Primary actions and links are Forest. Secondary hierarchy comes from Ink opacity, not new grays.
+
+Design intent lives in Figma file `w7hKbZWJIgb74guqh5uGUF` (Foundations `127:22`,
+Color + Text `126:11`). If code and Figma disagree, ask before changing either.

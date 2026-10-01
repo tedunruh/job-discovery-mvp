@@ -5,7 +5,7 @@ from functools import wraps
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, redirect, render_template, request, send_from_directory, session, url_for
 
 from dashboard.auth import create_magic_link, get_user_by_email, send_magic_link_email, verify_magic_link
 from dashboard.filters import is_remote_us
@@ -24,6 +24,14 @@ app = Flask(__name__)
 # deployed off localhost (Story 2) so session cookies can't be forged.
 app.secret_key = os.environ.get("SECRET_KEY", "dev-only-not-for-production")
 app.permanent_session_lifetime = timedelta(days=90)
+
+FIELD_GUIDE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "field-guide")
+
+
+@app.route("/field-guide/<any(dist, css):folder>/<path:filename>")
+def field_guide_static(folder, filename):
+    """Serve the Field Guide design system (tokens + component CSS) to templates."""
+    return send_from_directory(os.path.join(FIELD_GUIDE_DIR, folder), filename)
 
 
 def require_login(view):
