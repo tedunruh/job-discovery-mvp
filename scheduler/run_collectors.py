@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from collectors import ashby, greenhouse, lever, workable, workday
 from collectors.filters import is_design_role
 from db.db import (
+    get_all_user_role_categories,
     get_conn,
     get_source_health,
     get_tracked_companies,
@@ -18,6 +19,7 @@ from db.db import (
     touch_source_health,
     upsert_posting,
 )
+from role_categories import matches_categories
 from scheduler.notify import notify_health_alerts, notify_new_postings
 
 COLLECTORS = {
@@ -35,6 +37,7 @@ def run():
     new_postings_by_user = {}  # user_id -> {"ntfy_topic": str, "postings": [...]}
     health_alerts = []
     try:
+        all_user_categories = get_all_user_role_categories(conn)
         companies = get_tracked_companies(conn)
         if not companies:
             print("No companies tracked by any user (user_companies is empty) — nothing to do.")
@@ -81,6 +84,9 @@ def run():
                             # same set of users.
                             users_tracking = get_users_tracking_company(conn, company_id)
                         for user in users_tracking:
+                            user_categories = all_user_categories.get(user["id"], set())
+                            if not matches_categories(posting["title"], user_categories):
+                                continue
                             bucket = new_postings_by_user.setdefault(
                                 user["id"], {"ntfy_topic": user["ntfy_topic"], "postings": []}
                             )

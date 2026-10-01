@@ -51,6 +51,18 @@
       justify-content: space-between;
       padding-bottom: 6px;
     }
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .edit-roles-link {
+      font-weight: 600;
+      font-size: 14px;
+      color: rgba(41, 40, 36, 0.7);
+      text-decoration: none;
+    }
+    .edit-roles-link:hover { text-decoration: underline; }
     .toolbar-left label {
       display: flex;
       align-items: center;
@@ -211,6 +223,7 @@
           Remote US only
         </label>
       </form>
+      <a class="edit-roles-link" href="/onboarding">Edit roles</a>
     </div>
     <p class="role-count">{{ postings|length }} open role{{ "" if postings|length == 1 else "s" }}</p>
   </div>

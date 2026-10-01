@@ -117,6 +117,52 @@ def set_applied(conn, posting_id, applied, user_id):
         )
 
 
+def is_onboarded(conn, user_id):
+    with conn.cursor() as cur:
+        cur.execute("SELECT onboarded_at IS NOT NULL FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+        return bool(row and row[0])
+
+
+def get_user_role_categories(conn, user_id):
+    """Set of role-category keys (role_categories.ROLE_CATEGORIES) this user
+    picked during onboarding. Empty set means no preference - callers treat
+    that as "show everything" (see role_categories.matches_categories)."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT category FROM user_role_interests WHERE user_id = %s", (user_id,))
+        return {row[0] for row in cur.fetchall()}
+
+
+def set_user_role_categories(conn, user_id, categories):
+    """Replace this user's role-category picks wholesale (the onboarding
+    form posts the full current selection each time, not a diff) and mark
+    them onboarded in the same transaction."""
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM user_role_interests WHERE user_id = %s", (user_id,))
+        if categories:
+            psycopg2.extras.execute_values(
+                cur,
+                "INSERT INTO user_role_interests (user_id, category) VALUES %s",
+                [(user_id, category) for category in categories],
+            )
+        cur.execute(
+            "UPDATE users SET onboarded_at = COALESCE(onboarded_at, now()) WHERE id = %s",
+            (user_id,),
+        )
+
+
+def get_all_user_role_categories(conn):
+    """role categories for every user with at least one pick, as {user_id:
+    set(category)} - loaded once per scheduler run rather than per-user
+    per-company, since the whole table is tiny at this scale."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id, category FROM user_role_interests")
+        result = {}
+        for user_id, category in cur.fetchall():
+            result.setdefault(user_id, set()).add(category)
+        return result
+
+
 def get_tracked_companies(conn):
     """Companies at least one user actually tracks - the scraper only fetches
     these, not every row ever added to the shared companies directory."""

@@ -9,7 +9,15 @@ from flask import Flask, redirect, render_template, request, session, url_for
 
 from dashboard.auth import create_magic_link, get_user_by_email, send_magic_link_email, verify_magic_link
 from dashboard.filters import is_remote_us
-from db.db import get_conn, get_open_postings, set_applied
+from db.db import (
+    get_conn,
+    get_open_postings,
+    get_user_role_categories,
+    is_onboarded,
+    set_applied,
+    set_user_role_categories,
+)
+from role_categories import ROLE_CATEGORIES, matches_categories
 
 app = Flask(__name__)
 # Falls back to a fixed dev value locally; set a real SECRET_KEY once this is
@@ -100,15 +108,36 @@ def index():
     user_id = session["user_id"]
     conn = get_conn()
     try:
+        if not is_onboarded(conn, user_id):
+            return redirect(url_for("onboarding"))
         postings = get_open_postings(conn, user_id)
+        role_categories = get_user_role_categories(conn, user_id)
     finally:
         conn.close()
 
     remote_us_only = session.get("remote_us_only", False)
     if remote_us_only:
         postings = [p for p in postings if is_remote_us(p["location"], p["remote_type"])]
+    postings = [p for p in postings if matches_categories(p["title"], role_categories)]
 
     return render_template("index.html", postings=postings, remote_us_only=remote_us_only)
+
+
+@app.route("/onboarding", methods=["GET", "POST"])
+@require_login
+def onboarding():
+    user_id = session["user_id"]
+    conn = get_conn()
+    try:
+        if request.method == "POST":
+            selected = [c for c in request.form.getlist("categories") if c in ROLE_CATEGORIES]
+            set_user_role_categories(conn, user_id, selected)
+            conn.commit()
+            return redirect(url_for("index"))
+        selected = get_user_role_categories(conn, user_id)
+    finally:
+        conn.close()
+    return render_template("onboarding.html", categories=ROLE_CATEGORIES, selected=selected)
 
 
 @app.route("/toggle_remote_us", methods=["POST"])

@@ -83,7 +83,19 @@ CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     ntfy_topic TEXT NOT NULL UNIQUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- NULL until the user completes the one-time role-interest wizard
+    -- (dashboard/app.py redirects here on first post-login dashboard visit).
+    onboarded_at TIMESTAMPTZ
+);
+
+-- Which coarse role categories (see role_categories.py) a user wants to see.
+-- No rows = no preference set = show everything (same convention as an
+-- empty/unset filter elsewhere in the app, e.g. Remote US only unchecked).
+CREATE TABLE IF NOT EXISTS user_role_interests (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category TEXT NOT NULL,
+    PRIMARY KEY (user_id, category)
 );
 
 -- Single-use, expiring magic-link tokens. A row per requested link, not per
