@@ -3,23 +3,205 @@
 <head>
   <meta charset="utf-8">
   <title>Job Discovery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,100..900,0..100,0..1&display=swap" rel="stylesheet">
   <style>
     :root { color-scheme: light; }
-    body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; background: #fff; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #ddd; }
-    th { background: #f5f5f5; color: #1a1a1a; }
-    .btn { font-size: 0.85rem; padding: 0.25rem 0.6rem; cursor: pointer; }
-    .seen { color: #666; font-size: 0.85rem; }
-    .count { color: #666; margin-bottom: 1rem; }
-    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 1rem; }
-    .toolbar-left { display: flex; align-items: center; gap: 0.6rem; }
-    .toolbar label { font-size: 0.9rem; color: #333; display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
-    .logout-btn { font-size: 0.85rem; padding: 0.25rem 0.6rem; cursor: pointer; background: none; border: 1px solid #ccc; border-radius: 4px; color: #555; }
+    body {
+      margin: 0;
+      padding: 24px 48px;
+      background: #f6f2e9;
+      color: #292824;
+      font-family: "Avenir Next", Avenir, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    h1 {
+      font-family: "Fraunces", serif;
+      font-variation-settings: "SOFT" 0, "WONK" 1;
+      font-weight: 400;
+      font-size: 36px;
+      letter-spacing: -0.36px;
+      margin: 0;
+      color: #292824;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 0;
+      border-bottom: 1px solid rgba(41, 40, 36, 0.4);
+      margin-bottom: 36px;
+    }
+    .signout-btn {
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 14px;
+      color: #292824;
+      background: none;
+      border: 1px solid #94918c;
+      border-radius: 8px;
+      padding: 8px 13px;
+      cursor: pointer;
+    }
+    .signout-btn:hover { background: rgba(41, 40, 36, 0.05); }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 6px;
+    }
+    .toolbar-left label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      font-size: 14px;
+      color: rgba(41, 40, 36, 0.7);
+      cursor: pointer;
+    }
+    .toolbar-left input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      border: 1.5px solid rgba(41, 40, 36, 0.7);
+      border-radius: 4px;
+      cursor: pointer;
+      position: relative;
+    }
+    .toolbar-left input[type="checkbox"]:checked {
+      background: #355447;
+      border-color: #355447;
+    }
+    .toolbar-left input[type="checkbox"]:checked::after {
+      content: "";
+      position: absolute;
+      left: 5px;
+      top: 1px;
+      width: 4px;
+      height: 9px;
+      border: solid white;
+      border-width: 0 1.5px 1.5px 0;
+      transform: rotate(45deg);
+    }
+    .role-count {
+      font-weight: 500;
+      font-size: 14px;
+      color: rgba(41, 40, 36, 0.7);
+    }
+
+    ul.postings { list-style: none; margin: 0; padding: 0; }
+
+    /* Grid, not flex-wrap: the three segments need an explicit, deterministic
+       collapse order as the row narrows (view-job label hides first, then
+       meta relocates under lead, actions never moves) rather than whatever
+       flex-wrap's greedy line-filling happens to produce.
+       The meta column is a fixed width rather than auto: each <li> is its
+       own independent grid, so an auto track sizes itself per-row off that
+       row's own text ("Seen on LinkedIn 7 minutes ago" vs "Not seen on
+       LinkedIn") and the column drifts out of alignment between rows. */
+    .posting {
+      display: grid;
+      grid-template-columns: minmax(240px, 1fr) 210px auto;
+      grid-template-areas: "lead meta actions";
+      align-items: center;
+      column-gap: 24px;
+      row-gap: 8px;
+      padding: 16px 0;
+      border-bottom: 1px solid #939393;
+    }
+    .posting-lead { grid-area: lead; min-width: 0; }
+    .posting-title {
+      margin: 0;
+      font-weight: 500;
+      font-size: 16px;
+      color: #292824;
+    }
+    .posting-subline {
+      margin: 0;
+      font-weight: 500;
+      font-size: 14px;
+      color: rgba(41, 40, 36, 0.7);
+    }
+    .posting-source {
+      margin: 0;
+      font-weight: 500;
+      font-size: 12px;
+      color: rgba(41, 40, 36, 0.7);
+    }
+    .posting-meta {
+      grid-area: meta;
+      font-weight: 500;
+      color: rgba(41, 40, 36, 0.7);
+    }
+    .posting-meta p { margin: 0; }
+    .posting-meta .discovered { font-size: 14px; }
+
+    .posting-actions {
+      grid-area: actions;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      justify-self: end;
+    }
+    .view-job {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 44px;
+      font-weight: 500;
+      font-size: 14px;
+      color: rgba(41, 40, 36, 0.7);
+      text-decoration: none;
+    }
+    .view-job:hover { text-decoration: underline; }
+    .view-job svg { display: block; flex-shrink: 0; }
+
+    .applied-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+    }
+    .applied-toggle svg { display: block; }
+
+    /* Stage 1: drop the "View job post" label, keep the two icon buttons. */
+    @media (max-width: 880px) {
+      .view-job-label { display: none; }
+    }
+
+    /* Stage 2: meta relocates under lead; actions stays pinned top-right,
+       spanning both rows, and never wraps. */
+    @media (max-width: 680px) {
+      .posting {
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+          "lead actions"
+          "meta actions";
+      }
+      .posting-actions {
+        grid-row: 1 / 3;
+        align-self: center;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>Job Discovery</h1>
+  <header>
+    <h1>Scout</h1>
+    <form method="post" action="/logout">
+      <button class="signout-btn" type="submit">Sign out</button>
+    </form>
+  </header>
+
   <div class="toolbar">
     <div class="toolbar-left">
       <form method="post" action="/toggle_remote_us">
@@ -30,51 +212,45 @@
         </label>
       </form>
     </div>
-    <form method="post" action="/logout">
-      <button class="logout-btn" type="submit">Sign out</button>
-    </form>
+    <p class="role-count">{{ postings|length }} open role{{ "" if postings|length == 1 else "s" }}</p>
   </div>
-  <p class="count">{{ postings|length }} open design roles{{ " (Remote US only)" if remote_us_only else "" }}</p>
-  <table>
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Company</th>
-        <th>Location</th>
-        <th>Posted</th>
-        <th>Discovered</th>
-        <th>Days Ahead of LinkedIn</th>
-        <th></th>
-        <th>Applied</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for p in postings %}
-      <tr>
-        <td><a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.title }}</a></td>
-        <td>{{ p.company_name }}</td>
-        <td>{{ p.location or "" }}</td>
-        <td>{{ p.ats_posted_at|humanize }}</td>
-        <td>{{ p.first_seen_at|humanize }}</td>
-        <td>{{ p.days_ahead_of_linkedin if p.days_ahead_of_linkedin is not none else "" }}</td>
-        <td>
-          {% if p.linkedin_seen_at %}
-            <span class="seen">seen on LinkedIn</span>
-          {% else %}
-            <form method="post" action="/mark_seen/{{ p.id }}">
-              <button class="btn" type="submit">Mark seen on LinkedIn</button>
-            </form>
-          {% endif %}
-        </td>
-        <td>
-          <form method="post" action="/set_applied/{{ p.id }}">
-            <input type="hidden" name="applied" value="{{ 'false' if p.applied else 'true' }}">
-            <button class="btn" type="submit">{{ "✓ Applied" if p.applied else "Mark applied" }}</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+
+  <ul class="postings">
+    {% for p in postings %}
+    <li class="posting">
+      <div class="posting-lead">
+        <p class="posting-title">{{ p.title }}</p>
+        <p class="posting-subline">{{ p.company_name }}{% if p.location %} • {{ p.location }}{% endif %}</p>
+        <p class="posting-source">Found on {{ p.ats_type|capitalize }}</p>
+      </div>
+      <div class="posting-meta">
+        <p class="discovered">Discovered {{ p.first_seen_at|humanize }}</p>
+      </div>
+      <div class="posting-actions">
+        <a class="view-job" href="{{ p.url }}" target="_blank" rel="noopener" aria-label="View job post">
+          <span class="view-job-label">View job post</span>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10.6071 2.89286H15.1071V7.39286M14.7857 3.21429L8.03571 9.96428M13.1786 9V13.1786C13.1786 14.2437 12.3151 15.1071 11.25 15.1071H4.82143C3.7563 15.1071 2.89286 14.2437 2.89286 13.1786V6.75C2.89286 5.68488 3.7563 4.82143 4.82143 4.82143H9" stroke="#292824" stroke-opacity="0.7" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+        <form method="post" action="/set_applied/{{ p.id }}">
+          <input type="hidden" name="applied" value="{{ 'false' if p.applied else 'true' }}">
+          <button class="applied-toggle" type="submit" title="{{ 'Applied — click to unmark' if p.applied else 'Mark as applied' }}" aria-label="{{ 'Applied — click to unmark' if p.applied else 'Mark as applied' }}" aria-pressed="{{ 'true' if p.applied else 'false' }}">
+            {% if p.applied %}
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10" cy="10" r="9" fill="#355447"/>
+              <path d="M6 10.3L8.6 12.9L14 7.3" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {% else %}
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10" cy="10" r="8.25" stroke="#52575E" stroke-opacity="0.8" stroke-width="1.5"/>
+            </svg>
+            {% endif %}
+          </button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
 </body>
 </html>

@@ -9,7 +9,7 @@ from flask import Flask, redirect, render_template, request, session, url_for
 
 from dashboard.auth import create_magic_link, get_user_by_email, send_magic_link_email, verify_magic_link
 from dashboard.filters import is_remote_us
-from db.db import get_conn, get_open_postings, mark_linkedin_seen, set_applied
+from db.db import get_conn, get_open_postings, set_applied
 
 app = Flask(__name__)
 # Falls back to a fixed dev value locally; set a real SECRET_KEY once this is
@@ -116,18 +116,6 @@ def index():
 def toggle_remote_us():
     session.permanent = True
     session["remote_us_only"] = request.form.get("remote_us_only") == "true"
-    return redirect(url_for("index"))
-
-
-@app.route("/mark_seen/<int:posting_id>", methods=["POST"])
-@require_login
-def mark_seen(posting_id):
-    conn = get_conn()
-    try:
-        mark_linkedin_seen(conn, posting_id, session["user_id"])
-        conn.commit()
-    finally:
-        conn.close()
     return redirect(url_for("index"))
 
 
