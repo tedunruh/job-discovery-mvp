@@ -1,0 +1,172 @@
+/* Field Guide components. Hand-written; references semantic tokens only.
+   Load after dist/tokens.css. Class prefix: .fg-  */
+
+/* ---------- Base ---------- */
+:root { color-scheme: light; }
+
+.fg-page {
+  margin: 0;
+  background: var(--fg-color-surface-page);
+  color: var(--fg-color-text-primary);
+  font-family: var(--fg-font-family-ui);
+  font-size: var(--fg-font-size-md);
+  line-height: var(--fg-font-line-height-body);
+}
+
+/* Fraunces moments: wordmark, editorial headlines, discovery statements. */
+.fg-display {
+  font-family: var(--fg-font-family-display);
+  font-variation-settings: var(--fg-font-display-variation);
+  font-weight: var(--fg-font-weight-regular);
+  letter-spacing: var(--fg-font-letter-spacing-tight);
+  line-height: var(--fg-font-line-height-tight);
+  color: var(--fg-color-text-primary);
+  margin: 0;
+}
+
+.fg-text-secondary { color: var(--fg-color-text-secondary); }
+
+.fg-link {
+  color: var(--fg-color-action-primary);
+  font-weight: var(--fg-font-weight-demibold);
+  text-decoration: none;
+}
+.fg-link:hover { text-decoration: underline; }
+
+:where(.fg-button, .fg-input, .fg-checkbox, .fg-icon-button, .fg-link):focus-visible {
+  outline: 3px solid var(--fg-color-action-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---------- Button ---------- */
+/* Primary = Forest ("if Scout wants you to move, Forest shows you where to go").
+   Secondary = quiet Ink-tinted button for everything else. */
+.fg-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fg-space-2);
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: var(--fg-space-2) var(--fg-space-3);
+  font-family: var(--fg-font-family-ui);
+  font-size: var(--fg-font-size-sm);
+  font-weight: var(--fg-font-weight-demibold);
+  line-height: var(--fg-font-line-height-tight);
+  border-radius: var(--fg-radius-lg);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+}
+.fg-button--primary {
+  background: var(--fg-color-action-primary);
+  color: var(--fg-color-text-on-action);
+}
+.fg-button--primary:hover {
+  background: color-mix(in srgb, var(--fg-color-action-primary) 88%, var(--fg-color-palette-ink));
+}
+.fg-button--secondary {
+  background: var(--fg-color-action-secondary-fill);
+  color: var(--fg-color-text-primary);
+  border-color: var(--fg-color-border-default);
+}
+.fg-button--secondary:hover { background: var(--fg-color-action-secondary-hover); }
+.fg-button--block { width: 100%; }
+.fg-button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Icon-only button with a 44px hit area. */
+.fg-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--fg-size-touch-target);
+  height: var(--fg-size-touch-target);
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--fg-radius-full);
+  color: var(--fg-color-text-secondary);
+  cursor: pointer;
+}
+.fg-icon-button svg { display: block; }
+
+/* ---------- Input ---------- */
+.fg-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-1);
+}
+.fg-label {
+  padding: 0 var(--fg-space-3);
+  font-family: var(--fg-font-family-ui);
+  font-size: var(--fg-font-size-sm);
+  font-weight: var(--fg-font-weight-demibold);
+  color: var(--fg-color-text-primary);
+}
+.fg-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--fg-space-3);
+  font-family: var(--fg-font-family-ui);
+  font-size: var(--fg-font-size-lg); /* 16px keeps iOS from zooming on focus */
+  color: var(--fg-color-text-primary);
+  background: var(--fg-color-surface-field);
+  border: 1px solid var(--fg-color-border-strong);
+  border-radius: var(--fg-radius-sm);
+}
+.fg-input::placeholder { color: var(--fg-color-text-tertiary); }
+.fg-input:focus { border-color: var(--fg-color-action-primary); }
+
+/* ---------- Checkbox ---------- */
+.fg-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fg-space-2);
+  cursor: pointer;
+}
+.fg-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: var(--fg-size-control);
+  height: var(--fg-size-control);
+  margin: 0;
+  border: 1.5px solid var(--fg-color-text-secondary);
+  border-radius: var(--fg-radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+.fg-checkbox:checked {
+  background: var(--fg-color-action-selected);
+  border-color: var(--fg-color-action-selected);
+}
+.fg-checkbox:checked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 4px;
+  height: 9px;
+  border: solid var(--fg-color-text-on-action);
+  border-width: 0 1.5px 1.5px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+/* ---------- Message ---------- */
+/* Color supports meaning, never carries it alone: every message has text,
+   and the signal color sits in the fill and left rule, not the text. */
+.fg-message {
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--fg-space-3);
+  border-radius: var(--fg-radius-sm);
+  border-left: 3px solid transparent;
+  font-size: var(--fg-font-size-sm);
+  line-height: var(--fg-font-line-height-body);
+  color: var(--fg-color-text-primary);
+  text-align: left;
+}
+.fg-message--success   { background: var(--fg-color-signal-progress-subtle);  border-left-color: var(--fg-color-action-primary); }
+.fg-message--attention { background: var(--fg-color-signal-attention-subtle); border-left-color: var(--fg-color-signal-attention); }
+.fg-message--discovery { background: var(--fg-color-signal-discovery-subtle); border-left-color: var(--fg-color-signal-discovery); }
