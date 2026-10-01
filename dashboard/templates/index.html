@@ -3,106 +3,38 @@
 <head>
   <meta charset="utf-8">
   <title>Scout</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,100..900,0..100,0..1&display=swap" rel="stylesheet">
+  {% include "_field_guide_head.html" %}
   <style>
-    :root { color-scheme: light; }
-    body {
-      margin: 0;
-      padding: 24px 48px;
-      background: #f6f2e9;
-      color: #292824;
-      font-family: "Avenir Next", Avenir, -apple-system, "Segoe UI", Roboto, sans-serif;
-    }
-    h1 {
-      font-family: "Fraunces", serif;
-      font-variation-settings: "SOFT" 0, "WONK" 1;
-      font-weight: 400;
-      font-size: 36px;
-      letter-spacing: -0.36px;
-      margin: 0;
-      color: #292824;
-    }
+    body { padding: var(--fg-space-6) var(--fg-space-12); }
+    h1 { font-size: var(--fg-font-size-4xl); }
     header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 0;
-      border-bottom: 1px solid rgba(41, 40, 36, 0.4);
-      margin-bottom: 36px;
+      padding: var(--fg-space-4) 0;
+      border-bottom: 1px solid var(--fg-color-border-default);
+      margin-bottom: var(--fg-space-8);
     }
-    .signout-btn {
-      font-family: inherit;
-      font-weight: 600;
-      font-size: 14px;
-      color: #292824;
-      background: none;
-      border: 1px solid #94918c;
-      border-radius: 8px;
-      padding: 8px 13px;
-      cursor: pointer;
-    }
-    .signout-btn:hover { background: rgba(41, 40, 36, 0.05); }
 
     .toolbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding-bottom: 6px;
+      padding-bottom: var(--fg-space-2);
     }
     .toolbar-left {
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: var(--fg-space-5);
     }
-    .edit-roles-link {
-      font-weight: 600;
-      font-size: 14px;
-      color: rgba(41, 40, 36, 0.7);
-      text-decoration: none;
-    }
-    .edit-roles-link:hover { text-decoration: underline; }
-    .toolbar-left label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 600;
-      font-size: 14px;
-      color: rgba(41, 40, 36, 0.7);
-      cursor: pointer;
-    }
-    .toolbar-left input[type="checkbox"] {
-      appearance: none;
-      -webkit-appearance: none;
-      width: 18px;
-      height: 18px;
-      margin: 0;
-      border: 1.5px solid rgba(41, 40, 36, 0.7);
-      border-radius: 4px;
-      cursor: pointer;
-      position: relative;
-    }
-    .toolbar-left input[type="checkbox"]:checked {
-      background: #355447;
-      border-color: #355447;
-    }
-    .toolbar-left input[type="checkbox"]:checked::after {
-      content: "";
-      position: absolute;
-      left: 5px;
-      top: 1px;
-      width: 4px;
-      height: 9px;
-      border: solid white;
-      border-width: 0 1.5px 1.5px 0;
-      transform: rotate(45deg);
-    }
+    .toolbar-left .fg-check,
     .role-count {
-      font-weight: 500;
-      font-size: 14px;
-      color: rgba(41, 40, 36, 0.7);
+      margin: 0;
+      font-size: var(--fg-font-size-sm);
+      color: var(--fg-color-text-secondary);
     }
+    .toolbar-left .fg-check { font-weight: var(--fg-font-weight-demibold); }
+    .role-count { font-weight: var(--fg-font-weight-medium); }
 
     ul.postings { list-style: none; margin: 0; padding: 0; }
 
@@ -119,71 +51,49 @@
       grid-template-columns: minmax(240px, 1fr) 210px auto;
       grid-template-areas: "lead meta actions";
       align-items: center;
-      column-gap: 24px;
-      row-gap: 8px;
-      padding: 16px 0;
-      border-bottom: 1px solid #939393;
+      column-gap: var(--fg-space-6);
+      row-gap: var(--fg-space-2);
+      padding: var(--fg-space-4) 0;
+      border-bottom: 1px solid var(--fg-color-border-default);
     }
     .posting-lead { grid-area: lead; min-width: 0; }
-    .posting-title {
+    .posting-lead p,
+    .posting-meta p {
       margin: 0;
-      font-weight: 500;
-      font-size: 16px;
-      color: #292824;
+      font-weight: var(--fg-font-weight-medium);
+      line-height: var(--fg-font-line-height-snug);
     }
-    .posting-subline {
-      margin: 0;
-      font-weight: 500;
-      font-size: 14px;
-      color: rgba(41, 40, 36, 0.7);
-    }
-    .posting-source {
-      margin: 0;
-      font-weight: 500;
-      font-size: 12px;
-      color: rgba(41, 40, 36, 0.7);
-    }
+    .posting-title { font-size: var(--fg-font-size-lg); }
+    .posting-subline { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
+    .posting-source { font-size: var(--fg-font-size-xs); color: var(--fg-color-text-secondary); }
     .posting-meta {
       grid-area: meta;
-      font-weight: 500;
-      color: rgba(41, 40, 36, 0.7);
+      font-size: var(--fg-font-size-sm);
+      color: var(--fg-color-text-secondary);
     }
-    .posting-meta p { margin: 0; }
-    .posting-meta .discovered { font-size: 14px; }
 
     .posting-actions {
       grid-area: actions;
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: var(--fg-space-4);
       justify-self: end;
     }
     .view-job {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      height: 44px;
-      font-weight: 500;
-      font-size: 14px;
-      color: rgba(41, 40, 36, 0.7);
+      gap: var(--fg-space-2);
+      height: var(--fg-size-touch-target);
+      font-weight: var(--fg-font-weight-medium);
+      font-size: var(--fg-font-size-sm);
+      color: var(--fg-color-text-secondary);
       text-decoration: none;
     }
     .view-job:hover { text-decoration: underline; }
     .view-job svg { display: block; flex-shrink: 0; }
 
-    .applied-toggle {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 44px;
-      height: 44px;
-      background: none;
-      border: none;
-      padding: 0;
-      cursor: pointer;
-    }
-    .applied-toggle svg { display: block; }
+    .applied-toggle[aria-pressed="true"] { color: var(--fg-color-action-selected); }
 
     /* Stage 1: drop the "View job post" label, keep the two icon buttons. */
     @media (max-width: 880px) {
@@ -206,11 +116,11 @@
     }
   </style>
 </head>
-<body>
+<body class="fg-page">
   <header>
-    <h1>Scout</h1>
+    <h1 class="fg-display">Scout</h1>
     <form method="post" action="/logout">
-      <button class="signout-btn" type="submit">Sign out</button>
+      <button class="fg-button fg-button--secondary" type="submit">Sign out</button>
     </form>
   </header>
 
@@ -218,12 +128,12 @@
     <div class="toolbar-left">
       <form method="post" action="/toggle_remote_us">
         <input type="hidden" name="remote_us_only" value="{{ 'false' if remote_us_only else 'true' }}">
-        <label>
-          <input type="checkbox" onchange="this.form.submit()" {{ "checked" if remote_us_only else "" }}>
+        <label class="fg-check">
+          <input class="fg-checkbox" type="checkbox" onchange="this.form.submit()" {{ "checked" if remote_us_only else "" }}>
           Remote US only
         </label>
       </form>
-      <a class="edit-roles-link" href="/onboarding">Edit roles</a>
+      <a class="fg-link" href="/onboarding">Edit roles</a>
     </div>
     <p class="role-count">{{ postings|length }} open role{{ "" if postings|length == 1 else "s" }}</p>
   </div>
@@ -243,20 +153,20 @@
         <a class="view-job" href="{{ p.url }}" target="_blank" rel="noopener" aria-label="View job post">
           <span class="view-job-label">View job post</span>
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10.6071 2.89286H15.1071V7.39286M14.7857 3.21429L8.03571 9.96428M13.1786 9V13.1786C13.1786 14.2437 12.3151 15.1071 11.25 15.1071H4.82143C3.7563 15.1071 2.89286 14.2437 2.89286 13.1786V6.75C2.89286 5.68488 3.7563 4.82143 4.82143 4.82143H9" stroke="#292824" stroke-opacity="0.7" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10.6071 2.89286H15.1071V7.39286M14.7857 3.21429L8.03571 9.96428M13.1786 9V13.1786C13.1786 14.2437 12.3151 15.1071 11.25 15.1071H4.82143C3.7563 15.1071 2.89286 14.2437 2.89286 13.1786V6.75C2.89286 5.68488 3.7563 4.82143 4.82143 4.82143H9" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </a>
         <form method="post" action="/set_applied/{{ p.id }}">
           <input type="hidden" name="applied" value="{{ 'false' if p.applied else 'true' }}">
-          <button class="applied-toggle" type="submit" title="{{ 'Applied — click to unmark' if p.applied else 'Mark as applied' }}" aria-label="{{ 'Applied — click to unmark' if p.applied else 'Mark as applied' }}" aria-pressed="{{ 'true' if p.applied else 'false' }}">
+          <button class="fg-icon-button applied-toggle" type="submit" title="{{ 'Applied — click to unmark' if p.applied else 'Mark as applied' }}" aria-label="{{ 'Applied — click to unmark' if p.applied else 'Mark as applied' }}" aria-pressed="{{ 'true' if p.applied else 'false' }}">
             {% if p.applied %}
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="10" cy="10" r="9" fill="#355447"/>
-              <path d="M6 10.3L8.6 12.9L14 7.3" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="10" cy="10" r="9" fill="currentColor"/>
+              <path d="M6 10.3L8.6 12.9L14 7.3" stroke="var(--fg-color-text-on-action)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             {% else %}
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="10" cy="10" r="8.25" stroke="#52575E" stroke-opacity="0.8" stroke-width="1.5"/>
+              <circle cx="10" cy="10" r="8.25" stroke="currentColor" stroke-width="1.5"/>
             </svg>
             {% endif %}
           </button>
