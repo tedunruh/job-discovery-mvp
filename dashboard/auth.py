@@ -60,9 +60,9 @@ def send_magic_link_email(email, link_url):
         RESEND_URL,
         headers={"Authorization": f"Bearer {api_key}"},
         json={
-            "from": os.environ.get("RESEND_FROM", "Job Discovery <onboarding@resend.dev>"),
+            "from": os.environ.get("RESEND_FROM", "Scout <onboarding@resend.dev>"),
             "to": [email],
-            "subject": "Your Job Discovery sign-in link",
+            "subject": "Your Scout sign-in link",
             "text": f"Sign in: {link_url}\n\nThis link expires in {MAGIC_LINK_TTL_MINUTES} minutes and works once.",
         },
         timeout=10,
