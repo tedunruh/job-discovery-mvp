@@ -283,25 +283,60 @@
 
   <script>
     (function () {
-      // Desktop gap unchanged (70px, not reported as an issue); mobile halved to
-      // 35px per feedback that the pin sat close enough to the top of a real
-      // phone screen to crowd the status bar.
-      var DESIRED_GAP_PX = { 'route-layer--desktop': 70, 'route-layer--mobile': 35 };
       var wordmark = document.querySelector('.wordmark');
-      if (!wordmark) return;
+      var button = document.querySelector('.signin-btn');
+      if (!wordmark || !button) return;
+
+      var DESKTOP_TOP_GAP = 70; // not reported as an issue; offset-only, same as before
+
+      // Mobile has two constraints, not one: the pin must stay close to the
+      // wordmark (top) AND the start dot must stay clear of mobile browser
+      // chrome at the bottom - closer to the sign-in button than its native
+      // spacing gives. A single offset can't satisfy both independently:
+      // translateY shifts the whole canvas rigidly, so the on-screen distance
+      // between the pin and the start dot is fixed by scale alone, not by
+      // offset. Solve for the scale that makes that distance equal "the space
+      // available for both desired gaps," then offset to hit the top gap.
+      var MOBILE_TOP_GAP = 35;
+      var MOBILE_BOTTOM_GAP = 48;
+      var MOBILE_NATIVE_W = 390, MOBILE_NATIVE_H = 844;
+      var MOBILE_PIN_BOTTOM_NATIVE = 120;  // pin top (44) + height (76)
+      var MOBILE_START_TOP_NATIVE = 758;   // start dot's own top
+
+      function positionDesktop(layer, wordmarkTop) {
+        var pin = layer.querySelector('.rt-pin');
+        if (!pin) return;
+        layer.style.setProperty('--route-offset-y', '0px'); // measure from the unshifted baseline
+        var pinBottom = pin.getBoundingClientRect().bottom;
+        var delta = (wordmarkTop - pinBottom) - DESKTOP_TOP_GAP;
+        layer.style.setProperty('--route-offset-y', delta + 'px');
+      }
+
+      function positionMobile(layer, wordmarkTop, buttonBottom) {
+        var fitScale = Math.min(1, window.innerWidth / MOBILE_NATIVE_W, window.innerHeight / MOBILE_NATIVE_H);
+        var desiredSpan = (buttonBottom - wordmarkTop) + MOBILE_TOP_GAP + MOBILE_BOTTOM_GAP;
+        var nativeSpan = MOBILE_START_TOP_NATIVE - MOBILE_PIN_BOTTOM_NATIVE;
+        var gapScale = desiredSpan / nativeSpan;
+        layer.style.setProperty('--route-scale', Math.min(fitScale, gapScale));
+
+        var pin = layer.querySelector('.rt-pin');
+        if (!pin) return;
+        layer.style.setProperty('--route-offset-y', '0px');
+        var pinBottom = pin.getBoundingClientRect().bottom;
+        var delta = (wordmarkTop - MOBILE_TOP_GAP) - pinBottom;
+        layer.style.setProperty('--route-offset-y', delta + 'px');
+      }
 
       function positionRoute() {
         var wordmarkTop = wordmark.getBoundingClientRect().top;
+        var buttonBottom = button.getBoundingClientRect().bottom;
         document.querySelectorAll('.route-layer').forEach(function (layer) {
           if (getComputedStyle(layer).display === 'none') return; // hidden breakpoint variant
-          var pin = layer.querySelector('.rt-pin');
-          if (!pin) return;
-          var variantClass = layer.classList[1]; // 'route-layer--desktop' or '--mobile'
-          var desiredGap = DESIRED_GAP_PX[variantClass];
-          layer.style.setProperty('--route-offset-y', '0px'); // measure from the unshifted baseline
-          var pinBottom = pin.getBoundingClientRect().bottom;
-          var delta = (wordmarkTop - pinBottom) - desiredGap;
-          layer.style.setProperty('--route-offset-y', delta + 'px');
+          if (layer.classList[1] === 'route-layer--mobile') {
+            positionMobile(layer, wordmarkTop, buttonBottom);
+          } else {
+            positionDesktop(layer, wordmarkTop);
+          }
         });
       }
 
