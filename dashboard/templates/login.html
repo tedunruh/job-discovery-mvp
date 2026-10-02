@@ -108,15 +108,26 @@
       pointer-events: none;
       z-index: 0;
     }
+    /* The canvas's own geometric center sits much higher than the destination pin,
+       so centering the canvas on the viewport put the pin far above the wordmark.
+       --route-offset-y pulls the canvas down to bring the pin to a fixed visual
+       distance above the wordmark instead. It can't be a fixed CSS formula: the
+       wordmark is centered by body's flexbox (depends on viewport height and the
+       card's own content height) while the canvas is centered by this transform
+       (depends on --route-scale) - two independent layout systems with no fixed
+       ratio between them. The script below measures the real gap after layout and
+       sets this property precisely; 83px is just the pre-JS/no-JS fallback. */
     .route-layer--desktop {
       width: 1440px;
       height: 900px;
-      transform: translate(-50%, -50%) scale(min(1, calc(100vw / 1440px), calc(100vh / 900px)));
+      --route-scale: min(1, calc(100vw / 1440px), calc(100vh / 900px));
+      transform: translate(-50%, calc(-50% + var(--route-offset-y, 83px))) scale(var(--route-scale));
     }
     .route-layer--mobile {
       width: 390px;
       height: 844px;
-      transform: translate(-50%, -50%) scale(min(1, calc(100vw / 390px), calc(100vh / 844px)));
+      --route-scale: min(1, calc(100vw / 390px), calc(100vh / 844px));
+      transform: translate(-50%, calc(-50% + var(--route-offset-y, 83px))) scale(var(--route-scale));
       display: none;
     }
 
@@ -129,12 +140,13 @@
     .rt-dash {
       animation-duration: 4.5s;
       animation-timing-function: linear;
-      animation-iteration-count: infinite;
+      animation-iteration-count: 1;
+      animation-fill-mode: forwards;
     }
     .route-layer--desktop .rt-dash { width: 34px; height: 8px; border-radius: 4px; background: rgba(41, 40, 36, 0.4); }
     .route-layer--mobile .rt-dash { width: 24px; height: 5px; border-radius: 3px; background: rgba(41, 40, 36, 0.4); }
 
-    .rt-dot { position: absolute; animation: 4.5s linear infinite; }
+    .rt-dot { position: absolute; animation: 4.5s linear 1 forwards; }
     .route-layer--desktop .rt-dot { width: 24px; height: 24px; }
     .route-layer--mobile .rt-dot { width: 22px; height: 22px; }
 
@@ -160,7 +172,7 @@
 
     /* Destination pin: always visible, bounces once the trail finishes drawing. */
     .rt-pin-d {
-      animation: rt-pin-d-translate 4.5s linear infinite, rt-pin-d-scale 4.5s linear infinite;
+      animation: rt-pin-d-translate 4.5s linear 1 forwards, rt-pin-d-scale 4.5s linear 1 forwards;
     }
     @keyframes rt-pin-d-translate {
       0% { translate: 0px 0px; }
@@ -182,7 +194,7 @@
       100% { scale: 1 1; }
     }
     .rt-pin-m {
-      animation: rt-pin-m-translate 4.5s linear infinite, rt-pin-m-scale 4.5s linear infinite;
+      animation: rt-pin-m-translate 4.5s linear 1 forwards, rt-pin-m-scale 4.5s linear 1 forwards;
     }
     @keyframes rt-pin-m-translate {
       0% { translate: 0px 0px; }
@@ -268,5 +280,29 @@
       </form>
     </div>
   </div>
+
+  <script>
+    (function () {
+      var DESIRED_GAP_PX = 70; // visual space between the pin's bottom and the wordmark's top
+      var wordmark = document.querySelector('.wordmark');
+      if (!wordmark) return;
+
+      function positionRoute() {
+        var wordmarkTop = wordmark.getBoundingClientRect().top;
+        document.querySelectorAll('.route-layer').forEach(function (layer) {
+          if (getComputedStyle(layer).display === 'none') return; // hidden breakpoint variant
+          var pin = layer.querySelector('.rt-pin');
+          if (!pin) return;
+          layer.style.setProperty('--route-offset-y', '0px'); // measure from the unshifted baseline
+          var pinBottom = pin.getBoundingClientRect().bottom;
+          var delta = (wordmarkTop - pinBottom) - DESIRED_GAP_PX;
+          layer.style.setProperty('--route-offset-y', delta + 'px');
+        });
+      }
+
+      positionRoute();
+      window.addEventListener('resize', positionRoute);
+    })();
+  </script>
 </body>
 </html>
