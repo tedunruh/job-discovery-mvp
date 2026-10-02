@@ -86,3 +86,28 @@ one. When several visual complaints arrive together about the same component,
 check whether a single structural cause (here: clip vs. scale) explains all of them
 before investigating each symptom individually.
 **Standing checks added:** the fourth one above.
+
+### 2026-10-01 — Route animation: destination pin too far from wordmark
+**Shipped:** moved the pin closer to the wordmark; changed the animation from an
+infinite 4.5s loop to running once per page load (replaying only on reload).
+**Rework count:** 1
+**Root cause:** *Assumed a fixed ratio between two independently-positioned
+systems.* First attempt multiplied a canvas-space pixel offset by the same
+`--route-scale` factor used to shrink the canvas, assuming the pin-to-wordmark gap
+would then stay proportional at any viewport size. It doesn't: the wordmark is
+positioned by `body`'s flexbox centering (a function of viewport height and the
+card's own content height), while the canvas is positioned by a CSS transform (a
+function of `--route-scale`) - two unrelated layout systems with no fixed ratio
+between them. Verified correct at the viewport it was tuned on (1440x900, exactly
+on target) and silently wrong elsewhere - a smaller test viewport (800x600) showed
+the pin actually overlapping the wordmark (gap of -29px). Fixed by measuring the
+real gap with `getBoundingClientRect()` after layout and setting the offset
+precisely, recalculated on resize, instead of deriving it from a formula.
+**Standing checks added:**
+- [ ] **No fixed-ratio assumptions across independent layout systems.** If two
+      elements are positioned by different mechanisms (flexbox/grid centering vs. a
+      transform, a sibling's layout vs. an absolutely-positioned overlay, etc.),
+      don't assume their relationship scales by a shared factor just because one
+      side of it does. Verify a derived spacing/alignment value at more than one
+      viewport size - tuning against a single size and assuming the formula
+      generalizes is how this shipped wrong the first time.
