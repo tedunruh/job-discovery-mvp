@@ -1,3 +1,57 @@
+  {% set desktop_dashes = [
+    {'left': 164.9, 'top': 751.54, 'w': 34.157, 'h': 8.695, 'rot': -1.17, 'reveal': 5.678},
+    {'left': 227.78, 'top': 729.19, 'w': 34.639, 'h': 19.462, 'rot': -20.62, 'reveal': 8.36},
+    {'left': 278.24, 'top': 674.11, 'w': 24.816, 'h': 33.066, 'rot': -57.97, 'reveal': 11.041},
+    {'left': 270.13, 'top': 607.05, 'w': 20.336, 'h': 34.486, 'rot': -112.37, 'reveal': 13.722},
+    {'left': 212.09, 'top': 568.06, 'w': 32.781, 'h': 25.411, 'rot': -146.56, 'reveal': 16.404},
+    {'left': 202.45, 'top': 508.56, 'w': 8.776, 'h': 34.174, 'rot': -91.31, 'reveal': 19.085},
+    {'left': 234.53, 'top': 464.89, 'w': 30.252, 'h': 29.117, 'rot': -43.23, 'reveal': 21.767},
+    {'left': 286.25, 'top': 426.15, 'w': 31.985, 'h': 26.823, 'rot': -36.93, 'reveal': 24.448},
+    {'left': 336.05, 'top': 384.45, 'w': 30.741, 'h': 28.551, 'rot': -41.59, 'reveal': 27.129},
+    {'left': 378.61, 'top': 327.66, 'w': 24.176, 'h': 33.345, 'rot': -59.44, 'reveal': 29.811},
+    {'left': 405.97, 'top': 265.87, 'w': 19.498, 'h': 34.633, 'rot': -69.31, 'reveal': 32.492},
+    {'left': 427.89, 'top': 207.4, 'w': 20.266, 'h': 34.5, 'rot': -67.77, 'reveal': 35.174},
+    {'left': 460.42, 'top': 153.91, 'w': 27.459, 'h': 31.566, 'rot': -51.41, 'reveal': 37.855},
+    {'left': 510.58, 'top': 123.23, 'w': 33.785, 'h': 22.998, 'rot': -27.94, 'reveal': 40.536},
+    {'left': 572.37, 'top': 110.68, 'w': 34.919, 'h': 14.852, 'rot': -11.92, 'reveal': 43.218},
+    {'left': 635.76, 'top': 110.16, 'w': 34.03, 'h': 8.127, 'rot': 0.21, 'reveal': 45.899},
+    {'left': 696.39, 'top': 120.56, 'w': 34.777, 'h': 18.417, 'rot': 18.58, 'reveal': 48.58},
+    {'left': 752.34, 'top': 148.5, 'w': 33.202, 'h': 24.511, 'rot': 31.33, 'reveal': 51.262},
+    {'left': 806.74, 'top': 182.33, 'w': 33.484, 'h': 23.828, 'rot': 29.78, 'reveal': 53.943},
+    {'left': 869.88, 'top': 205.69, 'w': 34.856, 'h': 13.523, 'rot': 9.54, 'reveal': 56.625},
+    {'left': 938.0, 'top': 191.66, 'w': 34.89, 'h': 17.033, 'rot': -15.95, 'reveal': 59.306},
+    {'left': 995.22, 'top': 203.71, 'w': 33.219, 'h': 24.474, 'rot': 31.24, 'reveal': 61.987},
+    {'left': 1029.16, 'top': 254.98, 'w': 20.869, 'h': 34.376, 'rot': 66.55, 'reveal': 64.669},
+    {'left': 1055.05, 'top': 316.12, 'w': 22.141, 'h': 34.053, 'rot': 63.9, 'reveal': 67.35},
+    {'left': 1094.84, 'top': 366.35, 'w': 31.602, 'h': 27.407, 'rot': 38.45, 'reveal': 70.032},
+    {'left': 1158.82, 'top': 388.63, 'w': 34.654, 'h': 11.538, 'rot': 6.05, 'reveal': 72.713},
+    {'left': 1222.03, 'top': 357.23, 'w': 32.667, 'h': 25.632, 'rot': -33.97, 'reveal': 75.394},
+    {'left': 1255.32, 'top': 289.68, 'w': 15.203, 'h': 34.926, 'rot': -77.44, 'reveal': 78.076},
+    {'left': 1251.36, 'top': 223.54, 'w': 12.937, 'h': 34.809, 'rot': -98.5, 'reveal': 80.757},
+    {'left': 1224.48, 'top': 160.55, 'w': 20.92, 'h': 34.364, 'rot': -113.55, 'reveal': 83.438},
+  ] %}
+  {% set mobile_dashes = [
+    {'left': 32.26, 'top': 722.14, 'w': 7.786, 'h': 24.421, 'rot': -83.25, 'reveal': 4},
+    {'left': 18.25, 'top': 674.94, 'w': 11.555, 'h': 24.437, 'rot': -106.35, 'reveal': 7.942},
+    {'left': 12.09, 'top': 628.82, 'w': 7.207, 'h': 24.361, 'rot': -95.33, 'reveal': 11.883},
+    {'left': 22.0, 'top': 585.89, 'w': 14.946, 'h': 23.784, 'rot': -64.2, 'reveal': 15.825},
+    {'left': 25.65, 'top': 537.2, 'w': 7.179, 'h': 24.357, 'rot': -95.26, 'reveal': 19.766},
+    {'left': 13.54, 'top': 490.11, 'w': 10.243, 'h': 24.51, 'rot': -102.93, 'reveal': 23.708},
+    {'left': 10.87, 'top': 444.99, 'w': 5.823, 'h': 24.158, 'rot': -91.97, 'reveal': 27.649},
+    {'left': 20.96, 'top': 399.27, 'w': 12.186, 'h': 24.369, 'rot': -71.96, 'reveal': 31.591},
+    {'left': 22.48, 'top': 351.62, 'w': 7.328, 'h': 24.374, 'rot': -95.62, 'reveal': 35.532},
+    {'left': 12.02, 'top': 305.75, 'w': 9.708, 'h': 24.515, 'rot': -101.56, 'reveal': 39.474},
+    {'left': 9.03, 'top': 259.16, 'w': 6.008, 'h': 24.19, 'rot': -92.42, 'reveal': 43.415},
+    {'left': 16.27, 'top': 214.86, 'w': 12.664, 'h': 24.302, 'rot': -70.66, 'reveal': 47.357},
+    {'left': 28.11, 'top': 167.47, 'w': 12.166, 'h': 24.371, 'rot': -72.01, 'reveal': 51.298},
+    {'left': 46.61, 'top': 127.42, 'w': 16.51, 'h': 23.208, 'rot': -59.43, 'reveal': 55.24},
+    {'left': 77.37, 'top': 99.61, 'w': 22.562, 'h': 17.801, 'rot': -34.79, 'reveal': 59.181},
+    {'left': 121.63, 'top': 100.24, 'w': 24.148, 'h': 5.766, 'rot': 1.84, 'reveal': 63.123},
+    {'left': 168.17, 'top': 99.52, 'w': 24.466, 'h': 8.347, 'rot': -8.14, 'reveal': 67.064},
+    {'left': 214.24, 'top': 84.08, 'w': 24.466, 'h': 11.192, 'rot': -15.39, 'reveal': 71.006},
+    {'left': 258.27, 'top': 89.95, 'w': 24.319, 'h': 12.55, 'rot': 19.02, 'reveal': 74.947},
+    {'left': 296.39, 'top': 115.14, 'w': 21.36, 'h': 19.56, 'rot': 41.16, 'reveal': 78.889},
+  ] %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -12,12 +66,16 @@
       align-items: center;
       justify-content: center;
       padding: var(--fg-space-6) var(--fg-space-12);
+      position: relative;
+      overflow: hidden;
     }
     .card {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: var(--fg-space-16);
+      position: relative;
+      z-index: 1;
     }
     .wordmark {
       font-size: var(--fg-font-size-wordmark);
@@ -33,9 +91,154 @@
     .auth .fg-field,
     .auth .fg-button,
     .auth .fg-message { width: 280px; }
+
+    /* ---------- Animated route decoration (Figma motion, nodes 121:2052 / 140:137) ----------
+       Purely decorative background: a dashed trail reveals itself dash-by-dash over a shared
+       4.5s loop, finishing with a small squash-and-stretch bounce on the destination pin.
+       Desktop canvas is a fixed 1440x900 "artwork" centered over the page and clipped by
+       body's overflow:hidden at narrower widths; mobile swaps to Figma's own compact
+       390x844 variant rather than trying to rescale 50 individually-rotated dashes fluidly. */
+    .route-layer {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .route-layer--desktop { width: 1440px; height: 900px; transform: translate(-50%, -50%); }
+    .route-layer--mobile { width: 390px; height: 844px; transform: translate(-50%, -50%); display: none; }
+
+    .rt-hit {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .rt-dash {
+      animation-duration: 4.5s;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+    .route-layer--desktop .rt-dash { width: 34px; height: 8px; border-radius: 4px; background: rgba(41, 40, 36, 0.4); }
+    .route-layer--mobile .rt-dash { width: 24px; height: 5px; border-radius: 3px; background: rgba(41, 40, 36, 0.4); }
+
+    .rt-dot { position: absolute; animation: 4.5s linear infinite; }
+    .route-layer--desktop .rt-dot { width: 24px; height: 24px; }
+    .route-layer--mobile .rt-dot { width: 22px; height: 22px; }
+
+    .rt-pin { position: absolute; width: 56px; height: 76px; }
+
+    {% macro dash_keyframes(prefix, dashes) %}
+    {% for d in dashes %}
+    @keyframes {{ prefix }}-{{ loop.index }} {
+      0% { animation-timing-function: step-end; opacity: 0.12; }
+      {{ d.reveal }}% { opacity: 1; }
+      100% { opacity: 1; }
+    }
+    {% endfor %}
+    {% endmacro %}
+
+    {{ dash_keyframes('rt-d', desktop_dashes) }}
+    {{ dash_keyframes('rt-m', mobile_dashes) }}
+
+    @keyframes rt-dot-start-d { 0% { animation-timing-function: step-end; opacity: 0.12; } 2.524% { opacity: 1; } 100% { opacity: 1; } }
+    @keyframes rt-dot-end-d { 0% { animation-timing-function: step-end; opacity: 0.12; } 1.262% { opacity: 1; } 100% { opacity: 1; } }
+    @keyframes rt-dot-start-m { 0% { animation-timing-function: step-end; opacity: 0.12; } 1.778% { opacity: 1; } 100% { opacity: 1; } }
+    @keyframes rt-dot-end-m { 0% { animation-timing-function: step-end; opacity: 0.12; } 79.778% { opacity: 1; } 100% { opacity: 1; } }
+
+    /* Destination pin: always visible, bounces once the trail finishes drawing. */
+    .rt-pin-d {
+      animation: rt-pin-d-translate 4.5s linear infinite, rt-pin-d-scale 4.5s linear infinite;
+    }
+    @keyframes rt-pin-d-translate {
+      0% { translate: 0px 0px; }
+      83.438% { animation-timing-function: ease-out; translate: 0px 0px; }
+      85.647% { animation-timing-function: ease-out; translate: 0px 4px; }
+      89.117% { animation-timing-function: ease-in; translate: 0px -24px; }
+      93.218% { animation-timing-function: ease-out; translate: 0px 0px; }
+      94.795% { animation-timing-function: ease-out; translate: 0px -4px; }
+      97.003% { translate: 0px 0px; }
+      100% { translate: 0px 0px; }
+    }
+    @keyframes rt-pin-d-scale {
+      0% { scale: 1 1; }
+      83.438% { animation-timing-function: ease-out; scale: 1 1; }
+      85.647% { animation-timing-function: ease-out; scale: 1.16 0.82; }
+      88.801% { animation-timing-function: ease-in-out; scale: 0.92 1.13; }
+      92.587% { animation-timing-function: ease-out; scale: 1.04 0.96; }
+      95.741% { scale: 1 1; }
+      100% { scale: 1 1; }
+    }
+    .rt-pin-m {
+      animation: rt-pin-m-translate 4.5s linear infinite, rt-pin-m-scale 4.5s linear infinite;
+    }
+    @keyframes rt-pin-m-translate {
+      0% { translate: 0px 0px; }
+      78.889% { animation-timing-function: ease-out; translate: 0px 0px; }
+      81.778% { animation-timing-function: ease-out; translate: 0px 3px; }
+      86.667% { animation-timing-function: ease-in; translate: 0px -18px; }
+      92.889% { animation-timing-function: ease-out; translate: 0px 0px; }
+      95.111% { animation-timing-function: ease-out; translate: 0px -3px; }
+      98.222% { translate: 0px 0px; }
+      100% { translate: 0px 0px; }
+    }
+    @keyframes rt-pin-m-scale {
+      0% { scale: 1 1; }
+      78.889% { animation-timing-function: ease-out; scale: 1 1; }
+      81.778% { animation-timing-function: ease-out; scale: 1.16 0.82; }
+      86.222% { animation-timing-function: ease-in-out; scale: 0.92 1.13; }
+      92.667% { animation-timing-function: ease-out; scale: 1.04 0.96; }
+      97.333% { scale: 1 1; }
+      100% { scale: 1 1; }
+    }
+
+    @media (max-width: 680px) {
+      .route-layer--desktop { display: none; }
+      .route-layer--mobile { display: block; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .rt-dash, .rt-dot { animation: none !important; opacity: 1 !important; }
+      .rt-pin-d, .rt-pin-m { animation: none !important; }
+    }
   </style>
 </head>
 <body class="fg-page">
+
+  <div class="route-layer route-layer--desktop" aria-hidden="true">
+    <svg class="rt-dot" style="left: 141px; top: 746px; animation-name: rt-dot-start-d;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#292824"/></svg>
+    {% for d in desktop_dashes %}
+    <div class="rt-hit" style="left: {{ d.left }}px; top: {{ d.top }}px; width: {{ d.w }}px; height: {{ d.h }}px;">
+      <div style="transform: rotate({{ d.rot }}deg);">
+        <div class="rt-dash" style="animation-name: rt-d-{{ loop.index }};"></div>
+      </div>
+    </div>
+    {% endfor %}
+    <svg class="rt-dot" style="left: 1212.46px; top: 141.31px; animation-name: rt-dot-end-d;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#292824"/></svg>
+    <svg class="rt-pin rt-pin-d" style="left: 1194.27px; top: 64.56px;" viewBox="0 0 56 76">
+      <circle cx="28" cy="36" r="28" fill="#C9785B" fill-opacity="0.13"/>
+      <path d="M28 0C14.75 0 4 10.75 4 24C4 42 28 68 28 68C28 68 52 42 52 24C52 10.75 41.25 0 28 0Z" fill="#C9785B"/>
+      <circle cx="28" cy="24" r="12" fill="#F6F2E9"/>
+    </svg>
+  </div>
+
+  <div class="route-layer route-layer--mobile" aria-hidden="true">
+    <svg class="rt-dot" style="left: 26px; top: 758px; animation-name: rt-dot-start-m;" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#292824"/></svg>
+    {% for d in mobile_dashes %}
+    <div class="rt-hit" style="left: {{ d.left }}px; top: {{ d.top }}px; width: {{ d.w }}px; height: {{ d.h }}px;">
+      <div style="transform: rotate({{ d.rot }}deg);">
+        <div class="rt-dash" style="animation-name: rt-m-{{ loop.index }};"></div>
+      </div>
+    </div>
+    {% endfor %}
+    <svg class="rt-dot" style="left: 329px; top: 121px; animation-name: rt-dot-end-m;" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#292824"/></svg>
+    <svg class="rt-pin rt-pin-m" style="left: 312px; top: 44px;" viewBox="0 0 56 76">
+      <circle cx="28" cy="36" r="28" fill="#C9785B" fill-opacity="0.13"/>
+      <path d="M28 0C14.75 0 4 10.75 4 24C4 42 28 68 28 68C28 68 52 42 52 24C52 10.75 41.25 0 28 0Z" fill="#C9785B"/>
+      <circle cx="28" cy="24" r="12" fill="#F6F2E9"/>
+    </svg>
+  </div>
+
   <div class="card">
     <h1 class="fg-display wordmark">Scout</h1>
     <div class="auth">
@@ -49,7 +252,7 @@
           <label class="fg-label" for="email">email</label>
           <input class="fg-input" type="email" id="email" name="email" placeholder="you@example.com" required autofocus>
         </div>
-        <button class="fg-button fg-button--primary" type="submit">Send sign-in link</button>
+        <button class="signin-btn fg-button fg-button--primary" type="submit">Send sign-in link</button>
       </form>
     </div>
   </div>
