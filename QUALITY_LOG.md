@@ -36,6 +36,18 @@ bug that already shipped once - see the dated log entry it links to.
       you meant to fix - on every element the selector matches, before vs. after.
       A fix for one property can silently override another (color swept up while
       fixing font-size). *(2026-10-01 #3)*
+- [ ] **Fixed-size decorative assets scale, never clip.** Any Figma artwork with a
+      native pixel canvas (illustrations, decorative backgrounds) that's centered
+      over a responsive page must scale down via `transform: scale(min(1, 100vw /
+      <native-width>px, 100vh / <native-height>px))` to fit the viewport - never
+      `overflow:hidden` clipping. Clipping doesn't just crop edges; elements near
+      the canvas edge (often the most important ones - start/end markers, a CTA)
+      disappear below ordinary viewport widths, and an arbitrary crop into the
+      middle of the artwork can make unrelated elements look misaligned or
+      overlapping even though their real relative positions are untouched. Verify
+      with `getBoundingClientRect()` that every element in the canvas is within
+      `[0, innerWidth] x [0, innerHeight]` at a width well below the native
+      canvas size, not just a screenshot at native size. *(2026-10-01 #4)*
 
 ## Log
 
@@ -56,3 +68,21 @@ vertical alignment, link color on "Edit roles."
    `color` - overriding `.fg-link`'s distinct link color as a side effect of a fix
    aimed at something else entirely.
 **Standing checks added:** all three above.
+
+### 2026-10-01 — Sign-in page route animation (Figma motion, nodes 121:2052 / 140:137)
+**Shipped:** a dashed-trail reveal animation plus destination-pin bounce, implemented
+from Figma's motion data across a desktop (1440x900) and mobile (390x844) canvas.
+**Rework count:** 1
+**Root cause:** *Fixed-size decorative canvas clipped instead of scaled.* The two
+canvases were centered over the page and clipped by `overflow:hidden` whenever the
+viewport was narrower than their native size - which is most real browser windows,
+not an edge case. This single flaw produced four distinct-looking symptoms reported
+together: the start/end markers (positioned near the canvas edges by design)
+disappearing first as the window shrank, and an arbitrary crop into the middle of
+the curve making unrelated dashes appear to overlap or misalign, even though their
+true relative positions (re-verified against a fresh Figma fetch) were untouched.
+Worth noting for next time: the user's report read as four separate bugs; it was
+one. When several visual complaints arrive together about the same component,
+check whether a single structural cause (here: clip vs. scale) explains all of them
+before investigating each symptom individually.
+**Standing checks added:** the fourth one above.
