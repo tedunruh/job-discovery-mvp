@@ -95,9 +95,12 @@
     /* ---------- Animated route decoration (Figma motion, nodes 121:2052 / 140:137) ----------
        Purely decorative background: a dashed trail reveals itself dash-by-dash over a shared
        4.5s loop, finishing with a small squash-and-stretch bounce on the destination pin.
-       Desktop canvas is a fixed 1440x900 "artwork" centered over the page and clipped by
-       body's overflow:hidden at narrower widths; mobile swaps to Figma's own compact
-       390x844 variant rather than trying to rescale 50 individually-rotated dashes fluidly. */
+       Each canvas is a fixed-size "artwork" (1440x900 desktop, 390x844 mobile) - rather than
+       clip it at the edges when the viewport is narrower (which hid the start/end markers,
+       since they sit near the canvas edges by design, and made an arbitrary crop of the curve
+       look like unrelated dashes were overlapping), it's scaled down to fit via `scale()`.
+       The whole canvas shrinks as one unit, so every element's position relative to every
+       other stays exactly as designed at any viewport size - nothing is ever clipped. */
     .route-layer {
       position: absolute;
       left: 50%;
@@ -105,8 +108,17 @@
       pointer-events: none;
       z-index: 0;
     }
-    .route-layer--desktop { width: 1440px; height: 900px; transform: translate(-50%, -50%); }
-    .route-layer--mobile { width: 390px; height: 844px; transform: translate(-50%, -50%); display: none; }
+    .route-layer--desktop {
+      width: 1440px;
+      height: 900px;
+      transform: translate(-50%, -50%) scale(min(1, calc(100vw / 1440px), calc(100vh / 900px)));
+    }
+    .route-layer--mobile {
+      width: 390px;
+      height: 844px;
+      transform: translate(-50%, -50%) scale(min(1, calc(100vw / 390px), calc(100vh / 844px)));
+      display: none;
+    }
 
     .rt-hit {
       position: absolute;
