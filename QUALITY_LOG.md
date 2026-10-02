@@ -111,3 +111,34 @@ precisely, recalculated on resize, instead of deriving it from a formula.
       side of it does. Verify a derived spacing/alignment value at more than one
       viewport size - tuning against a single size and assuming the formula
       generalizes is how this shipped wrong the first time.
+
+### 2026-10-01 — Route animation: fixing one end pushed the other off-screen
+**Shipped:** mobile route canvas now solves for scale AND offset together so both
+the pin (top) and the start dot (bottom) land at independent target gaps.
+**Rework count:** 1 (but caused entirely by the previous entry's own fix, not
+independently reported broken until the user hit it on a real device)
+**Root cause:** *A rigid transform has one vertical degree of freedom; two
+constraints need two.* The previous fix pulled the canvas down (via
+`--route-offset-y`) to bring the pin closer to the wordmark - correct for the top,
+but `translateY` shifts the *entire* canvas as one rigid unit, so the same move
+pushed the start dot, already near the bottom edge by design, further down too.
+On mobile this pushed it 38px past the viewport bottom entirely (and well past
+real mobile Safari/Chrome's bottom toolbar before that). Not caught at the time
+because verification checked the pin-to-wordmark gap (the thing being fixed) but
+not the start dot's position (a different element, unrelated to that specific
+change) - the regression was real but invisible to a check scoped only to what
+was being changed. Fixed by recognizing the real constraint: the on-screen
+distance between the pin and the start dot is fixed by *scale* alone (translate
+can't change it, since it moves both ends equally), so hitting two independent
+gap targets needs solving for scale first - from the required pin-to-start
+distance - then offset, rather than offset alone.
+**Standing checks added:**
+- [ ] **A fix verified only at the element(s) being changed can still break a
+      sibling.** When a fix moves, resizes, or restyles a shared container (here:
+      translating the whole canvas to fix the pin), re-check every other element
+      inside that container too, not just the one the fix targeted - they share
+      the same transform/layout context and a move that's correct for one can be
+      wrong for another. One rigid transform has exactly as many free parameters
+      as it has (translate = 1 per axis, scale = 1 more) - if a problem has more
+      independent positional constraints than that, translate/offset alone cannot
+      solve it and the extra parameter (usually scale) has to be solved for too.
