@@ -283,7 +283,10 @@
 
   <script>
     (function () {
-      var DESIRED_GAP_PX = 70; // visual space between the pin's bottom and the wordmark's top
+      // Desktop gap unchanged (70px, not reported as an issue); mobile halved to
+      // 35px per feedback that the pin sat close enough to the top of a real
+      // phone screen to crowd the status bar.
+      var DESIRED_GAP_PX = { 'route-layer--desktop': 70, 'route-layer--mobile': 35 };
       var wordmark = document.querySelector('.wordmark');
       if (!wordmark) return;
 
@@ -293,9 +296,11 @@
           if (getComputedStyle(layer).display === 'none') return; // hidden breakpoint variant
           var pin = layer.querySelector('.rt-pin');
           if (!pin) return;
+          var variantClass = layer.classList[1]; // 'route-layer--desktop' or '--mobile'
+          var desiredGap = DESIRED_GAP_PX[variantClass];
           layer.style.setProperty('--route-offset-y', '0px'); // measure from the unshifted baseline
           var pinBottom = pin.getBoundingClientRect().bottom;
-          var delta = (wordmarkTop - pinBottom) - DESIRED_GAP_PX;
+          var delta = (wordmarkTop - pinBottom) - desiredGap;
           layer.style.setProperty('--route-offset-y', delta + 'px');
         });
       }
