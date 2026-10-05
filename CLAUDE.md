@@ -28,7 +28,14 @@ Color + Text `126:11`). If code and Figma disagree, ask before changing either.
 
 ## Before calling UI work done
 
-Read `QUALITY_LOG.md` and run its **Standing checks** - each exists because it
+First run `python scripts/quality_check.py` - it automates the mechanical
+standing checks (viewport meta, no overflow, login artwork in bounds, toolbar
+alignment, computed-style drift vs. `scripts/quality_baseline.json`) and must
+pass. If it flags style drift you intended, accept it with `--update-baseline`.
+Add a check there when a new mechanically-checkable cause shows up. Dev setup:
+`pip install -r requirements-dev.txt`.
+
+Then read `QUALITY_LOG.md` and run its **Standing checks** - each exists because it
 caught a real bug that already shipped once; don't relearn the lesson the hard
 way a second time. After finishing a change, log it there: what shipped, how
 many corrections it took to get right, and why (a named root cause, not "bug
