@@ -23,6 +23,7 @@ from db.db import (
     upsert_posting,
 )
 from role_categories import matches_categories
+from scheduler.heartbeat import ping_failure, ping_success
 from scheduler.notify import notify_health_alerts, notify_new_postings
 
 # The schedule is every ~30 min (external cron); a gap past this means runs were
@@ -48,10 +49,13 @@ def run():
         # the workflow still fails visibly.
         health_alerts.append(f"Collector run crashed: {type(e).__name__}: {e}")
         notify_health_alerts(health_alerts)
+        ping_failure()
         raise
     if health_alerts:
         print(f"{len(health_alerts)} health alert(s) — sending")
         notify_health_alerts(health_alerts)
+    # Only a run that completed counts as "alive" for the external monitor.
+    ping_success()
 
 
 def _run(health_alerts):
