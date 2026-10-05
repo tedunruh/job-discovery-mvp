@@ -17,8 +17,23 @@ def _format_discovered_at(dt):
     return dt.astimezone(LOCAL_TZ).strftime("%b %-d, %-I:%M %p %Z")
 
 
+def _post(payload, label):
+    """POST to ntfy. Returns True on success; False (and prints) on any network
+    error or non-2xx response - callers use this to raise a health alert rather
+    than failing silently."""
+    try:
+        resp = requests.post(NTFY_URL, json=payload, timeout=10)
+        resp.raise_for_status()
+        return True
+    except requests.RequestException as e:
+        print(f"{label} send failed: {e}")
+        return False
+
+
 def notify_new_postings(new_postings, ntfy_topic, discovered_at=None):
-    """Push a phone notification via ntfy.sh for genuinely new postings, to
+    """Returns True if sent (or nothing to send), False if the send failed.
+
+    Push a phone notification via ntfy.sh for genuinely new postings, to
     one user's own topic - each user has their own ntfy_topic (users table),
     so this is called once per user with their matching subset of postings.
 
@@ -31,7 +46,7 @@ def notify_new_postings(new_postings, ntfy_topic, discovered_at=None):
     """
     topic = ntfy_topic
     if not topic or not new_postings:
-        return
+        return True
 
     discovered_label = _format_discovered_at(discovered_at or datetime.now(timezone.utc))
 
@@ -50,10 +65,7 @@ def notify_new_postings(new_postings, ntfy_topic, discovered_at=None):
     if click:
         payload["click"] = click
 
-    try:
-        requests.post(NTFY_URL, json=payload, timeout=10)
-    except requests.RequestException as e:
-        print(f"Notification failed (non-fatal): {e}")
+    return _post(payload, "Notification")
 
 
 def notify_health_alerts(alerts):
@@ -65,13 +77,10 @@ def notify_health_alerts(alerts):
     """
     topic = os.environ.get("NTFY_HEALTH_TOPIC")
     if not topic or not alerts:
-        return
+        return True
 
     title = f"{len(alerts)} pipeline health alerts" if len(alerts) > 1 else "Pipeline health alert"
     message = "\n\n".join(alerts[:10])
     payload = {"topic": topic, "title": title, "message": message, "priority": 4, "tags": ["warning"]}
 
-    try:
-        requests.post(NTFY_URL, json=payload, timeout=10)
-    except requests.RequestException as e:
-        print(f"Health alert notification failed (non-fatal): {e}")
+    return _post(payload, "Health alert")

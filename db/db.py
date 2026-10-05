@@ -444,3 +444,20 @@ def log_visit(conn, user_id, gap_minutes=30):
             """,
             (user_id, user_id, gap_minutes),
         )
+
+
+def start_scheduler_run(conn):
+    """Record that a collector run started. Returns (run_id, minutes since the
+    previous run started, or None if there was none)."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT EXTRACT(EPOCH FROM now() - max(started_at)) / 60 FROM scheduler_runs")
+        gap = cur.fetchone()[0]
+        cur.execute("INSERT INTO scheduler_runs DEFAULT VALUES RETURNING id")
+        run_id = cur.fetchone()[0]
+        cur.execute("DELETE FROM scheduler_runs WHERE started_at < now() - interval '30 days'")
+    return run_id, (float(gap) if gap is not None else None)
+
+
+def finish_scheduler_run(conn, run_id):
+    with conn.cursor() as cur:
+        cur.execute("UPDATE scheduler_runs SET finished_at = now() WHERE id = %s", (run_id,))
