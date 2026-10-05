@@ -20,6 +20,11 @@ root-cause categories appearing - i.e. we're actually learning, not just logging
 Run these before calling any UI change done. Each exists because it caught a real
 bug that already shipped once - see the dated log entry it links to.
 
+> **Automated:** `python scripts/quality_check.py` runs the viewport, bounds,
+> overflow and toolbar-alignment checks below (plus computed-style drift) across
+> six viewport sizes. Verified to fail on each regression class it targets. The
+> rest still need a human eye.
+
 - [ ] **Viewport correctness.** `<meta name="viewport" content="width=device-width, initial-scale=1">`
       is present on every page - check the actual shared head partial, don't assume
       it's inherited. Verify with `window.innerWidth` at an emulated mobile size and
