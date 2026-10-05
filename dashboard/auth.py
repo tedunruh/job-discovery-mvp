@@ -6,6 +6,11 @@ import psycopg2.extras
 import requests
 
 MAGIC_LINK_TTL_MINUTES = 15
+# Max sign-in emails per address in any 15 min window. Stops /login being used
+# to flood a tester's inbox (or burn Resend quota). Counted from magic_links
+# itself - every link we send is a row there, so no extra table.
+MAX_LINKS_PER_WINDOW = 5
+LINK_WINDOW_MINUTES = 15
 RESEND_URL = "https://api.resend.com/emails"
 
 
@@ -13,6 +18,18 @@ def get_user_by_email(conn, email):
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("SELECT * FROM users WHERE email = %s", (email,))
         return cur.fetchone()
+
+
+def too_many_recent_links(conn, user_id):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT count(*) FROM magic_links
+            WHERE user_id = %s AND created_at > now() - make_interval(mins => %s)
+            """,
+            (user_id, LINK_WINDOW_MINUTES),
+        )
+        return cur.fetchone()[0] >= MAX_LINKS_PER_WINDOW
 
 
 def create_magic_link(conn, user_id, ttl_minutes=MAGIC_LINK_TTL_MINUTES):

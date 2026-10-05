@@ -7,7 +7,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, g, redirect, render_template, request, send_from_directory, session, url_for
 
-from dashboard.auth import create_magic_link, get_user_by_email, send_magic_link_email, verify_magic_link
+from dashboard.auth import (
+    create_magic_link,
+    get_user_by_email,
+    send_magic_link_email,
+    too_many_recent_links,
+    verify_magic_link,
+)
 from dashboard.filters import is_remote_us
 from db.db import (
     SESSION_TTL_DAYS,
@@ -112,7 +118,12 @@ def login():
     conn = get_conn()
     try:
         user = get_user_by_email(conn, email)
-        if user:
+        if user and too_many_recent_links(conn, user["id"]):
+            # Rate-limited: send nothing, but respond identically so the
+            # limit doesn't reveal that the address is registered. Links
+            # already sent stay valid for their 15 minutes.
+            print(f"[rate-limit] sign-in emails for user {user['id']} capped")
+        elif user:
             token = create_magic_link(conn, user["id"])
             conn.commit()
             link_url = url_for("verify", token=token, _external=True)
