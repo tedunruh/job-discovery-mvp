@@ -9,6 +9,7 @@ from db.db import (
     get_all_user_role_categories,
     get_conn,
     get_source_health,
+    finish_scheduler_run,
     get_tracked_companies,
     get_users_tracking_company,
     mark_notified,
@@ -17,11 +18,16 @@ from db.db import (
     record_fetch_success,
     record_no_design_roles,
     record_zero_result,
+    start_scheduler_run,
     touch_source_health,
     upsert_posting,
 )
 from role_categories import matches_categories
 from scheduler.notify import notify_health_alerts, notify_new_postings
+
+# The schedule is every ~30 min (external cron); a gap past this means runs were
+# missed - cron-job.org down, GitHub dispatch delayed, or the job failing early.
+MAX_RUN_GAP_MINUTES = 90
 
 COLLECTORS = {
     "greenhouse": greenhouse.fetch,
@@ -33,15 +39,40 @@ COLLECTORS = {
 
 
 def run():
+    health_alerts = []
+    try:
+        _run(health_alerts)
+    except Exception as e:
+        # Anything that escapes (DB down, a bug) used to surface only in the
+        # GitHub Actions log. Push it to the health channel, then re-raise so
+        # the workflow still fails visibly.
+        health_alerts.append(f"Collector run crashed: {type(e).__name__}: {e}")
+        notify_health_alerts(health_alerts)
+        raise
+    if health_alerts:
+        print(f"{len(health_alerts)} health alert(s) — sending")
+        notify_health_alerts(health_alerts)
+
+
+def _run(health_alerts):
     conn = get_conn()
     new_postings_count = 0
     new_postings_by_user = {}  # user_id -> {"ntfy_topic": str, "postings": [...]}
-    health_alerts = []
+    notify_failures = 0
     try:
+        run_id, gap_minutes = start_scheduler_run(conn)
+        conn.commit()
+        if gap_minutes is not None and gap_minutes > MAX_RUN_GAP_MINUTES:
+            health_alerts.append(
+                f"Scheduler gap: {gap_minutes / 60:.1f}h since the previous collector run "
+                f"(expected ~every 30 min). New roles in that window were discovered late."
+            )
         all_user_categories = get_all_user_role_categories(conn)
         companies = get_tracked_companies(conn)
         if not companies:
             print("No companies tracked by any user (user_companies is empty) — nothing to do.")
+            finish_scheduler_run(conn, run_id)
+            conn.commit()
             return
         for company in companies:
             fetch = COLLECTORS[company["ats_type"]]
@@ -126,17 +157,22 @@ def run():
                     )
 
             conn.commit()
+        finish_scheduler_run(conn, run_id)
+        conn.commit()
     finally:
         conn.close()
 
     if new_postings_count:
         print(f"{new_postings_count} new posting(s) across {len(new_postings_by_user)} user(s) — sending notifications")
         for bucket in new_postings_by_user.values():
-            notify_new_postings(bucket["postings"], bucket["ntfy_topic"])
-
-    if health_alerts:
-        print(f"{len(health_alerts)} health alert(s) — sending")
-        notify_health_alerts(health_alerts)
+            if not notify_new_postings(bucket["postings"], bucket["ntfy_topic"]):
+                notify_failures += 1
+        if notify_failures:
+            health_alerts.append(
+                f"Push notification failed for {notify_failures} of {len(new_postings_by_user)} "
+                f"user(s) this run — they won't be told about {new_postings_count} new posting(s) "
+                f"(still visible on the dashboard)."
+            )
 
 
 if __name__ == "__main__":

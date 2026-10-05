@@ -135,6 +135,14 @@ CREATE TABLE IF NOT EXISTS user_events (
 );
 CREATE INDEX IF NOT EXISTS user_events_user_created_idx ON user_events (user_id, created_at DESC);
 
+-- One row per collector run (SC-31). Lets a run notice that the *previous* one was
+-- long ago - the only way to detect a missed schedule from inside the job.
+CREATE TABLE IF NOT EXISTS scheduler_runs (
+    id BIGSERIAL PRIMARY KEY,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at TIMESTAMPTZ
+);
+
 -- Which companies a user tracks. companies stays the shared directory -
 -- verified ATS identifiers benefit every user, not duplicated per user.
 CREATE TABLE IF NOT EXISTS user_companies (

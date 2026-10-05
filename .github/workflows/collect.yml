@@ -19,8 +19,17 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - run: python scheduler/run_collectors.py
+      - id: collect
+        run: python scheduler/run_collectors.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NTFY_TOPIC: ${{ vars.NTFY_TOPIC }}
           NTFY_HEALTH_TOPIC: ${{ vars.NTFY_HEALTH_TOPIC }}
+      # Last resort for failures the Python alerting can't cover (pip install
+      # failed, runner problem). A crash inside the collector alerts itself. Posts straight to the health topic.
+      - name: Alert on failed run
+        if: failure() && steps.collect.outcome != 'failure'
+        run: |
+          curl -fsS -H "Title: Collector workflow failed" -H "Priority: high" -H "Tags: warning" \
+            -d "Run failed before or outside normal alerting: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            "https://ntfy.sh/${{ vars.NTFY_HEALTH_TOPIC }}"
