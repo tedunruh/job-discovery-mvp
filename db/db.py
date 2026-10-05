@@ -409,3 +409,38 @@ def revoke_user_sessions(conn, user_id):
     with conn.cursor() as cur:
         cur.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
         return cur.rowcount
+
+
+def log_event(conn, user_id, event_type, posting_id=None):
+    """Append an engagement event (see user_events in schema.sql)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO user_events (user_id, event_type, posting_id) VALUES (%s, %s, %s)",
+            (user_id, event_type, posting_id),
+        )
+
+
+def get_posting_url(conn, posting_id):
+    with conn.cursor() as cur:
+        cur.execute("SELECT url FROM postings WHERE id = %s", (posting_id,))
+        row = cur.fetchone()
+        return row[0] if row else None
+
+
+def log_visit(conn, user_id, gap_minutes=30):
+    """Log a dashboard visit unless this user already has one in the last
+    gap_minutes - the dashboard reloads after every filter toggle or applied
+    click, which shouldn't each count as a visit."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO user_events (user_id, event_type)
+            SELECT %s, 'visit'
+            WHERE NOT EXISTS (
+                SELECT 1 FROM user_events
+                WHERE user_id = %s AND event_type = 'visit'
+                  AND created_at > now() - make_interval(mins => %s)
+            )
+            """,
+            (user_id, user_id, gap_minutes),
+        )

@@ -15,9 +15,12 @@ from db.db import (
     delete_session,
     get_conn,
     get_open_postings,
+    get_posting_url,
     get_session_user,
     get_user_role_categories,
     is_onboarded,
+    log_event,
+    log_visit,
     set_applied,
     set_user_role_categories,
 )
@@ -142,6 +145,7 @@ def verify():
     conn = get_conn()
     try:
         token = create_session(conn, user_id)
+        log_event(conn, user_id, "sign_in")
         conn.commit()
     finally:
         conn.close()
@@ -173,6 +177,8 @@ def index():
     try:
         if not is_onboarded(conn, user_id):
             return redirect(url_for("onboarding"))
+        log_visit(conn, user_id)
+        conn.commit()
         postings = get_open_postings(conn, user_id)
         role_categories = get_user_role_categories(conn, user_id)
     finally:
@@ -218,10 +224,28 @@ def set_applied_route(posting_id):
     conn = get_conn()
     try:
         set_applied(conn, posting_id, applied, g.user_id)
+        if applied:
+            log_event(conn, g.user_id, "applied", posting_id)
         conn.commit()
     finally:
         conn.close()
     return redirect(url_for("index"))
+
+
+@app.route("/open/<int:posting_id>")
+@require_login
+def open_posting(posting_id):
+    """Log that this user opened a posting, then send them on to the ATS page.
+    The dashboard's job links go through here so opens can be counted."""
+    conn = get_conn()
+    try:
+        url = get_posting_url(conn, posting_id)
+        if url:
+            log_event(conn, g.user_id, "opened", posting_id)
+            conn.commit()
+    finally:
+        conn.close()
+    return redirect(url) if url else redirect(url_for("index"))
 
 
 if __name__ == "__main__":

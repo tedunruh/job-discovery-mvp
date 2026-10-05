@@ -122,6 +122,19 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 );
 CREATE INDEX IF NOT EXISTS user_sessions_user_id_idx ON user_sessions (user_id);
 
+-- Lightweight engagement log (SC-19): append-only, one row per event. Types:
+-- sign_in (magic link redeemed), visit (dashboard loaded), opened (clicked a
+-- posting's link), applied (marked a posting applied). posting_id is set for
+-- opened/applied. No analytics layer - scripts/engagement.py reads it directly.
+CREATE TABLE IF NOT EXISTS user_events (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    posting_id INTEGER REFERENCES postings(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS user_events_user_created_idx ON user_events (user_id, created_at DESC);
+
 -- Which companies a user tracks. companies stays the shared directory -
 -- verified ATS identifiers benefit every user, not duplicated per user.
 CREATE TABLE IF NOT EXISTS user_companies (
