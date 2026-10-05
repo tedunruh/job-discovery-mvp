@@ -142,3 +142,29 @@ distance - then offset, rather than offset alone.
       as it has (translate = 1 per axis, scale = 1 more) - if a problem has more
       independent positional constraints than that, translate/offset alone cannot
       solve it and the extra parameter (usually scale) has to be solved for too.
+
+### 2026-10-05 — SC-29: the "9 broken data sources"
+**Shipped:** health detector no longer treats "no design roles right now" as an
+anomaly; Amplitude and Workhuman re-mapped to Ashby; stuck sources reset.
+**Rework count:** 0 (diagnosed before any fix was shipped)
+**Root cause:** *A health signal that conflated two different states.* The
+detector counted "fetched fine, zero design roles" as a possible schema break,
+the same as "fetched nothing / titles blank." For a source with a design-role
+baseline, three quiet cycles flipped it to `isolated`, and isolation is sticky
+(writes are skipped until a human resets it) - so a healthy company that simply
+had no design opening for a few days then silently stayed hidden when it did post
+one. Clerk's Brand Designer was being missed this way. Of the 9 "broken" sources,
+7 were false positives of this kind; 2 (Amplitude, Workhuman) had genuinely moved
+ATS. Found by fetching each endpoint directly and checking whether it returned
+real, titled postings, rather than trusting the status column. Fix separates
+"endpoint alive, nothing relevant" (`record_no_design_roles`, healthy) from
+"empty/blank result" (the existing anomaly path).
+**Standing checks added:**
+- [ ] **A sticky alarm state needs a precision check.** Any detector that latches
+      (isolated, blocked, quarantined) and suppresses data until a human clears it
+      must be audited against ground truth - hit the real source and compare - not
+      just reviewed for whether its trigger *can* fire. A false-positive latch
+      loses data silently, which is worse than a noisy alert.
+- [ ] **Dry-run pipeline changes against live data inside a rolled-back
+      transaction** with notifications stubbed, and read the resulting rows before
+      shipping.

@@ -256,12 +256,15 @@ def record_zero_result(conn, company_id):
     health = get_source_health(conn, company_id)
     baseline = health["typical_posting_count"]
     if baseline is None or baseline <= 0:
+        # The fetch itself succeeded, so a failure-driven 'degraded' is resolved.
+        # (Callers never reach here for 'isolated' - run_collectors skips those.)
         with conn.cursor() as cur:
             cur.execute(
                 """
                 UPDATE source_health
                 SET last_success_at = now(), last_checked_at = now(),
-                    consecutive_failures = 0, consecutive_zero_results = 0
+                    consecutive_failures = 0, consecutive_zero_results = 0,
+                    status = 'healthy'
                 WHERE company_id = %s
                 """,
                 (company_id,),
@@ -270,7 +273,7 @@ def record_zero_result(conn, company_id):
 
     new_streak = health["consecutive_zero_results"] + 1
     is_new_isolation = new_streak >= ZERO_RESULT_THRESHOLD
-    new_status = "isolated" if is_new_isolation else health["status"]
+    new_status = "isolated" if is_new_isolation else ("healthy" if health["status"] == "degraded" else health["status"])
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -282,6 +285,25 @@ def record_zero_result(conn, company_id):
             (new_streak, new_status, company_id),
         )
     return is_new_isolation, new_streak
+
+
+def record_no_design_roles(conn, company_id):
+    """The fetch returned real postings (non-blank titles), none of them design
+    roles. That's a healthy source with nothing for us right now - not an
+    anomaly - so it must not count toward isolation. typical_posting_count is
+    deliberately left alone: it's a baseline for design-role volume, and a quiet
+    stretch shouldn't drag it toward zero."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE source_health
+            SET last_success_at = now(), last_checked_at = now(),
+                consecutive_failures = 0, consecutive_zero_results = 0,
+                status = 'healthy'
+            WHERE company_id = %s
+            """,
+            (company_id,),
+        )
 
 
 def record_fetch_failure(conn, company_id):
