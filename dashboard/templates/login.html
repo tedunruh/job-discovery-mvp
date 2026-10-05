@@ -274,7 +274,7 @@
       <form class="auth-form" method="post" action="/login">
         <div class="fg-field">
           <label class="fg-label" for="email">email</label>
-          <input class="fg-input" type="email" id="email" name="email" placeholder="you@example.com" required autofocus>
+          <input class="fg-input" type="email" id="email" name="email" placeholder="you@example.com" value="{{ last_email or '' }}" autocomplete="username email" required {{ '' if last_email else 'autofocus' }}>
         </div>
         <button class="signin-btn fg-button fg-button--primary" type="submit">Send sign-in link</button>
       </form>
