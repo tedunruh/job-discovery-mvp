@@ -15,6 +15,7 @@ from db.db import (
     mark_stale_postings_closed,
     record_fetch_failure,
     record_fetch_success,
+    record_no_design_roles,
     record_zero_result,
     touch_source_health,
     upsert_posting,
@@ -59,6 +60,7 @@ def run():
                 continue
 
             design_postings = [p for p in postings if is_design_role(p["title"])]
+            endpoint_alive = any((p.get("title") or "").strip() for p in postings)
             print(f"  {len(postings)} total, {len(design_postings)} design roles")
 
             health = get_source_health(conn, company_id)
@@ -101,10 +103,20 @@ def run():
                 mark_stale_postings_closed(
                     conn, company_id, [p["ats_posting_id"] for p in design_postings]
                 )
+            elif endpoint_alive:
+                # Real postings with real titles came back, none of them design
+                # roles: the source works, the company just has nothing for us
+                # right now. Not an anomaly (this used to count toward
+                # isolation, which sticky-blocked the source and hid any design
+                # role the company posted later). Roles we'd previously seen
+                # there are genuinely gone, so close them.
+                record_no_design_roles(conn, company_id)
+                mark_stale_postings_closed(conn, company_id, [])
             else:
-                # An anomalous empty result shouldn't mass-close this company's
-                # real open postings, so mark_stale_postings_closed is
-                # deliberately skipped here - only called in the branch above.
+                # An anomalous empty result (nothing came back, or titles are
+                # blank - the signature of a schema change) shouldn't mass-close
+                # this company's real open postings, so mark_stale_postings_closed
+                # is deliberately skipped here.
                 is_new_isolation, streak = record_zero_result(conn, company_id)
                 if is_new_isolation:
                     print(f"  possible schema issue: 0 design roles for {streak} consecutive cycles")
