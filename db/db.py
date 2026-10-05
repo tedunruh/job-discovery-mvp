@@ -1,4 +1,6 @@
+import hashlib
 import os
+import secrets
 
 import psycopg2
 import psycopg2.extras
@@ -6,6 +8,8 @@ import psycopg2.extras
 # Health-tracking thresholds (see source_health table).
 FAILURE_THRESHOLD = 3  # consecutive transient failures before marking 'degraded'
 ZERO_RESULT_THRESHOLD = 3  # consecutive anomalous zero-result cycles before 'isolated'
+SESSION_TTL_DAYS = 30  # sliding: renewed on use
+SESSION_RENEW_AFTER_SECONDS = 3600  # don't write on every request
 EMA_ALPHA = 0.3  # weight given to the newest observation in the rolling baseline
 
 
@@ -346,3 +350,62 @@ def reset_source_health(conn, company_id):
             """,
             (company_id,),
         )
+
+
+def _hash_token(token):
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def create_session(conn, user_id):
+    """New login session for this user. Returns the raw token for the cookie;
+    only its hash is stored."""
+    token = secrets.token_urlsafe(32)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO user_sessions (token_hash, user_id, expires_at)
+            VALUES (%s, %s, now() + make_interval(days => %s))
+            """,
+            (_hash_token(token), user_id, SESSION_TTL_DAYS),
+        )
+    return token
+
+
+def get_session_user(conn, token):
+    """Validate a session token. Returns (user_id, renewed): user_id is None if
+    the token is unknown or expired. renewed is True when this call slid the
+    expiry forward (the caller then re-sends the cookie so its max-age slides
+    too). Renewal is throttled to once per SESSION_RENEW_AFTER_SECONDS."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE user_sessions
+            SET last_seen_at = now(), expires_at = now() + make_interval(days => %s)
+            WHERE token_hash = %s AND expires_at > now()
+              AND last_seen_at < now() - make_interval(secs => %s)
+            RETURNING user_id
+            """,
+            (SESSION_TTL_DAYS, _hash_token(token), SESSION_RENEW_AFTER_SECONDS),
+        )
+        row = cur.fetchone()
+        if row:
+            return row[0], True
+        cur.execute(
+            "SELECT user_id FROM user_sessions WHERE token_hash = %s AND expires_at > now()",
+            (_hash_token(token),),
+        )
+        row = cur.fetchone()
+        return (row[0] if row else None), False
+
+
+def delete_session(conn, token):
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM user_sessions WHERE token_hash = %s", (_hash_token(token),))
+
+
+def revoke_user_sessions(conn, user_id):
+    """Log a user out everywhere (e.g. removing an alpha tester). Returns the
+    number of sessions ended."""
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
+        return cur.rowcount

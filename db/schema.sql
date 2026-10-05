@@ -109,6 +109,19 @@ CREATE TABLE IF NOT EXISTS magic_links (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Server-side login sessions (SC-43). The browser holds a random token; only its
+-- sha256 is stored, so a DB leak can't be replayed as live sessions. Server-side
+-- (not a signed cookie) so revoking a tester deletes their rows and logs them
+-- out everywhere. expires_at slides forward on use (see dashboard/app.py).
+CREATE TABLE IF NOT EXISTS user_sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS user_sessions_user_id_idx ON user_sessions (user_id);
+
 -- Which companies a user tracks. companies stays the shared directory -
 -- verified ATS identifiers benefit every user, not duplicated per user.
 CREATE TABLE IF NOT EXISTS user_companies (
