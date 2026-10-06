@@ -166,7 +166,7 @@
   </header>
 
   <div class="filters">
-    <form method="post" action="/set_range">
+    <form method="get" action="/">
       <select class="range-select" name="range" aria-label="Show roles discovered" onchange="this.form.submit()">
         {% for key, (label, _) in ranges.items() %}
         <option value="{{ key }}" {{ "selected" if key == posted_range else "" }}>{{ label }}</option>
@@ -177,7 +177,7 @@
 
   <div class="toolbar">
     <div class="toolbar-left">
-      <form method="post" action="/toggle_remote_us">
+      <form method="get" action="/">
         <input type="hidden" name="remote_us_only" value="{{ 'false' if remote_us_only else 'true' }}">
         <label class="fg-check">
           <input class="fg-checkbox" type="checkbox" onchange="this.form.submit()" {{ "checked" if remote_us_only else "" }}>

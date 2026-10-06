@@ -78,6 +78,14 @@ def field_guide_static(folder, filename):
     return send_from_directory(os.path.join(FIELD_GUIDE_DIR, folder), filename)
 
 
+@app.errorhandler(405)
+def method_not_allowed(_error):
+    """A POST-only URL requested as a plain page load. The usual cause is Render's
+    wake-up page replaying an interrupted form submit as a GET. Send people to
+    the dashboard (or sign-in) instead of a bare error page."""
+    return redirect(url_for("index"))
+
+
 def require_login(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -202,6 +210,18 @@ def logout():
 @require_login
 def index():
     user_id = g.user_id
+
+    # The filter controls submit as plain GETs (/?range=week, /?remote_us_only=true).
+    # A GET can be safely replayed - e.g. by Render's wake-up page, which reloads the
+    # URL once a sleeping free-tier service is up. A POST-only filter lands on a 405.
+    if "range" in request.args or "remote_us_only" in request.args:
+        session.permanent = True
+        if request.args.get("range") in RANGES:
+            session["posted_range"] = request.args["range"]
+        if "remote_us_only" in request.args:
+            session["remote_us_only"] = request.args["remote_us_only"] == "true"
+        return redirect(url_for("index"))
+
     posted_range = session.get("posted_range", DEFAULT_RANGE)
     if posted_range not in RANGES:
         posted_range = DEFAULT_RANGE
