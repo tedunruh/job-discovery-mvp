@@ -15,6 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Keep the Render dashboard awake in waking hours (see the script). Before and
+      # after the collector so pings are ~13 min apart, under Render's 15 min idle limit.
+      - name: Keep dashboard awake
+        run: bash scripts/keep_awake.sh
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -27,6 +31,9 @@ jobs:
           NTFY_TOPIC: ${{ vars.NTFY_TOPIC }}
           NTFY_HEALTH_TOPIC: ${{ vars.NTFY_HEALTH_TOPIC }}
           HEALTHCHECK_URL: ${{ vars.HEALTHCHECK_URL }}
+      - name: Keep dashboard awake (end of run)
+        if: always()
+        run: bash scripts/keep_awake.sh
       # Last resort for failures the Python alerting can't cover (pip install
       # failed, runner problem). A crash inside the collector alerts itself. Posts straight to the health topic.
       - name: Alert on failed run
