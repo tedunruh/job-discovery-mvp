@@ -63,6 +63,13 @@
       outline: 2px solid var(--fg-color-action-primary);
       outline-offset: 2px;
     }
+    .more {
+      display: flex;
+      align-items: center;
+      gap: var(--fg-space-4);
+      margin: var(--fg-space-6) 0 var(--fg-space-8);
+      font-size: var(--fg-font-size-sm);
+    }
     .empty {
       margin: var(--fg-space-8) 0;
       color: var(--fg-color-text-secondary);
@@ -179,10 +186,10 @@
       </form>
       <a class="fg-link" href="/onboarding">Edit roles</a>
     </div>
-    <p class="role-count">{{ postings|length }} open role{{ "" if postings|length == 1 else "s" }}</p>
+    <p class="role-count">{{ total }} open role{{ "" if total == 1 else "s" }}</p>
   </div>
 
-  {% if not postings %}
+  {% if not total %}
   <p class="empty">
     {% if posted_range == "all" %}No roles found{% else %}No roles discovered in the {{ ranges[posted_range][0]|lower }}{% endif %}{% if remote_us_only %} that are remote in the US{% endif %}.
     {% if posted_range != "all" %}Try a wider range.{% endif %}
@@ -226,5 +233,12 @@
     </li>
     {% endfor %}
   </ul>
+
+  {% if next_n %}
+  <p class="more">
+    <span class="fg-text-secondary">Showing {{ postings|length }} of {{ total }}</span>
+    <a class="fg-link" href="/?n={{ next_n }}">Show {{ page_size }} more</a>
+  </p>
+  {% endif %}
 </body>
 </html>
