@@ -1,5 +1,14 @@
 {
  "1280": {
+  ".range-select": {
+   "color": "rgba(41, 40, 36, 0.7)",
+   "display": "inline-block",
+   "font-size": "14px",
+   "font-weight": "600",
+   "line-height": "normal",
+   "margin": "0px",
+   "padding": "0px"
+  },
   ".role-count": {
    "color": "rgba(41, 40, 36, 0.7)",
    "display": "block",
@@ -38,6 +47,15 @@
   }
  },
  "1440": {
+  ".range-select": {
+   "color": "rgba(41, 40, 36, 0.7)",
+   "display": "inline-block",
+   "font-size": "14px",
+   "font-weight": "600",
+   "line-height": "normal",
+   "margin": "0px",
+   "padding": "0px"
+  },
   ".role-count": {
    "color": "rgba(41, 40, 36, 0.7)",
    "display": "block",
@@ -75,7 +93,16 @@
    "padding": "0px"
   }
  },
- "320": {
+ "360": {
+  ".range-select": {
+   "color": "rgba(41, 40, 36, 0.7)",
+   "display": "inline-block",
+   "font-size": "14px",
+   "font-weight": "600",
+   "line-height": "normal",
+   "margin": "0px",
+   "padding": "0px"
+  },
   ".role-count": {
    "color": "rgba(41, 40, 36, 0.7)",
    "display": "block",
@@ -114,6 +141,15 @@
   }
  },
  "390": {
+  ".range-select": {
+   "color": "rgba(41, 40, 36, 0.7)",
+   "display": "inline-block",
+   "font-size": "14px",
+   "font-weight": "600",
+   "line-height": "normal",
+   "margin": "0px",
+   "padding": "0px"
+  },
   ".role-count": {
    "color": "rgba(41, 40, 36, 0.7)",
    "display": "block",
@@ -152,6 +188,15 @@
   }
  },
  "768": {
+  ".range-select": {
+   "color": "rgba(41, 40, 36, 0.7)",
+   "display": "inline-block",
+   "font-size": "14px",
+   "font-weight": "600",
+   "line-height": "normal",
+   "margin": "0px",
+   "padding": "0px"
+  },
   ".role-count": {
    "color": "rgba(41, 40, 36, 0.7)",
    "display": "block",
@@ -190,6 +235,15 @@
   }
  },
  "800": {
+  ".range-select": {
+   "color": "rgba(41, 40, 36, 0.7)",
+   "display": "inline-block",
+   "font-size": "14px",
+   "font-weight": "600",
+   "line-height": "normal",
+   "margin": "0px",
+   "padding": "0px"
+  },
   ".role-count": {
    "color": "rgba(41, 40, 36, 0.7)",
    "display": "block",
