@@ -10,10 +10,10 @@ from db.db import (
     finish_scheduler_run,
     get_all_user_keywords,
     get_all_user_role_categories,
+    get_all_users,
+    get_companies_to_scan,
     get_conn,
     get_source_health,
-    get_tracked_companies,
-    get_users_tracking_company,
     mark_full_ingest_done,
     mark_notified,
     mark_stale_postings_closed,
@@ -101,9 +101,10 @@ def _run(health_alerts):
             )
         all_user_categories = get_all_user_role_categories(conn)
         all_user_keywords = get_all_user_keywords(conn)
-        companies = get_tracked_companies(conn)
+        all_users = get_all_users(conn)
+        companies = get_companies_to_scan(conn)
         if not companies:
-            print("No companies tracked by any user (user_companies is empty) — nothing to do.")
+            print("No companies in the directory — nothing to do.")
             finish_scheduler_run(conn, run_id)
             conn.commit()
             return
@@ -146,7 +147,6 @@ def _run(health_alerts):
                 backfill = company["full_ingest_at"] is None
                 new_ids = upsert_postings(conn, company_id, storable, backfill=backfill)
 
-                users_tracking = None
                 for posting in storable:
                     posting_id = new_ids.get(str(posting["ats_posting_id"]))
                     if posting_id is None:
@@ -158,12 +158,7 @@ def _run(health_alerts):
                         # alert you to every role it already had open.
                         continue
                     new_postings_count += 1
-                    if users_tracking is None:
-                        # Looked up once per company (not per posting) -
-                        # every posting from this company fans out to the
-                        # same set of users.
-                        users_tracking = get_users_tracking_company(conn, company_id)
-                    for user in users_tracking:
+                    for user in all_users:
                         if not matches_profile(
                             posting["title"],
                             posting["is_design"],

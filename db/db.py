@@ -127,10 +127,11 @@ def mark_stale_postings_closed(conn, company_id, seen_ats_posting_ids):
 
 
 def get_open_postings(conn, user_id, since=None, keywords=()):
-    """Open postings from companies this user tracks (user_companies), with
-    this user's own applied relevance joined in from user_postings - a
-    posting no other user has touched simply has no row there, hence the
-    LEFT JOIN + COALESCE.
+    """Open postings from every company in the directory, with this user's own
+    applied relevance joined in from user_postings - a posting no other user has
+    touched simply has no row there, hence the LEFT JOIN + COALESCE. (Every user
+    sees every company; what narrows the list is their role profile, not a
+    per-user company list - see user_companies, now unused.)
 
     The table now holds every role, so rows are narrowed in SQL before they
     reach Python: design roles always, other roles only if the title matches one
@@ -146,14 +147,13 @@ def get_open_postings(conn, user_id, since=None, keywords=()):
                    COALESCE(up.applied, false) AS applied
             FROM postings p
             JOIN companies c ON c.id = p.company_id
-            JOIN user_companies uc ON uc.company_id = c.id AND uc.user_id = %s
             LEFT JOIN user_postings up ON up.posting_id = p.id AND up.user_id = %s
             WHERE p.status = 'open'
               AND (p.is_design OR p.title ~* ANY(%s::text[]))
               AND (%s::timestamptz IS NULL OR p.first_seen_at >= %s)
             ORDER BY p.first_seen_at DESC
             """,
-            (user_id, user_id, keyword_patterns, since, since),
+            (user_id, keyword_patterns, since, since),
         )
         return cur.fetchall()
 
@@ -251,34 +251,19 @@ def mark_full_ingest_done(conn, company_id):
         cur.execute("UPDATE companies SET full_ingest_at = now() WHERE id = %s", (company_id,))
 
 
-def get_tracked_companies(conn):
-    """Companies at least one user actually tracks - the scraper only fetches
-    these, not every row ever added to the shared companies directory."""
+def get_companies_to_scan(conn):
+    """Every company in the directory. The scraper scans all of them each run, for
+    everyone - coverage is Scout's job, not a per-user list."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            """
-            SELECT DISTINCT c.id, c.name, c.ats_type, c.ats_identifier, c.full_ingest_at
-            FROM companies c
-            JOIN user_companies uc ON uc.company_id = c.id
-            ORDER BY c.name
-            """
-        )
+        cur.execute("SELECT id, name, ats_type, ats_identifier, full_ingest_at FROM companies ORDER BY name")
         return cur.fetchall()
 
 
-def get_users_tracking_company(conn, company_id):
-    """Users who track this company (user_companies), for per-user notification
-    fan-out - each gets notified only about companies they actually follow."""
+def get_all_users(conn):
+    """Everyone who gets alerts. Each is matched against their own role profile
+    (role_categories.matches_profile) before being notified."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            """
-            SELECT u.id, u.ntfy_topic
-            FROM users u
-            JOIN user_companies uc ON uc.user_id = u.id
-            WHERE uc.company_id = %s
-            """,
-            (company_id,),
-        )
+        cur.execute("SELECT id, ntfy_topic FROM users ORDER BY id")
         return cur.fetchall()
 
 
