@@ -164,3 +164,30 @@ CREATE TABLE IF NOT EXISTS user_postings (
     notified_at TIMESTAMPTZ,
     PRIMARY KEY (user_id, posting_id)
 );
+
+-- ---------------------------------------------------------------------------
+-- SC-45a: all roles. Additive migrations (safe to re-run).
+-- ---------------------------------------------------------------------------
+
+-- postings now holds every role a tracked company lists, not just design ones.
+-- is_design = passed collectors.filters.is_design_role at ingest. Rows that
+-- predate this column were all design roles, so they're backfilled true.
+-- content_hash lets the collector skip rewriting postings that haven't changed.
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS is_design BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS content_hash TEXT;
+UPDATE postings SET is_design = true WHERE content_hash IS NULL AND is_design = false;
+
+-- NULL until the first full (all-roles) ingest of this company has run. That
+-- run is "silent" for non-design roles: it fills the table without notifying
+-- anyone, otherwise ~every existing posting would look new.
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS full_ingest_at TIMESTAMPTZ;
+
+-- Per-user keyword profile for non-design roles: a posting outside design shows
+-- up (and alerts) only if its title contains one of these words/phrases.
+-- No keywords = design roles only, exactly as before. SC-46 will fill this from
+-- a resume; until then users type them in.
+CREATE TABLE IF NOT EXISTS user_role_keywords (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    keyword TEXT NOT NULL,
+    PRIMARY KEY (user_id, keyword)
+);
