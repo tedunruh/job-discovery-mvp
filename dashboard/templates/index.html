@@ -32,6 +32,7 @@
        .toolbar-left, instead of being pushed off-center by the phantom
        line-box space a block container adds below inline-flex content. */
     .toolbar-left form { display: contents; }
+    .range-select,
     .toolbar-left .fg-check,
     .toolbar-left .fg-link,
     .role-count {
@@ -40,7 +41,30 @@
       line-height: var(--fg-font-line-height-snug, normal);
     }
     .toolbar-left .fg-check,
+    .range-select,
     .role-count {
+      color: var(--fg-color-text-secondary);
+    }
+    /* Own row above the toolbar: four controls don't fit one line at phone
+       width without the labels wrapping. Native select restyled to read like
+       the toolbar text. */
+    .filters { padding-bottom: var(--fg-space-3); }
+    .filters form { display: contents; }
+    .range-select {
+      font-family: inherit;
+      font-weight: var(--fg-font-weight-demibold);
+      background: transparent;
+      border: 0;
+      padding: 0;
+      margin-left: -4px; /* cancel the native select's inner text inset so it lines up with the toolbar below */
+      cursor: pointer;
+    }
+    .range-select:focus-visible {
+      outline: 2px solid var(--fg-color-action-primary);
+      outline-offset: 2px;
+    }
+    .empty {
+      margin: var(--fg-space-8) 0;
       color: var(--fg-color-text-secondary);
     }
     .toolbar-left .fg-check { font-weight: var(--fg-font-weight-demibold); }
@@ -134,6 +158,16 @@
     </form>
   </header>
 
+  <div class="filters">
+    <form method="post" action="/set_range">
+      <select class="range-select" name="range" aria-label="Show roles discovered" onchange="this.form.submit()">
+        {% for key, (label, _) in ranges.items() %}
+        <option value="{{ key }}" {{ "selected" if key == posted_range else "" }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+
   <div class="toolbar">
     <div class="toolbar-left">
       <form method="post" action="/toggle_remote_us">
@@ -147,6 +181,13 @@
     </div>
     <p class="role-count">{{ postings|length }} open role{{ "" if postings|length == 1 else "s" }}</p>
   </div>
+
+  {% if not postings %}
+  <p class="empty">
+    {% if posted_range == "all" %}No roles found{% else %}No roles discovered in the {{ ranges[posted_range][0]|lower }}{% endif %}{% if remote_us_only %} that are remote in the US{% endif %}.
+    {% if posted_range != "all" %}Try a wider range.{% endif %}
+  </p>
+  {% endif %}
 
   <ul class="postings">
     {% for p in postings %}

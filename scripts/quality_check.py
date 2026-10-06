@@ -9,7 +9,8 @@ What it checks, at phone / tablet / desktop sizes, on /login, /onboarding and /:
   1. viewport meta present, and a mobile-emulated page reports its true width
   2. no horizontal page overflow
   3. login route artwork (pins, dots) stays inside the viewport once animations end
-  4. dashboard toolbar items are vertically aligned (centerY) and padded >= 16px
+  4. dashboard toolbar items are vertically aligned (centerY), single-line (no text
+     wrapping) and padded >= 16px
   5. computed styles of the toolbar vs. a saved baseline - flags *changes* for
      review (sibling-regression catcher; not a failure, since edits are often intended)
 
@@ -40,12 +41,14 @@ from db.db import create_session, get_conn  # noqa: E402
 
 BASELINE_PATH = os.path.join(ROOT, "scripts", "quality_baseline.json")
 TEST_EMAIL = "quality-check@example.invalid"
-VIEWPORTS = [(320, 640), (390, 844), (768, 1024), (800, 600), (1280, 800), (1440, 900)]
+# Narrowest supported phone is 360 (small Android). 320 (iPhone SE 1st gen) was dropped
+# deliberately: the three toolbar items can't fit one line in its 288px of content.
+VIEWPORTS = [(360, 740), (390, 844), (768, 1024), (800, 600), (1280, 800), (1440, 900)]
 MOBILE_MAX_WIDTH = 768  # below this, emulate a touch phone (viewport meta must work)
 ALIGN_TOLERANCE_PX = 1.0
 MIN_SIDE_PADDING_PX = 16
 STYLE_PROPS = ["font-size", "line-height", "font-weight", "color", "display", "padding", "margin"]
-STYLE_SELECTORS = [".toolbar", ".toolbar-left .fg-check", ".toolbar-left .fg-link", ".role-count"]
+STYLE_SELECTORS = [".toolbar", ".range-select", ".toolbar-left .fg-check", ".toolbar-left .fg-link", ".role-count"]
 
 logging.getLogger("werkzeug").setLevel(logging.ERROR)  # quiet the per-request access log
 
@@ -143,7 +146,8 @@ def check_toolbar(page, w):
         () => {
           const sel = ['.toolbar-left .fg-check', '.toolbar-left .fg-link', '.role-count'];
           const rects = sel.map(s => { const e = document.querySelector(s); if (!e) return null;
-            const r = e.getBoundingClientRect(); return { s, cy: r.top + r.height / 2, left: r.left }; });
+            const r = e.getBoundingClientRect(), lh = parseFloat(getComputedStyle(e).lineHeight) || r.height;
+            return { s, cy: r.top + r.height / 2, left: r.left, lines: r.height / lh }; });
           return { rects, toolbarLeft: document.querySelector('.toolbar-left')?.getBoundingClientRect().left };
         }
         """
@@ -155,6 +159,8 @@ def check_toolbar(page, w):
     spread = max(ys) - min(ys)
     detail = ", ".join(f"{r['s'].split()[-1]}={r['cy']:.1f}" for r in info["rects"])
     check(spread <= ALIGN_TOLERANCE_PX, f"toolbar items share a centerY  [@{w}]", f"spread {spread:.2f}px ({detail})")
+    wrapped = [f"{r['s'].split()[-1]} ({r['lines']:.1f} lines)" for r in info["rects"] if r["lines"] > 1.5]
+    check(not wrapped, f"toolbar text stays on one line  [@{w}]", "wrapped: " + ", ".join(wrapped))
     check(info["toolbarLeft"] >= MIN_SIDE_PADDING_PX - 0.5, f"toolbar side padding >= {MIN_SIDE_PADDING_PX}px  [@{w}]",
           f"left edge at {info['toolbarLeft']:.1f}px")
 

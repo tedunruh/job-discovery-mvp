@@ -51,6 +51,17 @@ def set_session_cookie(response, token):
     response.set_cookie(SESSION_COOKIE, token, max_age=SESSION_TTL_DAYS * 86400, **COOKIE_OPTS)
     return response
 
+# "Discovered within" filter on the dashboard: key -> (label, window). Keyed on
+# first_seen_at (when Scout found it - what each row shows as "Discovered").
+# 24h is the default so the list opens on what's new.
+RANGES = {
+    "24h": ("Past 24 hours", timedelta(hours=24)),
+    "week": ("Past week", timedelta(days=7)),
+    "month": ("Past month", timedelta(days=30)),
+    "all": ("All time", None),
+}
+DEFAULT_RANGE = "24h"
+
 FIELD_GUIDE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "field-guide")
 
 
@@ -200,7 +211,21 @@ def index():
         postings = [p for p in postings if is_remote_us(p["location"], p["remote_type"])]
     postings = [p for p in postings if matches_categories(p["title"], role_categories)]
 
-    return render_template("index.html", postings=postings, remote_us_only=remote_us_only)
+    posted_range = session.get("posted_range", DEFAULT_RANGE)
+    if posted_range not in RANGES:
+        posted_range = DEFAULT_RANGE
+    window = RANGES[posted_range][1]
+    if window is not None:
+        cutoff = datetime.now(timezone.utc) - window
+        postings = [p for p in postings if p["first_seen_at"] >= cutoff]
+
+    return render_template(
+        "index.html",
+        postings=postings,
+        remote_us_only=remote_us_only,
+        ranges=RANGES,
+        posted_range=posted_range,
+    )
 
 
 @app.route("/onboarding", methods=["GET", "POST"])
@@ -225,6 +250,15 @@ def onboarding():
 def toggle_remote_us():
     session.permanent = True
     session["remote_us_only"] = request.form.get("remote_us_only") == "true"
+    return redirect(url_for("index"))
+
+
+@app.route("/set_range", methods=["POST"])
+@require_login
+def set_range():
+    choice = request.form.get("range", DEFAULT_RANGE)
+    session.permanent = True
+    session["posted_range"] = choice if choice in RANGES else DEFAULT_RANGE
     return redirect(url_for("index"))
 
 
