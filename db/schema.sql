@@ -143,6 +143,9 @@ CREATE TABLE IF NOT EXISTS scheduler_runs (
     finished_at TIMESTAMPTZ
 );
 
+-- NO LONGER USED (SC-45b): every user now sees, and is alerted about, every company in
+-- the directory; their role profile is what narrows the list. Kept so old data isn't
+-- destroyed; safe to drop later.
 -- Which companies a user tracks. companies stays the shared directory -
 -- verified ATS identifiers benefit every user, not duplicated per user.
 CREATE TABLE IF NOT EXISTS user_companies (

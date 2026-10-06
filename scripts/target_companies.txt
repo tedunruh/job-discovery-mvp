@@ -67,7 +67,7 @@ Loom
 Framer
 InVision
 Descript
-Runway
+# Runway   (skipped: the only board found is Runway Financial, not the video-AI company)
 OpenAI
 Cohere
 Mistral AI

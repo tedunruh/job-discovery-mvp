@@ -25,17 +25,19 @@ Lever, Ashby) and tracks how many days ahead of LinkedIn they showed up.
    psql "$DATABASE_URL" -f db/schema.sql
    ```
 
-5. **Add companies to track.** Companies live in the `companies` table (the
-   shared directory) plus a `user_companies` row per user who tracks them —
-   the scraper only fetches companies with at least one `user_companies` row
-   (`db.get_tracked_companies`). Verify a candidate's `ats_type` and
-   `ats_identifier` against the live API before adding it (see the format
-   notes that used to live in `collectors/company_list.py`, now folded into
-   `db/schema.sql`'s comments), then insert both rows directly, e.g.:
-   ```sql
-   INSERT INTO companies (name, ats_type, ats_identifier) VALUES ('Figma', 'greenhouse', 'figma') RETURNING id;
-   INSERT INTO user_companies (user_id, company_id) VALUES (1, <id from above>);
+5. **Add companies.** Companies live in the shared `companies` table, and the
+   scraper scans every one of them each run, for every user. Verify a candidate's
+   `ats_type` and `ats_identifier` against the live API before adding it (format
+   notes are in `db/schema.sql`'s comments), or let the detector do it:
+   ```bash
+   python scripts/add_companies.py scripts/target_companies.txt --dry-run   # preview
+   python scripts/add_companies.py scripts/target_companies.txt             # add
    ```
+   Or insert one by hand:
+   ```sql
+   INSERT INTO companies (name, ats_type, ats_identifier) VALUES ('Figma', 'greenhouse', 'figma');
+   ```
+   A company's first scan is silent (nobody is alerted to roles it already had open).
 
 6. **Run the collectors once, manually.**
    ```bash
@@ -56,8 +58,7 @@ No self-serve signup — this is a hand-invited beta. Add a user directly:
 ```sql
 INSERT INTO users (email, ntfy_topic) VALUES ('alpha-tester@example.com', 'jobdiscovery-<random topic string>');
 ```
-Give them companies to track the same way (`INSERT INTO user_companies ...`),
-same pattern as step 5 above. Once the row exists, they can request a
+There's nothing else to set up per user - they see every company. Once the row exists, they can request a
 sign-in link from `/login` with that email — an unrecognized email gets the
 same generic "if that email is on the list..." response either way, so
 adding someone is the only step, nothing else to configure per user.

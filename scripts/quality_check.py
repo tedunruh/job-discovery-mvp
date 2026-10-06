@@ -63,7 +63,7 @@ def check(ok, label, detail=""):
 
 
 def provision_user():
-    """Throwaway onboarded user tracking a company that has open postings."""
+    """Throwaway onboarded user (every user sees every company)."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("DELETE FROM users WHERE email = %s", (TEST_EMAIL,))
@@ -72,15 +72,6 @@ def provision_user():
         (TEST_EMAIL,),
     )
     user_id = cur.fetchone()[0]
-    cur.execute(
-        """
-        SELECT company_id FROM postings WHERE status = 'open'
-        GROUP BY company_id ORDER BY count(*) DESC LIMIT 1
-        """
-    )
-    row = cur.fetchone()
-    if row:
-        cur.execute("INSERT INTO user_companies (user_id, company_id) VALUES (%s, %s)", (user_id, row[0]))
     token = create_session(conn, user_id)
     conn.commit()
     conn.close()
