@@ -22,15 +22,17 @@ from db.db import (
     get_conn,
     get_open_postings,
     get_posting_url,
+    get_user_keywords,
     get_session_user,
     get_user_role_categories,
     is_onboarded,
     log_event,
     log_visit,
     set_applied,
+    set_user_keywords,
     set_user_role_categories,
 )
-from role_categories import ROLE_CATEGORIES, matches_categories
+from role_categories import ROLE_CATEGORIES, MAX_KEYWORDS, clean_keywords, matches_profile
 
 app = Flask(__name__)
 # Falls back to a fixed dev value locally; set a real SECRET_KEY once this is
@@ -61,6 +63,11 @@ RANGES = {
     "all": ("All time", None),
 }
 DEFAULT_RANGE = "24h"
+
+# The dashboard renders this many roles, then offers "show more" - the table holds
+# every role at every tracked company, so an unbounded list is thousands of rows.
+PAGE_SIZE = 50
+MAX_SHOWN = 1000
 
 FIELD_GUIDE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "field-guide")
 
@@ -195,33 +202,42 @@ def logout():
 @require_login
 def index():
     user_id = g.user_id
+    posted_range = session.get("posted_range", DEFAULT_RANGE)
+    if posted_range not in RANGES:
+        posted_range = DEFAULT_RANGE
+    window = RANGES[posted_range][1]
+    cutoff = datetime.now(timezone.utc) - window if window is not None else None
+
     conn = get_conn()
     try:
         if not is_onboarded(conn, user_id):
             return redirect(url_for("onboarding"))
         log_visit(conn, user_id)
         conn.commit()
-        postings = get_open_postings(conn, user_id)
         role_categories = get_user_role_categories(conn, user_id)
+        keywords = get_user_keywords(conn, user_id)
+        postings = get_open_postings(conn, user_id, since=cutoff, keywords=keywords)
     finally:
         conn.close()
 
     remote_us_only = session.get("remote_us_only", False)
     if remote_us_only:
         postings = [p for p in postings if is_remote_us(p["location"], p["remote_type"])]
-    postings = [p for p in postings if matches_categories(p["title"], role_categories)]
+    postings = [
+        p for p in postings
+        if matches_profile(p["title"], p["is_design"], role_categories, keywords)
+    ]
 
-    posted_range = session.get("posted_range", DEFAULT_RANGE)
-    if posted_range not in RANGES:
-        posted_range = DEFAULT_RANGE
-    window = RANGES[posted_range][1]
-    if window is not None:
-        cutoff = datetime.now(timezone.utc) - window
-        postings = [p for p in postings if p["first_seen_at"] >= cutoff]
+    total = len(postings)
+    limit = min(max(request.args.get("n", PAGE_SIZE, type=int), PAGE_SIZE), MAX_SHOWN)
+    shown = postings[:limit]
 
     return render_template(
         "index.html",
-        postings=postings,
+        postings=shown,
+        total=total,
+        next_n=limit + PAGE_SIZE if total > limit and limit < MAX_SHOWN else None,
+        page_size=PAGE_SIZE,
         remote_us_only=remote_us_only,
         ranges=RANGES,
         posted_range=posted_range,
@@ -237,12 +253,20 @@ def onboarding():
         if request.method == "POST":
             selected = [c for c in request.form.getlist("categories") if c in ROLE_CATEGORIES]
             set_user_role_categories(conn, user_id, selected)
+            set_user_keywords(conn, user_id, clean_keywords(request.form.get("keywords", "")))
             conn.commit()
             return redirect(url_for("index"))
         selected = get_user_role_categories(conn, user_id)
+        keywords = get_user_keywords(conn, user_id)
     finally:
         conn.close()
-    return render_template("onboarding.html", categories=ROLE_CATEGORIES, selected=selected)
+    return render_template(
+        "onboarding.html",
+        categories=ROLE_CATEGORIES,
+        selected=selected,
+        keywords=", ".join(keywords),
+        max_keywords=MAX_KEYWORDS,
+    )
 
 
 @app.route("/toggle_remote_us", methods=["POST"])

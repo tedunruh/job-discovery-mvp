@@ -46,12 +46,14 @@
       font-weight: var(--fg-font-weight-medium);
       font-size: var(--fg-font-size-lg);
     }
+    .other-roles { margin: var(--fg-space-6) 0; }
+    .other-roles .hint { margin: var(--fg-space-2) 0 0; font-size: var(--fg-font-size-sm); }
   </style>
 </head>
 <body class="fg-page">
   <div class="card">
     <h1 class="fg-display">What are you looking for?</h1>
-    <p class="subtext fg-text-secondary">Select any that interest you — leave them all unchecked to see every role we find. You can change this anytime from "Edit roles" on the dashboard.</p>
+    <p class="subtext fg-text-secondary">Select any design roles that interest you — leave them all unchecked to see every design role we find. You can change this anytime from "Edit roles" on the dashboard.</p>
     <form method="post" action="/onboarding">
       <div class="categories">
         {% for key, cat in categories.items() %}
@@ -60,6 +62,11 @@
           {{ cat.label }}
         </label>
         {% endfor %}
+      </div>
+      <div class="fg-field other-roles">
+        <label class="fg-label" for="keywords">Other roles</label>
+        <input class="fg-input" type="text" id="keywords" name="keywords" value="{{ keywords }}" placeholder="product manager, data scientist" autocomplete="off">
+        <p class="hint fg-text-secondary">Optional. Roles outside design show up only if their title contains one of these words or phrases — separate them with commas (up to {{ max_keywords }}).</p>
       </div>
       <button class="fg-button fg-button--primary fg-button--block" type="submit">Continue to dashboard</button>
     </form>

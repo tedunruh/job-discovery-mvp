@@ -1,5 +1,7 @@
 import hashlib
+import json
 import os
+import re
 import secrets
 
 import psycopg2
@@ -31,23 +33,58 @@ def upsert_company(conn, name, ats_type, ats_identifier):
         return cur.fetchone()[0]
 
 
-def upsert_posting(conn, company_id, posting):
-    """Insert or update a posting. Returns (posting_id, is_new) where is_new is
-    True if this was a brand-new posting (never seen before), False if it
-    already existed and was just refreshed.
+def _content_hash(posting):
+    """Fingerprint of what we store. Unchanged postings (same hash) aren't
+    rewritten, so a cycle that finds nothing new does almost no writes."""
+    core = [
+        posting["title"], posting.get("location"), posting.get("remote_type"),
+        # Date only: Workday derives its posted time from relative text ("3 days ago"),
+        # so the seconds differ on every fetch and would make every row look changed.
+        posting["url"], str(posting.get("ats_posted_at") or "")[:10],
+    ]
+    if posting.get("is_design"):
+        core.append(posting.get("raw_json"))  # full payload is kept (and so tracked) for design roles only
+    return hashlib.sha256(json.dumps(core, sort_keys=True, default=str).encode()).hexdigest()
 
-    Uses the `xmax = 0` trick: xmax is unset (0) on a freshly inserted row
-    version and gets set by the UPDATE path of ON CONFLICT DO UPDATE, so it
-    reliably distinguishes insert from update within the same statement.
+
+def upsert_postings(conn, company_id, postings, backfill=False):
+    """Insert/refresh every posting from one company's fetch in a single batched
+    statement. Each posting dict carries is_design (set by the collector).
+
+    Returns {ats_posting_id: postings.id} for the postings that were brand new
+    (never seen before).
+    Unchanged postings are skipped entirely (see _content_hash), so last_seen_at
+    only moves when something about the posting changed or it reopened.
+
+    Storage: only design roles keep their full raw payload - for everything else
+    the HTML body etc. is dropped ({}), which is most of the bytes.
+
+    backfill=True is the company's first all-roles ingest: first_seen_at is set
+    from the ATS's own posted date (capped at now) instead of now, so the
+    "discovered within" dashboard filter doesn't treat hundreds of long-open
+    roles as discovered today.
     """
+    by_id = {str(p["ats_posting_id"]): p for p in postings if p.get("ats_posting_id") is not None}
+    if not by_id:
+        return {}
+    rows = []
+    for ats_id, p in by_id.items():
+        rows.append((
+            company_id, ats_id, p["title"], p.get("location"), p.get("remote_type"),
+            p["url"], p.get("ats_posted_at"),
+            psycopg2.extras.Json((p.get("raw_json") or {}) if p.get("is_design") else {}),
+            _content_hash(p), bool(p.get("is_design")), backfill, p.get("ats_posted_at"),
+        ))
+    new_ids = {}
     with conn.cursor() as cur:
-        cur.execute(
+        returned = psycopg2.extras.execute_values(
+            cur,
             """
             INSERT INTO postings (
-                company_id, ats_posting_id, title, location, remote_type,
-                url, ats_posted_at, raw_json, last_seen_at
+                company_id, ats_posting_id, title, location, remote_type, url,
+                ats_posted_at, raw_json, content_hash, is_design, first_seen_at, last_seen_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, now())
+            VALUES %s
             ON CONFLICT (company_id, ats_posting_id) DO UPDATE SET
                 title = EXCLUDED.title,
                 location = EXCLUDED.location,
@@ -55,22 +92,25 @@ def upsert_posting(conn, company_id, posting):
                 url = EXCLUDED.url,
                 ats_posted_at = EXCLUDED.ats_posted_at,
                 raw_json = EXCLUDED.raw_json,
+                content_hash = EXCLUDED.content_hash,
+                is_design = EXCLUDED.is_design,
                 last_seen_at = now(),
                 status = 'open'
-            RETURNING id, (xmax = 0) AS is_new
+            WHERE postings.content_hash IS DISTINCT FROM EXCLUDED.content_hash
+               OR postings.status <> 'open'
+            RETURNING id, ats_posting_id, (xmax = 0) AS is_new
             """,
-            (
-                company_id,
-                posting["ats_posting_id"],
-                posting["title"],
-                posting.get("location"),
-                posting.get("remote_type"),
-                posting["url"],
-                posting.get("ats_posted_at"),
-                psycopg2.extras.Json(posting.get("raw_json") or {}),
-            ),
+            rows,
+            template="""(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                CASE WHEN %s THEN LEAST(COALESCE(%s::timestamptz, now()), now()) ELSE now() END,
+                now())""",
+            page_size=500,
+            fetch=True,
         )
-        return cur.fetchone()
+        for posting_id, ats_id, is_new in returned:
+            if is_new:
+                new_ids[ats_id] = posting_id
+    return new_ids
 
 
 def mark_stale_postings_closed(conn, company_id, seen_ats_posting_ids):
@@ -86,25 +126,34 @@ def mark_stale_postings_closed(conn, company_id, seen_ats_posting_ids):
         )
 
 
-def get_open_postings(conn, user_id):
+def get_open_postings(conn, user_id, since=None, keywords=()):
     """Open postings from companies this user tracks (user_companies), with
     this user's own applied relevance joined in from user_postings - a
     posting no other user has touched simply has no row there, hence the
-    LEFT JOIN + COALESCE."""
+    LEFT JOIN + COALESCE.
+
+    The table now holds every role, so rows are narrowed in SQL before they
+    reach Python: design roles always, other roles only if the title matches one
+    of the user's keywords (a coarse pre-filter; role_categories.matches_profile
+    makes the exact call), and optionally only those first seen since `since`.
+    """
+    keyword_patterns = [r"\y" + re.escape(kw) + r"\y" for kw in keywords]
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
             SELECT p.id, c.name AS company_name, c.ats_type, p.title, p.location, p.remote_type,
-                   p.url, p.first_seen_at,
+                   p.url, p.first_seen_at, p.is_design,
                    COALESCE(up.applied, false) AS applied
             FROM postings p
             JOIN companies c ON c.id = p.company_id
             JOIN user_companies uc ON uc.company_id = c.id AND uc.user_id = %s
             LEFT JOIN user_postings up ON up.posting_id = p.id AND up.user_id = %s
             WHERE p.status = 'open'
+              AND (p.is_design OR p.title ~* ANY(%s::text[]))
+              AND (%s::timestamptz IS NULL OR p.first_seen_at >= %s)
             ORDER BY p.first_seen_at DESC
             """,
-            (user_id, user_id),
+            (user_id, user_id, keyword_patterns, since, since),
         )
         return cur.fetchall()
 
@@ -167,13 +216,48 @@ def get_all_user_role_categories(conn):
         return result
 
 
+def get_user_keywords(conn, user_id):
+    """This user's non-design keyword profile, in a stable order."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT keyword FROM user_role_keywords WHERE user_id = %s ORDER BY keyword", (user_id,))
+        return [row[0] for row in cur.fetchall()]
+
+
+def set_user_keywords(conn, user_id, keywords):
+    """Replace this user's keyword profile wholesale (callers pass the cleaned list)."""
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM user_role_keywords WHERE user_id = %s", (user_id,))
+        if keywords:
+            psycopg2.extras.execute_values(
+                cur,
+                "INSERT INTO user_role_keywords (user_id, keyword) VALUES %s",
+                [(user_id, kw) for kw in keywords],
+            )
+
+
+def get_all_user_keywords(conn):
+    """{user_id: [keyword, ...]} for every user with a profile - loaded once per
+    scheduler run, like get_all_user_role_categories."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id, keyword FROM user_role_keywords")
+        result = {}
+        for user_id, keyword in cur.fetchall():
+            result.setdefault(user_id, []).append(keyword)
+        return result
+
+
+def mark_full_ingest_done(conn, company_id):
+    with conn.cursor() as cur:
+        cur.execute("UPDATE companies SET full_ingest_at = now() WHERE id = %s", (company_id,))
+
+
 def get_tracked_companies(conn):
     """Companies at least one user actually tracks - the scraper only fetches
     these, not every row ever added to the shared companies directory."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
-            SELECT DISTINCT c.id, c.name, c.ats_type, c.ats_identifier
+            SELECT DISTINCT c.id, c.name, c.ats_type, c.ats_identifier, c.full_ingest_at
             FROM companies c
             JOIN user_companies uc ON uc.company_id = c.id
             ORDER BY c.name
@@ -289,25 +373,6 @@ def record_zero_result(conn, company_id):
             (new_streak, new_status, company_id),
         )
     return is_new_isolation, new_streak
-
-
-def record_no_design_roles(conn, company_id):
-    """The fetch returned real postings (non-blank titles), none of them design
-    roles. That's a healthy source with nothing for us right now - not an
-    anomaly - so it must not count toward isolation. typical_posting_count is
-    deliberately left alone: it's a baseline for design-role volume, and a quiet
-    stretch shouldn't drag it toward zero."""
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE source_health
-            SET last_success_at = now(), last_checked_at = now(),
-                consecutive_failures = 0, consecutive_zero_results = 0,
-                status = 'healthy'
-            WHERE company_id = %s
-            """,
-            (company_id,),
-        )
 
 
 def record_fetch_failure(conn, company_id):
