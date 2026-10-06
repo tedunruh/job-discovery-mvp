@@ -173,3 +173,31 @@ real, titled postings, rather than trusting the status column. Fix separates
 - [ ] **Dry-run pipeline changes against live data inside a rolled-back
       transaction** with notifications stubbed, and read the resulting rows before
       shipping.
+
+### 2026-10-06 — SC-45a: all roles at the existing 59 companies
+**Shipped:** the collector stores every role (not just design), batched upserts
+with change detection, concurrent fetching, a silent first-ingest backfill,
+per-user keyword profiles, and a paginated dashboard.
+**Rework count:** 0 (all defects below were caught by a rolled-back dry run
+against live data before anything shipped)
+**Root cause:** *Change detection hashed a volatile field.* The "skip unchanged
+postings" hash included `ats_posted_at`, but Workday derives that timestamp from
+relative text ("posted 3 days ago"), so its seconds differ on every fetch and all
+147 Workday rows looked changed every cycle - the "do nothing" run still wrote
+147 rows. Found only because the dry run's second pass was checked for write
+count, not just for correctness of output. Fixed by hashing date precision only.
+**Also designed up front, from the grooming:** turning the filter off would have
+made ~7,800 existing postings "new" and fanned them out to notifications, and
+"empty preferences = show everything" would have sent a no-profile user every
+role. Both were closed before building (silent backfill; non-design roles need an
+explicit keyword match).
+**Standing checks added:**
+- [ ] **Idempotency: a run with no upstream changes must write ~0 rows.** For any
+      sync/ingest job, run it twice back-to-back in a rolled-back transaction and
+      assert the second pass's insert/update counts
+      (`pg_stat_xact_user_tables`). Nonzero means a volatile field is leaking into
+      change detection, and the job is doing needless writes forever.
+- [ ] **Before widening an ingest filter, trace what "new" triggers downstream.**
+      Anything keyed off "first time seen" (alerts, counters, emails) fires for the
+      whole backlog the moment the filter opens. Dry-run it and read the
+      notifications it would send.
