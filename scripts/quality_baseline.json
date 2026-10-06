@@ -6,7 +6,7 @@
    "font-size": "14px",
    "font-weight": "600",
    "line-height": "normal",
-   "margin": "0px",
+   "margin": "0px 0px 0px -4px",
    "padding": "0px"
   },
   ".role-count": {
@@ -53,7 +53,7 @@
    "font-size": "14px",
    "font-weight": "600",
    "line-height": "normal",
-   "margin": "0px",
+   "margin": "0px 0px 0px -4px",
    "padding": "0px"
   },
   ".role-count": {
@@ -100,7 +100,7 @@
    "font-size": "14px",
    "font-weight": "600",
    "line-height": "normal",
-   "margin": "0px",
+   "margin": "0px 0px 0px -4px",
    "padding": "0px"
   },
   ".role-count": {
@@ -147,7 +147,7 @@
    "font-size": "14px",
    "font-weight": "600",
    "line-height": "normal",
-   "margin": "0px",
+   "margin": "0px 0px 0px -4px",
    "padding": "0px"
   },
   ".role-count": {
@@ -194,7 +194,7 @@
    "font-size": "14px",
    "font-weight": "600",
    "line-height": "normal",
-   "margin": "0px",
+   "margin": "0px 0px 0px -4px",
    "padding": "0px"
   },
   ".role-count": {
@@ -241,7 +241,7 @@
    "font-size": "14px",
    "font-weight": "600",
    "line-height": "normal",
-   "margin": "0px",
+   "margin": "0px 0px 0px -4px",
    "padding": "0px"
   },
   ".role-count": {
