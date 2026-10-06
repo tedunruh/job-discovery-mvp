@@ -151,10 +151,11 @@ def _run(health_alerts):
                     posting_id = new_ids.get(str(posting["ats_posting_id"]))
                     if posting_id is None:
                         continue
-                    if backfill and not posting["is_design"]:
-                        # First all-roles ingest of this company: filling the table,
-                        # not news. (Design roles keep their existing behavior - those
-                        # were already being ingested, so a new one really is new.)
+                    if backfill:
+                        # First scan of this company (every company that existed when
+                        # all-roles ingest shipped has already had one): filling the
+                        # table, not news. Without this, tracking a new company would
+                        # alert you to every role it already had open.
                         continue
                     new_postings_count += 1
                     if users_tracking is None:

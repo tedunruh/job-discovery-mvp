@@ -1,0 +1,153 @@
+# Starter list of tech companies for the shared directory (SC-45b). Edit freely - the
+# detector decides which ATS each is on. "name | link" to disambiguate.
+Dropbox
+Twilio
+Okta
+Reddit
+GitLab
+HashiCorp
+Elastic
+MongoDB
+Webflow
+Carta
+Checkr
+Chime
+SoFi
+Plaid
+Mercury
+Rippling
+Deel
+Lattice
+Retool
+Grammarly
+Coursera
+Udemy
+Peloton
+Strava
+Etsy
+Faire
+Flexport
+Opendoor
+Zillow
+Redfin
+Compass
+Roblox
+Unity
+Epic Games
+Niantic
+Riot Games
+Twitch
+Medium
+Substack
+Patreon
+Kickstarter
+Ironclad
+Lucid Software
+Miro
+Airbyte
+dbt Labs
+Snowflake
+Confluent
+Cockroach Labs
+PlanetScale
+Neon
+Netlify
+Fastly
+Sentry
+PagerDuty
+LaunchDarkly
+Heap
+Pendo
+Gong
+Salesloft
+HubSpot
+Front
+Calendly
+Loom
+Framer
+InVision
+Descript
+Runway
+OpenAI
+Cohere
+Mistral AI
+Hugging Face
+Weights & Biases
+Perplexity
+Character.AI
+Glean
+Harvey
+Hebbia
+Marqeta
+Toast
+Kraken
+Gemini
+Chainalysis
+DoorDash
+Uber
+Hopper
+Headspace
+Calm
+Oura
+WHOOP
+Hinge Health
+Ro
+Noom
+Tempus
+Flatiron Health
+Benchling
+Veeva
+Oscar Health
+Zocdoc
+Carbon Health
+Maven Clinic
+Anduril
+Rivian
+Lucid Motors
+Nuro
+Applied Intuition
+Shield AI
+Attentive
+Amplify
+Navan
+Gitpod
+Postman
+Algolia
+Contentful
+Sanity
+Prismic
+Intuit
+Adobe
+Atlassian
+Shopify
+Squarespace
+Wix
+Mailchimp
+Klaviyo
+Braze
+Iterable
+Segment
+Heroku
+DigitalOcean
+Linode
+Vimeo
+Zapier
+Airtable
+Typeform
+SurveyMonkey
+Qualtrics
+Medallia
+UserTesting
+Maze
+Dovetail
+Pitch
+Superhuman
+Linear
+Height
+Cron
+Raycast
+Arc
+The Browser Company
+Warp
+Replicate
+Modal

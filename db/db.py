@@ -526,3 +526,34 @@ def start_scheduler_run(conn):
 def finish_scheduler_run(conn, run_id):
     with conn.cursor() as cur:
         cur.execute("UPDATE scheduler_runs SET finished_at = now() WHERE id = %s", (run_id,))
+
+
+# --- company directory (SC-45b) ---------------------------------------------------
+
+def add_company_if_absent(conn, name, ats_type, ats_identifier):
+    """Find or create a directory entry. Returns (company_id, created).
+
+    Matches case-insensitively on the identifier (Ashby slugs differ only by
+    case across sources - 'workhuman' vs 'Workhuman' are the same board), and
+    never renames an existing company, unlike upsert_company.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id FROM companies WHERE ats_type = %s AND lower(ats_identifier) = lower(%s)",
+            (ats_type, ats_identifier),
+        )
+        row = cur.fetchone()
+        if row:
+            return row[0], False
+        cur.execute(
+            """
+            INSERT INTO companies (name, ats_type, ats_identifier) VALUES (%s, %s, %s)
+            ON CONFLICT (ats_type, ats_identifier) DO NOTHING RETURNING id
+            """,
+            (name, ats_type, ats_identifier),
+        )
+        row = cur.fetchone()
+        if row:
+            return row[0], True
+        cur.execute("SELECT id FROM companies WHERE ats_type = %s AND ats_identifier = %s", (ats_type, ats_identifier))
+        return cur.fetchone()[0], False
