@@ -207,7 +207,13 @@ explicit keyword match).
 `.fg-menu`, `.fg-radio`, ghost button), whole-row job links with hover tint,
 labeled Applied toggle, header "Role preferences". Quality check updated for the
 new toolbar markup, plus a new menu-in-viewport and Escape-closes check.
-**Rework count:** 0 so far (pending review)
+**Rework count:** 1
+3. *Mobile layout copied the desktop grouping instead of re-deciding it.* On
+   phones the row kept the desktop "Second" group (Discovered + Applied) as one
+   unit, so Applied lined up with the Discovered timestamp instead of the title.
+   Fixed by dissolving the group (`display: contents`) and placing Applied
+   beside the title, centered on its first line. New automated check:
+   `Applied toggle centered on title line` at phone widths, mutation-tested.
 **Caught before shipping:**
 1. *Inherited rule collapsed a new component.* An old `.filters form { display:
    contents }` from the previous toolbar removed the box of the new menu (also a

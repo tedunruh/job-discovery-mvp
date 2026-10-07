@@ -169,6 +169,24 @@ def check_toolbar(page, w):
           f"left edge at {info['toolbarLeft']:.1f}px")
 
 
+def check_applied_alignment(page, w):
+    """At phone widths the Applied toggle sits beside the job title: its icon must
+    be centered on the title's first line (not on the Discovered line below)."""
+    rows = page.evaluate(
+        """
+        () => [...document.querySelectorAll('.posting')].slice(0, 5).map(li => {
+          const t = li.querySelector('.posting-title'), i = li.querySelector('.applied-toggle svg');
+          const tr = t.getBoundingClientRect(), ir = i.getBoundingClientRect();
+          const lh = parseFloat(getComputedStyle(t).lineHeight);
+          return { title: tr.top + lh / 2, icon: ir.top + ir.height / 2 };
+        })
+        """
+    )
+    off = [abs(r["title"] - r["icon"]) for r in rows]
+    check(rows and max(off) <= ALIGN_TOLERANCE_PX, f"Applied toggle centered on title line  [@{w}]",
+          f"worst offset {max(off):.2f}px" if rows else "no rows")
+
+
 def check_filter_menus(page, w):
     """Open each filter menu in turn; it must land fully inside the viewport (a
     menu anchored to a pill near the right edge can hang off a phone screen).
@@ -239,6 +257,8 @@ def main():
                     if path == "/":
                         check_toolbar(page, w)
                         check_filter_menus(page, w)
+                        if w <= 680:
+                            check_applied_alignment(page, w)
                         snapshots[str(w)] = snapshot_styles(page)
                 ctx.close()
             browser.close()
