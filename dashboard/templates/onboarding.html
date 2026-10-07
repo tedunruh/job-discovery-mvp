@@ -53,7 +53,7 @@
 <body class="fg-page">
   <div class="card">
     <h1 class="fg-display">What are you looking for?</h1>
-    <p class="subtext fg-text-secondary">Select any design roles that interest you — leave them all unchecked to see every design role we find. You can change this anytime from "Edit roles" on the dashboard.</p>
+    <p class="subtext fg-text-secondary">{% if first_time %}We've started you with Product Design. Add or remove roles to match what you're after — leave them all unchecked to see every design role we find.{% else %}Select any design roles that interest you — leave them all unchecked to see every design role we find.{% endif %} You can change this anytime from "Edit roles" on the dashboard.</p>
     <form method="post" action="/onboarding">
       <div class="categories">
         {% for key, cat in categories.items() %}
