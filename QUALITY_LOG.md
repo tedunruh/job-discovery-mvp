@@ -201,3 +201,56 @@ explicit keyword match).
       Anything keyed off "first time seen" (alerts, counters, emails) fires for the
       whole backlog the moment the filter opens. Dry-run it and read the
       notifications it would send.
+
+### 2026-10-06 — Dashboard refresh from Figma (node 117:2047)
+**Shipped:** Work type / Posted dropdown filters (new Field Guide `.fg-filter`,
+`.fg-menu`, `.fg-radio`, ghost button), whole-row job links with hover tint,
+labeled Applied toggle, header "Role preferences". Quality check updated for the
+new toolbar markup, plus a new menu-in-viewport and Escape-closes check.
+**Rework count:** 1
+3. *Mobile layout copied the desktop grouping instead of re-deciding it.* On
+   phones the row kept the desktop "Second" group (Discovered + Applied) as one
+   unit, so Applied lined up with the Discovered timestamp instead of the title.
+   Fixed by dissolving the group (`display: contents`) and placing Applied
+   beside the title, centered on its first line. New automated check:
+   `Applied toggle centered on title line` at phone widths, mutation-tested.
+**Caught before shipping:**
+1. *Inherited rule collapsed a new component.* An old `.filters form { display:
+   contents }` from the previous toolbar removed the box of the new menu (also a
+   `<form>`), so menus rendered in-flow instead of floating. Caught by screenshot.
+2. *Check measured against a width the bug itself changes.* The first menu-bounds
+   check compared against `innerWidth`; on a mobile page an overflowing menu widens
+   the layout viewport, so `innerWidth` grew to fit it and the check always passed.
+   Found by mutation-testing the check (shifting the menu off-screen on purpose).
+   Fixed by comparing against the requested viewport width.
+**Standing checks added:**
+- [ ] **Mutation-test every new check.** Break the thing a new check guards
+      (deliberately, then revert) and confirm the check fails before trusting it.
+      A check that can't fail is worse than none.
+- [ ] **Bounds checks use the true viewport width**, never `innerWidth` or
+      `scrollWidth` read after the element under test has rendered.
+
+### 2026-10-06 — Roboto as the UI fallback font
+**Shipped:** UI stack is now Avenir Next → Avenir → Roboto → sans-serif (was
+-apple-system → Segoe UI → Roboto), and Roboto 400/500/600 loads from Google Fonts
+so non-Apple devices get it even where it isn't installed (Windows).
+**Rework count:** 0
+**Note for verification:** the cloud preview can't reach Google Fonts and has no
+Avenir Next, so screenshots were silently rendering in DejaVu, not the real type.
+Installed Roboto and Fraunces locally (from the @fontsource npm packages) so the
+quality check and screenshots now render the actual fallback; Roboto is the
+wider of the two UI faces, so toolbar fit is checked against the worst case.
+
+### 2026-10-06 — Roboto fallback one weight lighter; Applied gap 4px
+**Shipped:** Roboto is now self-hosted as "Field Guide Roboto" (field-guide/fonts,
+OFL-1.1) with each weight mapped one step lighter (400→300, 500→400, 600→500) so it
+matches Avenir Next's color. Applied toggle icon-to-label gap 12px → 4px.
+**Rework count:** 1 (reviewer judged Roboto too heavy at matching weights and the
+Applied gap too wide, after the previous entry shipped)
+**Root cause:** *Font substitution judged by family, not by rendered weight.*
+Roboto Medium is visibly heavier than Avenir Next Medium; swapping families at the
+same nominal weights changes the page's typographic color.
+**Standing checks added:**
+- [x] Automated: `Roboto fallback font loads` - every UI weight of the self-hosted
+      face actually loads (a 404 otherwise drops silently to generic sans-serif).
+      Mutation-tested by removing one woff2 file.

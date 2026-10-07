@@ -16,7 +16,8 @@ Rules:
 - Every template includes `{% include "_field_guide_head.html" %}` and uses `<body class="fg-page">`.
 - To change a token: edit `field-guide/tokens/*.json`, run `python field-guide/build.py`,
   commit the JSON and `field-guide/dist/tokens.css` together. Never edit `dist/` by hand.
-- Fonts are Fraunces (display) and Avenir Next (UI) only.
+- Fonts are Fraunces (display) and Avenir Next (UI) only, with Roboto as the UI fallback on
+  non-Apple devices (Avenir Next isn't web-licensed), self-hosted one weight lighter. Never add another typeface.
 - Goldenrod, Clay and Sage are never text colors on Parchment, and never the only signal of
   meaning. Pair them with Ink text or an icon.
 - Free text (messages, descriptions, body copy) is always left-aligned, even inside a centered
