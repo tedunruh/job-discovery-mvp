@@ -93,3 +93,19 @@ def matches_profile(title: str, is_design: bool, categories, keywords) -> bool:
     if is_design and matches_categories(title, categories):
         return True
     return matches_keywords(title, keywords)
+
+
+# Work type (see dashboard.filters.work_type): remote = remote AND in the US, hybrid, onsite.
+# None means a remote role outside the US, which only shows when the filter is "Any".
+WORK_TYPE_KEYS = ("remote", "hybrid", "onsite")
+DEFAULT_WORK_TYPES = ["remote"]  # what someone who never chose gets, on the dashboard and in alerts
+
+
+def matches_work_type(posting_work_type, prefs) -> bool:
+    """Does a posting's work type fit this person's preference? prefs=None means they
+    never chose (the default applies); an empty list, or all three, means Any."""
+    if prefs is None:
+        prefs = DEFAULT_WORK_TYPES
+    if not prefs or len(set(prefs)) >= len(WORK_TYPE_KEYS):
+        return True
+    return posting_work_type in prefs

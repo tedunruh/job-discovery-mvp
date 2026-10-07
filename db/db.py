@@ -33,7 +33,7 @@ def upsert_company(conn, name, ats_type, ats_identifier):
         return cur.fetchone()[0]
 
 
-def _content_hash(posting):
+def content_hash(posting):
     """Fingerprint of what we store. Unchanged postings (same hash) aren't
     rewritten, so a cycle that finds nothing new does almost no writes."""
     core = [
@@ -53,16 +53,16 @@ def upsert_postings(conn, company_id, postings, backfill=False):
 
     Returns {ats_posting_id: postings.id} for the postings that were brand new
     (never seen before).
-    Unchanged postings are skipped entirely (see _content_hash), so last_seen_at
+    Unchanged postings are skipped entirely (see content_hash), so last_seen_at
     only moves when something about the posting changed or it reopened.
 
     Storage: only design roles keep their full raw payload - for everything else
     the HTML body etc. is dropped ({}), which is most of the bytes.
 
-    backfill=True is the company's first all-roles ingest: first_seen_at is set
-    from the ATS's own posted date (capped at now) instead of now, so the
-    "discovered within" dashboard filter doesn't treat hundreds of long-open
-    roles as discovered today.
+    backfill=True is the company's first scan: first_seen_at is set from the ATS's own
+    posted date (capped at now) instead of now - and treated as ~6 months old when the ATS
+    gives no date - so the "discovered within" dashboard filter doesn't present hundreds of
+    long-open roles as discovered today.
     """
     by_id = {str(p["ats_posting_id"]): p for p in postings if p.get("ats_posting_id") is not None}
     if not by_id:
@@ -73,7 +73,7 @@ def upsert_postings(conn, company_id, postings, backfill=False):
             company_id, ats_id, p["title"], p.get("location"), p.get("remote_type"),
             p["url"], p.get("ats_posted_at"),
             psycopg2.extras.Json((p.get("raw_json") or {}) if p.get("is_design") else {}),
-            _content_hash(p), bool(p.get("is_design")), backfill, p.get("ats_posted_at"),
+            content_hash(p), bool(p.get("is_design")), backfill, p.get("ats_posted_at"),
         ))
     new_ids = {}
     with conn.cursor() as cur:
@@ -102,7 +102,7 @@ def upsert_postings(conn, company_id, postings, backfill=False):
             """,
             rows,
             template="""(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                CASE WHEN %s THEN LEAST(COALESCE(%s::timestamptz, now()), now()) ELSE now() END,
+                CASE WHEN %s THEN LEAST(COALESCE(%s::timestamptz, now() - interval '180 days'), now()) ELSE now() END,
                 now())""",
             page_size=500,
             fetch=True,
@@ -252,19 +252,37 @@ def mark_full_ingest_done(conn, company_id):
 
 
 def get_companies_to_scan(conn):
-    """Every company in the directory. The scraper scans all of them each run, for
-    everyone - coverage is Scout's job, not a per-user list."""
+    """Every company that isn't switched off (tier 'off'). `tier` says how to scan it - see
+    the tier note in schema.sql. Coverage is Scout's job, not a per-user list."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute("SELECT id, name, ats_type, ats_identifier, full_ingest_at FROM companies ORDER BY name")
+        cur.execute(
+            """
+            SELECT id, name, ats_type, ats_identifier, full_ingest_at, tier
+            FROM companies WHERE tier <> 'off' ORDER BY name
+            """
+        )
         return cur.fetchall()
 
 
 def get_all_users(conn):
     """Everyone who gets alerts. Each is matched against their own role profile
-    (role_categories.matches_profile) before being notified."""
+    (role_categories.matches_profile) and Work type before being notified.
+    work_types: None = never chose (default applies), [] = Any."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute("SELECT id, ntfy_topic FROM users ORDER BY id")
+        cur.execute("SELECT id, ntfy_topic, work_types FROM users ORDER BY id")
         return cur.fetchall()
+
+
+def get_user_work_types(conn, user_id):
+    with conn.cursor() as cur:
+        cur.execute("SELECT work_types FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+        return row[0] if row else None
+
+
+def set_user_work_types(conn, user_id, work_types):
+    with conn.cursor() as cur:
+        cur.execute("UPDATE users SET work_types = %s WHERE id = %s", (list(work_types), user_id))
 
 
 def mark_notified(conn, user_id, posting_id):
@@ -542,3 +560,69 @@ def add_company_if_absent(conn, name, ats_type, ats_identifier):
             return row[0], True
         cur.execute("SELECT id FROM companies WHERE ats_type = %s AND ats_identifier = %s", (ats_type, ats_identifier))
         return cur.fetchone()[0], False
+
+
+# --- discovered boards: lean, batched bookkeeping (SC-49) ---------------------------
+
+
+
+def record_tail_scan_results(conn, ok_ids, failed_ids, first_scan_ids):
+    """One round of batched health bookkeeping for a run's worth of discovered boards, instead
+    of ~6 queries per board. ok = fetched fine; failed = request error (counted, never alerted
+    per board - a few thousand boards means some are always down). first_scan_ids are marked
+    scanned so later new design roles can alert."""
+    with conn.cursor() as cur:
+        touched = list(set(ok_ids) | set(failed_ids))
+        if touched:
+            cur.execute(
+                "INSERT INTO source_health (company_id) SELECT unnest(%s::int[]) ON CONFLICT (company_id) DO NOTHING",
+                (touched,),
+            )
+        if ok_ids:
+            cur.execute(
+                """
+                UPDATE source_health
+                SET last_success_at = now(), last_checked_at = now(), consecutive_failures = 0,
+                    consecutive_zero_results = 0, status = 'healthy'
+                WHERE company_id = ANY(%s)
+                """,
+                (list(ok_ids),),
+            )
+        if failed_ids:
+            cur.execute(
+                """
+                UPDATE source_health
+                SET last_checked_at = now(), consecutive_failures = consecutive_failures + 1,
+                    status = CASE WHEN consecutive_failures + 1 >= %s THEN 'degraded' ELSE status END
+                WHERE company_id = ANY(%s)
+                """,
+                (FAILURE_THRESHOLD * 8, list(failed_ids)),
+            )
+        if first_scan_ids:
+            cur.execute("UPDATE companies SET full_ingest_at = now() WHERE id = ANY(%s)", (list(first_scan_ids),))
+
+
+def promote_hot_boards(conn):
+    """A cold board that now has a design role becomes hot (scanned every run). Returns how many."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE companies c SET tier = 'hot'
+            WHERE c.tier = 'cold' AND EXISTS (SELECT 1 FROM postings p WHERE p.company_id = c.id AND p.is_design)
+            """
+        )
+        return cur.rowcount
+
+
+def get_open_posting_hashes(conn, company_ids):
+    """{company_id: {ats_posting_id: content_hash}} for these companies' open postings, in one
+    query - lets the scanner skip every database call for a board whose roles haven't changed."""
+    result = {}
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT company_id, ats_posting_id, content_hash FROM postings WHERE status = 'open' AND company_id = ANY(%s)",
+            (list(company_ids),),
+        )
+        for cid, ats_id, h in cur.fetchall():
+            result.setdefault(cid, {})[ats_id] = h
+    return result

@@ -10,9 +10,18 @@ on:
     - cron: "0 */6 * * *"
   workflow_dispatch: {}
 
+# One collector run at a time: scanning thousands of boards makes a run longer, and an
+# overlapping run would double-fetch and race on the same rows. A newer dispatch waits for
+# the current run instead of cancelling it (it would be killed mid-write otherwise).
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
 jobs:
   collect:
     runs-on: ubuntu-latest
+    # A run normally takes 3-5 minutes; this only stops a hung one before it blocks the queue.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       # Keep the Render dashboard awake in waking hours (see the script). Before and
