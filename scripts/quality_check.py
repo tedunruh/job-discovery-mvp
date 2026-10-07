@@ -169,6 +169,28 @@ def check_toolbar(page, w):
           f"left edge at {info['toolbarLeft']:.1f}px")
 
 
+def check_fallback_font(page, w):
+    """The Roboto fallback is self-hosted under its own family name. A bad path or
+    route 404s silently and the UI drops to the browser's generic sans-serif, so
+    confirm every weight the UI uses actually loads."""
+    loaded = page.evaluate(
+        """
+        async () => {
+          const out = {};
+          for (const wt of [400, 500, 600]) {
+            try {  // a 404'd file rejects here rather than returning an error status
+              const faces = await document.fonts.load(`${wt} 16px "Field Guide Roboto"`);
+              out[wt] = faces.length > 0 && faces.every(f => f.status === "loaded");
+            } catch (e) { out[wt] = false; }
+          }
+          return out;
+        }
+        """
+    )
+    bad = [k for k, ok in loaded.items() if not ok]
+    check(not bad, f"Roboto fallback font loads  [@{w}]", "failed weights: " + ", ".join(bad))
+
+
 def check_applied_alignment(page, w):
     """At phone widths the Applied toggle sits beside the job title: its icon must
     be centered on the title's first line (not on the Discovered line below)."""
@@ -257,6 +279,7 @@ def main():
                     if path == "/":
                         check_toolbar(page, w)
                         check_filter_menus(page, w)
+                        check_fallback_font(page, w)
                         if w <= 680:
                             check_applied_alignment(page, w)
                         snapshots[str(w)] = snapshot_styles(page)

@@ -72,7 +72,7 @@
 
   /* font.family */
   --fg-font-family-display: Fraunces, Georgia, serif;
-  --fg-font-family-ui: "Avenir Next", Avenir, Roboto, sans-serif;
+  --fg-font-family-ui: "Avenir Next", Avenir, "Field Guide Roboto", sans-serif;
 
   /* font */
   --fg-font-display-variation: "SOFT" 0, "WONK" 1;

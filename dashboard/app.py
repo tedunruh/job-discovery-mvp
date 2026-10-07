@@ -72,9 +72,9 @@ MAX_SHOWN = 1000
 FIELD_GUIDE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "field-guide")
 
 
-@app.route("/field-guide/<any(dist, css, js):folder>/<path:filename>")
+@app.route("/field-guide/<any(dist, css, js, fonts):folder>/<path:filename>")
 def field_guide_static(folder, filename):
-    """Serve the Field Guide design system (tokens, component CSS, small scripts) to templates."""
+    """Serve the Field Guide design system (tokens, component CSS, fonts, small scripts) to templates."""
     return send_from_directory(os.path.join(FIELD_GUIDE_DIR, folder), filename)
 
 
