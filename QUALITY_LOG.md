@@ -240,3 +240,17 @@ Avenir Next, so screenshots were silently rendering in DejaVu, not the real type
 Installed Roboto and Fraunces locally (from the @fontsource npm packages) so the
 quality check and screenshots now render the actual fallback; Roboto is the
 wider of the two UI faces, so toolbar fit is checked against the worst case.
+
+### 2026-10-06 — Roboto fallback one weight lighter; Applied gap 4px
+**Shipped:** Roboto is now self-hosted as "Field Guide Roboto" (field-guide/fonts,
+OFL-1.1) with each weight mapped one step lighter (400→300, 500→400, 600→500) so it
+matches Avenir Next's color. Applied toggle icon-to-label gap 12px → 4px.
+**Rework count:** 1 (reviewer judged Roboto too heavy at matching weights and the
+Applied gap too wide, after the previous entry shipped)
+**Root cause:** *Font substitution judged by family, not by rendered weight.*
+Roboto Medium is visibly heavier than Avenir Next Medium; swapping families at the
+same nominal weights changes the page's typographic color.
+**Standing checks added:**
+- [x] Automated: `Roboto fallback font loads` - every UI weight of the self-hosted
+      face actually loads (a 404 otherwise drops silently to generic sans-serif).
+      Mutation-tested by removing one woff2 file.

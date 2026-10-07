@@ -18,6 +18,8 @@ field-guide/
 │   └── radius.json
 ├── build.py           tokens/*.json -> dist/tokens.css (plain Python, no Node)
 ├── dist/tokens.css    GENERATED. Committed. Never edit by hand.
+├── css/fonts.css      @font-face for the Roboto fallback (one weight lighter)
+├── fonts/             self-hosted Roboto woff2 + license
 ├── js/filter.js       closes .fg-filter menus on outside click / Escape
 └── css/components.css hand-written components (.fg-*), semantic tokens only
 ```
@@ -64,7 +66,9 @@ Ink on Goldenrod 6.7:1, on Sage 6.7:1, on Clay 4.4:1 (large or bold text only).
   Always with `font-variation-settings: "SOFT" 0, "WONK" 1`.
 - **Avenir Next** (`--fg-font-family-ui`): clarity. Everything else.
   Avenir Next ships with Apple devices only (no web license), so everywhere else
-  falls back to **Roboto**, loaded from Google Fonts alongside Fraunces.
+  falls back to **Roboto**, self-hosted in `fonts/` as the family "Field Guide Roboto"
+  and mapped one weight lighter (400→300, 500→400, 600→500) so it matches Avenir's
+  color on the page. See `css/fonts.css`.
 - No other typefaces.
 
 Scale: 12 / 14 / 15 (body) / 16 / 20 / 24 / 28 / 36, plus 96 for the sign-in wordmark.
