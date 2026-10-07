@@ -23,6 +23,7 @@ from db.db import (
     get_open_postings,
     get_posting_url,
     get_user_keywords,
+    get_user_work_types,
     get_session_user,
     get_user_role_categories,
     is_onboarded,
@@ -31,6 +32,7 @@ from db.db import (
     set_applied,
     set_user_keywords,
     set_user_role_categories,
+    set_user_work_types,
 )
 from role_categories import ROLE_CATEGORIES, MAX_KEYWORDS, clean_keywords, matches_profile
 
@@ -226,10 +228,21 @@ def index():
         session.permanent = True
         if request.args.get("range") in RANGES:
             session["posted_range"] = request.args["range"]
+        chosen = None
         if "work_set" in request.args:
-            session["work_types"] = [w for w in WORK_TYPES if w in request.args.getlist("work")]
+            chosen = [w for w in WORK_TYPES if w in request.args.getlist("work")]
         elif "remote_us_only" in request.args:
-            session["work_types"] = ["remote"] if request.args["remote_us_only"] == "true" else []
+            chosen = ["remote"] if request.args["remote_us_only"] == "true" else []
+        if chosen is not None:
+            session["work_types"] = chosen
+            # Saved on the person, not just the session: alerts are decided by the collector,
+            # which can't see a cookie, and should follow the same Work type as the dashboard.
+            conn = get_conn()
+            try:
+                set_user_work_types(conn, user_id, chosen)
+                conn.commit()
+            finally:
+                conn.close()
         return redirect(url_for("index"))
 
     posted_range = session.get("posted_range", DEFAULT_RANGE)
@@ -246,11 +259,17 @@ def index():
         conn.commit()
         role_categories = get_user_role_categories(conn, user_id)
         keywords = get_user_keywords(conn, user_id)
+        saved_work_types = get_user_work_types(conn, user_id)
+        if saved_work_types is None and ("work_types" in session or "remote_us_only" in session):
+            # A choice made before it was stored on the person: save it, so alerts match it too.
+            saved_work_types = selected_work_types(None)
+            set_user_work_types(conn, user_id, saved_work_types)
+            conn.commit()
         postings = get_open_postings(conn, user_id, since=cutoff, keywords=keywords)
     finally:
         conn.close()
 
-    work_types = selected_work_types()
+    work_types = selected_work_types(saved_work_types)
     if work_types and len(work_types) < len(WORK_TYPES):  # none or all checked = Any
         postings = [p for p in postings if work_type(p["location"], p["remote_type"]) in work_types]
     postings = [
@@ -276,9 +295,12 @@ def index():
     )
 
 
-def selected_work_types():
-    """Checked Work type options, in display order. Sessions from before the Work
-    type filter carry the old remote_us_only flag instead; it maps to Remote."""
+def selected_work_types(saved):
+    """Checked Work type options, in display order. `saved` is what's stored on the person
+    (None = never chosen). Sessions from before it was stored fall back to the cookie, and the
+    old remote_us_only flag maps to Remote; nothing at all means the default (Remote)."""
+    if saved is not None:
+        return [w for w in WORK_TYPES if w in saved]
     if "work_types" in session:
         return [w for w in WORK_TYPES if w in session["work_types"]]
     if "remote_us_only" in session:  # an explicit choice made with the old toggle

@@ -194,3 +194,23 @@ CREATE TABLE IF NOT EXISTS user_role_keywords (
     keyword TEXT NOT NULL,
     PRIMARY KEY (user_id, keyword)
 );
+
+-- ---------------------------------------------------------------------------
+-- SC-49: scale scanning to discovered boards. Additive migrations (safe to re-run).
+-- ---------------------------------------------------------------------------
+
+-- How a company is scanned:
+--   core - the original watched companies: every role stored, scanned every run
+--   hot  - discovered boards that have (had) a design role: design roles only, every run
+--   cold - discovered boards with none yet: design roles only, in a rotating slice
+--          (each scanned about every 4 hours) - a board that posts one becomes hot
+--   off  - kill switch: never scanned
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'core';
+DO $$ BEGIN
+    ALTER TABLE companies ADD CONSTRAINT companies_tier_check CHECK (tier IN ('core', 'hot', 'cold', 'off'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+CREATE INDEX IF NOT EXISTS idx_companies_tier ON companies (tier);
+
+-- The person's Work type preference, so alerts follow the same parameters as the dashboard.
+-- NULL = never chosen (the app default applies: Remote); empty = Any.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS work_types TEXT[];
