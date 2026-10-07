@@ -7,3 +7,4 @@ venv/
 .env.local
 node_modules/
 scripts/add_companies_review.txt
+scripts/_discovery/
