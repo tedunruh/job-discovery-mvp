@@ -62,7 +62,13 @@ RANGES = {
     "month": ("Last month", "within a month", timedelta(days=30)),
     "all": ("All time", "any time", None),
 }
-DEFAULT_RANGE = "24h"
+DEFAULT_RANGE = "week"
+# What a signed-in session starts on until the person changes it (changes are remembered per
+# session). Remote = remote AND in the US, as inferred by dashboard.filters.work_type.
+DEFAULT_WORK_TYPES = ["remote"]
+# Role categories pre-checked the first time someone onboards, so the screen starts with
+# something selected; they can change it.
+DEFAULT_ONBOARDING_CATEGORIES = {"product_design"}
 
 # The dashboard renders this many roles, then offers "show more" - the table holds
 # every role at every tracked company, so an unbounded list is thousands of rows.
@@ -275,7 +281,9 @@ def selected_work_types():
     type filter carry the old remote_us_only flag instead; it maps to Remote."""
     if "work_types" in session:
         return [w for w in WORK_TYPES if w in session["work_types"]]
-    return ["remote"] if session.get("remote_us_only") else []
+    if "remote_us_only" in session:  # an explicit choice made with the old toggle
+        return ["remote"] if session["remote_us_only"] else []
+    return list(DEFAULT_WORK_TYPES)
 
 
 def work_type_label(work_types):
@@ -300,10 +308,14 @@ def onboarding():
             return redirect(url_for("index"))
         selected = get_user_role_categories(conn, user_id)
         keywords = get_user_keywords(conn, user_id)
+        first_time = not is_onboarded(conn, user_id)
     finally:
         conn.close()
+    if first_time and not selected:
+        selected = set(DEFAULT_ONBOARDING_CATEGORIES)
     return render_template(
         "onboarding.html",
+        first_time=first_time,
         categories=ROLE_CATEGORIES,
         selected=selected,
         keywords=", ".join(keywords),
