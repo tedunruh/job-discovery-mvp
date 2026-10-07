@@ -229,3 +229,14 @@ new toolbar markup, plus a new menu-in-viewport and Escape-closes check.
       A check that can't fail is worse than none.
 - [ ] **Bounds checks use the true viewport width**, never `innerWidth` or
       `scrollWidth` read after the element under test has rendered.
+
+### 2026-10-06 — Roboto as the UI fallback font
+**Shipped:** UI stack is now Avenir Next → Avenir → Roboto → sans-serif (was
+-apple-system → Segoe UI → Roboto), and Roboto 400/500/600 loads from Google Fonts
+so non-Apple devices get it even where it isn't installed (Windows).
+**Rework count:** 0
+**Note for verification:** the cloud preview can't reach Google Fonts and has no
+Avenir Next, so screenshots were silently rendering in DejaVu, not the real type.
+Installed Roboto and Fraunces locally (from the @fontsource npm packages) so the
+quality check and screenshots now render the actual fallback; Roboto is the
+wider of the two UI faces, so toolbar fit is checked against the worst case.

@@ -4,7 +4,7 @@
     "family": {
       "$type": "fontFamily",
       "display": { "$value": ["Fraunces", "Georgia", "serif"], "$description": "Wordmark, editorial headlines, introductions, discovery moments, brand storytelling." },
-      "ui":      { "$value": ["Avenir Next", "Avenir", "-apple-system", "Segoe UI", "Roboto", "sans-serif"], "$description": "Navigation, body, buttons, forms, labels, metadata, product UI." }
+      "ui":      { "$value": ["Avenir Next", "Avenir", "Roboto", "sans-serif"], "$description": "Navigation, body, buttons, forms, labels, metadata, product UI. Avenir Next ships with Apple devices; everywhere else falls back to Roboto, loaded from Google Fonts." }
     },
     "display-variation": { "$type": "string", "$value": "\"SOFT\" 0, \"WONK\" 1", "$description": "Fraunces axis settings used throughout the Figma file." },
     "weight": {

@@ -63,6 +63,8 @@ Ink on Goldenrod 6.7:1, on Sage 6.7:1, on Clay 4.4:1 (large or bold text only).
   Wordmark, editorial headlines, introductions, discovery moments.
   Always with `font-variation-settings: "SOFT" 0, "WONK" 1`.
 - **Avenir Next** (`--fg-font-family-ui`): clarity. Everything else.
+  Avenir Next ships with Apple devices only (no web license), so everywhere else
+  falls back to **Roboto**, loaded from Google Fonts alongside Fraunces.
 - No other typefaces.
 
 Scale: 12 / 14 / 15 (body) / 16 / 20 / 24 / 28 / 36, plus 96 for the sign-in wordmark.
