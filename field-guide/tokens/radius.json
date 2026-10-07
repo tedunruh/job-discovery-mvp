@@ -4,6 +4,7 @@
     "sm":   { "$value": "4px", "$description": "Inputs, checkboxes, messages" },
     "md":   { "$value": "6px", "$description": "Swatches, tags, small cards (Figma Color + Text)" },
     "lg":   { "$value": "8px", "$description": "Buttons" },
+    "xl":   { "$value": "12px", "$description": "Filter pills, sections (Figma dashboard 117:2047)" },
     "full": { "$value": "999px" }
   }
 }

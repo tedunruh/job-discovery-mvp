@@ -9,9 +9,10 @@ What it checks, at phone / tablet / desktop sizes, on /login, /onboarding and /:
   1. viewport meta present, and a mobile-emulated page reports its true width
   2. no horizontal page overflow
   3. login route artwork (pins, dots) stays inside the viewport once animations end
-  4. dashboard toolbar items are vertically aligned (centerY), single-line (no text
-     wrapping) and padded >= 16px
-  5. computed styles of the toolbar vs. a saved baseline - flags *changes* for
+  4. dashboard toolbar items (filter pills, role count) are single-line, items that
+     share a row share a centerY, and the toolbar is padded >= 16px
+  5. each dashboard filter menu, once opened, sits fully inside the viewport
+  6. computed styles of the toolbar vs. a saved baseline - flags *changes* for
      review (sibling-regression catcher; not a failure, since edits are often intended)
 
 It boots the real Flask app against the DB in .env.local with a throwaway user
@@ -48,7 +49,8 @@ MOBILE_MAX_WIDTH = 768  # below this, emulate a touch phone (viewport meta must 
 ALIGN_TOLERANCE_PX = 1.0
 MIN_SIDE_PADDING_PX = 16
 STYLE_PROPS = ["font-size", "line-height", "font-weight", "color", "display", "padding", "margin"]
-STYLE_SELECTORS = [".toolbar", ".range-select", ".toolbar-left .fg-check", ".toolbar-left .fg-link", ".role-count"]
+STYLE_SELECTORS = [".toolbar", ".fg-filter-pill", ".fg-filter-label", ".fg-filter-value", ".role-count"]
+TOOLBAR_ITEMS = ".toolbar .fg-filter-pill, .toolbar .role-count"
 
 logging.getLogger("werkzeug").setLevel(logging.ERROR)  # quiet the per-request access log
 
@@ -132,28 +134,60 @@ def check_login_artwork(page, w, h):
 
 
 def check_toolbar(page, w):
+    """Toolbar items may wrap onto more than one row at phone widths (two filter
+    pills plus the count don't fit 328px), so alignment is checked per row: items
+    whose boxes overlap vertically are on the same row and must share a centerY."""
     info = page.evaluate(
         """
-        () => {
-          const sel = ['.toolbar-left .fg-check', '.toolbar-left .fg-link', '.role-count'];
-          const rects = sel.map(s => { const e = document.querySelector(s); if (!e) return null;
-            const r = e.getBoundingClientRect(), lh = parseFloat(getComputedStyle(e).lineHeight) || r.height;
-            return { s, cy: r.top + r.height / 2, left: r.left, lines: r.height / lh }; });
-          return { rects, toolbarLeft: document.querySelector('.toolbar-left')?.getBoundingClientRect().left };
+        (sel) => {
+          const items = [...document.querySelectorAll(sel)].map(e => {
+            const r = e.getBoundingClientRect(), cs = getComputedStyle(e);
+            const lh = parseFloat(cs.lineHeight) || r.height;
+            const inner = r.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
+                          - parseFloat(cs.borderTopWidth) - parseFloat(cs.borderBottomWidth);
+            return { s: e.className, top: r.top, bottom: r.bottom, cy: r.top + r.height / 2, lines: inner / lh };
+          });
+          return { items, toolbarLeft: document.querySelector('.toolbar')?.getBoundingClientRect().left };
         }
-        """
+        """,
+        TOOLBAR_ITEMS,
     )
-    if any(r is None for r in info["rects"]):
-        check(False, f"toolbar elements found  [@{w}]", "missing toolbar item")
+    items = info["items"]
+    if len(items) < 3:
+        check(False, f"toolbar elements found  [@{w}]", f"expected 2 filter pills + role count, found {len(items)}")
         return
-    ys = [r["cy"] for r in info["rects"]]
-    spread = max(ys) - min(ys)
-    detail = ", ".join(f"{r['s'].split()[-1]}={r['cy']:.1f}" for r in info["rects"])
-    check(spread <= ALIGN_TOLERANCE_PX, f"toolbar items share a centerY  [@{w}]", f"spread {spread:.2f}px ({detail})")
-    wrapped = [f"{r['s'].split()[-1]} ({r['lines']:.1f} lines)" for r in info["rects"] if r["lines"] > 1.5]
+    rows = []
+    for it in sorted(items, key=lambda i: i["top"]):
+        row = next((r for r in rows if it["top"] < r[0]["bottom"] and it["bottom"] > r[0]["top"]), None)
+        (row.append(it) if row is not None else rows.append([it]))
+    worst = max((max(i["cy"] for i in r) - min(i["cy"] for i in r)) for r in rows)
+    detail = " | ".join(", ".join(f"{i['s'].split()[0]}={i['cy']:.1f}" for i in r) for r in rows)
+    check(worst <= ALIGN_TOLERANCE_PX, f"toolbar items in a row share a centerY  [@{w}]", f"spread {worst:.2f}px ({detail})")
+    wrapped = [f"{i['s'].split()[0]} ({i['lines']:.1f} lines)" for i in items if i["lines"] > 1.5]
     check(not wrapped, f"toolbar text stays on one line  [@{w}]", "wrapped: " + ", ".join(wrapped))
     check(info["toolbarLeft"] >= MIN_SIDE_PADDING_PX - 0.5, f"toolbar side padding >= {MIN_SIDE_PADDING_PX}px  [@{w}]",
           f"left edge at {info['toolbarLeft']:.1f}px")
+
+
+def check_filter_menus(page, w):
+    """Open each filter menu in turn; it must land fully inside the viewport (a
+    menu anchored to a pill near the right edge can hang off a phone screen).
+    Measured against the requested width w, not innerWidth: on a mobile page an
+    overflowing menu widens the layout viewport, so innerWidth grows to fit it
+    and the menu would always look "inside"."""
+    for fid in page.evaluate("[...document.querySelectorAll('details.fg-filter')].map(d => d.id)"):
+        page.click(f"#{fid} > summary")
+        r = page.evaluate(
+            f"(() => {{ const m = document.querySelector('#{fid} .fg-menu').getBoundingClientRect();"
+            f" return {{l: m.left, r: m.right, t: m.top, b: m.bottom, W: innerWidth, open: document.querySelector('#{fid}').open}}; }})()"
+        )
+        check(r["open"], f"filter menu opens  [#{fid} @{w}]")
+        inside = r["l"] >= -0.5 and r["r"] <= w + 0.5 and r["t"] >= -0.5
+        check(inside, f"filter menu inside viewport  [#{fid} @{w}]",
+              f"menu [{r['l']:.0f},{r['t']:.0f} -> {r['r']:.0f},{r['b']:.0f}] vs width {w}")
+        page.keyboard.press("Escape")
+        closed = page.evaluate(f"!document.querySelector('#{fid}').open")
+        check(closed, f"Escape closes filter menu  [#{fid} @{w}]")
 
 
 def snapshot_styles(page):
@@ -204,6 +238,7 @@ def main():
                         check_login_artwork(page, w, h)
                     if path == "/":
                         check_toolbar(page, w)
+                        check_filter_menus(page, w)
                         snapshots[str(w)] = snapshot_styles(page)
                 ctx.close()
             browser.close()

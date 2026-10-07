@@ -60,3 +60,27 @@ def is_remote(location, remote_type):
 
 def is_remote_us(location, remote_type):
     return is_remote(location, remote_type) and is_us_location(location)
+
+
+_HYBRID_RE = re.compile(r"\bhybrid\b", re.IGNORECASE)
+
+# Work-type buckets for the dashboard's "Work type" filter. Only Lever reports a
+# workplace type ("remote" / "hybrid" / "onsite"); Ashby and Workable only flag
+# remote; Greenhouse and Workday report nothing. So the bucket is inferred:
+#   remote  - remote AND in the US (same rule as the old "Remote US only" toggle)
+#   hybrid  - Lever says hybrid, or the location text says "hybrid"
+#   onsite  - everything else that isn't remote
+# Remote roles outside the US fall in no bucket: they show only when the filter
+# is left at "Any".
+WORK_TYPES = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On-site"}
+
+
+def work_type(location, remote_type):
+    kind = (remote_type or "").lower()
+    if kind == "hybrid":
+        return "hybrid"
+    if is_remote(location, remote_type):
+        return "remote" if is_us_location(location) else None
+    if location and _HYBRID_RE.search(location):
+        return "hybrid"
+    return "onsite"

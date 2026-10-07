@@ -1,0 +1,10 @@
+{
+  "$description": "Shadows. Only raised, temporary surfaces (menus, popovers) get one; Scout's resting UI is flat.",
+  "shadow": {
+    "$type": "shadow",
+    "raised": {
+      "$value": "4px 4px 6px rgb(0 0 0 / 0.16)",
+      "$description": "Dropdown menus (Figma dashboard 117:2047)."
+    }
+  }
+}

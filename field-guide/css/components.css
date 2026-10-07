@@ -40,7 +40,8 @@
 
 /* ---------- Button ---------- */
 /* Primary = Forest ("if Scout wants you to move, Forest shows you where to go").
-   Secondary = quiet Ink-tinted button for everything else. */
+   Secondary = quiet outlined Ink button. Ghost = Forest text, no outline
+   (e.g. "Role preferences" in the dashboard header). */
 .fg-button {
   display: inline-flex;
   align-items: center;
@@ -66,11 +67,16 @@
   background: color-mix(in srgb, var(--fg-color-action-primary) 88%, var(--fg-color-palette-ink));
 }
 .fg-button--secondary {
-  background: var(--fg-color-action-secondary-fill);
+  background: transparent;
   color: var(--fg-color-text-primary);
   border-color: var(--fg-color-border-default);
 }
-.fg-button--secondary:hover { background: var(--fg-color-action-secondary-hover); }
+.fg-button--secondary:hover { background: var(--fg-color-action-secondary-fill); }
+.fg-button--ghost {
+  background: transparent;
+  color: var(--fg-color-action-primary);
+}
+.fg-button--ghost:hover { background: var(--fg-color-signal-progress-subtle); }
 .fg-button--block { width: 100%; }
 .fg-button:disabled { opacity: 0.45; cursor: not-allowed; }
 
@@ -170,3 +176,106 @@
 .fg-message--success   { background: var(--fg-color-signal-progress-subtle);  border-left-color: var(--fg-color-action-primary); }
 .fg-message--attention { background: var(--fg-color-signal-attention-subtle); border-left-color: var(--fg-color-signal-attention); }
 .fg-message--discovery { background: var(--fg-color-signal-discovery-subtle); border-left-color: var(--fg-color-signal-discovery); }
+
+/* ---------- Radio ---------- */
+/* Checked state is the Forest check-disc used across Scout (Figma "Radio filled"). */
+.fg-radio {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border: 1.5px solid var(--fg-color-text-secondary);
+  border-radius: var(--fg-radius-full);
+  background: transparent;
+  cursor: pointer;
+}
+.fg-radio:checked {
+  background: var(--fg-color-action-selected);
+  border-color: var(--fg-color-action-selected);
+}
+.fg-radio:checked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 4px;
+  height: 8px;
+  border: solid var(--fg-color-text-on-action);
+  border-width: 0 1.6px 1.6px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.fg-radio:focus-visible {
+  outline: 3px solid var(--fg-color-action-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---------- Filter (pill + dropdown menu) ---------- */
+/* Built on <details>/<summary> so it opens without JS. Markup:
+   <details class="fg-filter">
+     <summary class="fg-filter-pill"><span class="fg-filter-label">Posted</span>
+       <span class="fg-filter-value">within 24 hours</span> <svg class="fg-filter-chevron">…</svg></summary>
+     <div class="fg-menu"> <label class="fg-menu-item">…</label> … </div>
+   </details>
+   field-guide/js/filter.js adds close-on-outside-click and Escape. */
+.fg-filter { position: relative; }
+.fg-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fg-space-2);
+  padding: 6px var(--fg-space-3) 6px var(--fg-space-3);
+  border: 1px solid var(--fg-color-action-subtle-border);
+  border-radius: var(--fg-radius-xl);
+  font-family: var(--fg-font-family-ui);
+  font-size: var(--fg-font-size-lg);
+  line-height: var(--fg-font-line-height-body);
+  white-space: nowrap;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.fg-filter-pill::-webkit-details-marker { display: none; }
+.fg-filter-pill:hover,
+.fg-filter[open] > .fg-filter-pill { background: var(--fg-color-signal-progress-subtle); }
+.fg-filter-pill:focus-visible {
+  outline: 3px solid var(--fg-color-action-focus-ring);
+  outline-offset: 2px;
+}
+.fg-filter-label { font-weight: var(--fg-font-weight-demibold); color: var(--fg-color-action-primary); }
+.fg-filter-value { font-weight: var(--fg-font-weight-medium); color: var(--fg-color-action-subtle-text); }
+.fg-filter-chevron {
+  display: block;
+  flex-shrink: 0;
+  color: var(--fg-color-action-primary);
+  transition: transform 120ms ease;
+}
+.fg-filter[open] .fg-filter-chevron { transform: rotate(180deg); }
+
+.fg-menu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + var(--fg-space-1));
+  left: 0;
+  min-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: var(--fg-space-2) var(--fg-space-4);
+  background: var(--fg-color-surface-raised);
+  border-radius: var(--fg-radius-md);
+  box-shadow: var(--fg-shadow-raised);
+}
+.fg-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--fg-space-3);
+  min-height: var(--fg-size-touch-target);
+  font-size: var(--fg-font-size-sm);
+  font-weight: var(--fg-font-weight-medium);
+  color: var(--fg-color-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.fg-menu-item:has(:checked) { color: var(--fg-color-text-primary); }

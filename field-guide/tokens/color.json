@@ -14,7 +14,9 @@
     "surface": {
       "$type": "color",
       "page":  { "$value": "{color.palette.parchment}" },
-      "field": { "$value": "{color.palette.white}" }
+      "field": { "$value": "{color.palette.white}" },
+      "raised": { "$value": "{color.palette.parchment}", "$description": "Menus and popovers. Lifted by shadow, not a new color." },
+      "hover":  { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.1 }, "$description": "Row hover tint (Figma dashboard 117:2047)." }
     },
     "text": {
       "$type": "color",
@@ -36,7 +38,9 @@
       "secondary-fill":  { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.06 } },
       "secondary-hover": { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.12 } },
       "selected":        { "$value": "{color.palette.forest}" },
-      "focus-ring":      { "$value": "{color.palette.forest}", "$extensions": { "fieldguide.alpha": 0.35 } }
+      "focus-ring":      { "$value": "{color.palette.forest}", "$extensions": { "fieldguide.alpha": 0.35 }  },
+      "subtle-text":     { "$value": "{color.palette.forest}", "$extensions": { "fieldguide.alpha": 0.8 }, "$description": "Secondary Forest text, e.g. a filter's current value. Figma draws 70%; 80% is the lightest that clears 4.5:1 on Parchment." },
+      "subtle-border":   { "$value": "{color.palette.forest}", "$extensions": { "fieldguide.alpha": 0.4 }, "$description": "Outline of Forest-led controls such as filter pills." }
     },
     "signal": {
       "$type": "color",

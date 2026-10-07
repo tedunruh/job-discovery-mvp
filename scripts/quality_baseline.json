@@ -1,12 +1,30 @@
 {
  "1280": {
-  ".range-select": {
-   "color": "rgba(41, 40, 36, 0.7)",
-   "display": "inline-block",
-   "font-size": "14px",
+  ".fg-filter-label": {
+   "color": "rgb(53, 84, 71)",
+   "display": "block",
+   "font-size": "16px",
    "font-weight": "600",
-   "line-height": "normal",
-   "margin": "0px 0px 0px -4px",
+   "line-height": "24px",
+   "margin": "0px",
+   "padding": "0px"
+  },
+  ".fg-filter-pill": {
+   "color": "rgb(41, 40, 36)",
+   "display": "inline-flex",
+   "font-size": "16px",
+   "font-weight": "400",
+   "line-height": "24px",
+   "margin": "0px",
+   "padding": "6px 12px"
+  },
+  ".fg-filter-value": {
+   "color": "rgba(53, 84, 71, 0.8)",
+   "display": "block",
+   "font-size": "16px",
+   "font-weight": "500",
+   "line-height": "24px",
+   "margin": "0px",
    "padding": "0px"
   },
   ".role-count": {
@@ -26,34 +44,34 @@
    "line-height": "22.5px",
    "margin": "0px",
    "padding": "0px 0px 8px"
-  },
-  ".toolbar-left .fg-check": {
-   "color": "rgba(41, 40, 36, 0.7)",
-   "display": "flex",
-   "font-size": "14px",
-   "font-weight": "600",
-   "line-height": "18.9px",
-   "margin": "0px",
-   "padding": "0px"
-  },
-  ".toolbar-left .fg-link": {
-   "color": "rgb(53, 84, 71)",
-   "display": "block",
-   "font-size": "14px",
-   "font-weight": "600",
-   "line-height": "18.9px",
-   "margin": "0px",
-   "padding": "0px"
   }
  },
  "1440": {
-  ".range-select": {
-   "color": "rgba(41, 40, 36, 0.7)",
-   "display": "inline-block",
-   "font-size": "14px",
+  ".fg-filter-label": {
+   "color": "rgb(53, 84, 71)",
+   "display": "block",
+   "font-size": "16px",
    "font-weight": "600",
-   "line-height": "normal",
-   "margin": "0px 0px 0px -4px",
+   "line-height": "24px",
+   "margin": "0px",
+   "padding": "0px"
+  },
+  ".fg-filter-pill": {
+   "color": "rgb(41, 40, 36)",
+   "display": "inline-flex",
+   "font-size": "16px",
+   "font-weight": "400",
+   "line-height": "24px",
+   "margin": "0px",
+   "padding": "6px 12px"
+  },
+  ".fg-filter-value": {
+   "color": "rgba(53, 84, 71, 0.8)",
+   "display": "block",
+   "font-size": "16px",
+   "font-weight": "500",
+   "line-height": "24px",
+   "margin": "0px",
    "padding": "0px"
   },
   ".role-count": {
@@ -73,34 +91,34 @@
    "line-height": "22.5px",
    "margin": "0px",
    "padding": "0px 0px 8px"
-  },
-  ".toolbar-left .fg-check": {
-   "color": "rgba(41, 40, 36, 0.7)",
-   "display": "flex",
-   "font-size": "14px",
-   "font-weight": "600",
-   "line-height": "18.9px",
-   "margin": "0px",
-   "padding": "0px"
-  },
-  ".toolbar-left .fg-link": {
-   "color": "rgb(53, 84, 71)",
-   "display": "block",
-   "font-size": "14px",
-   "font-weight": "600",
-   "line-height": "18.9px",
-   "margin": "0px",
-   "padding": "0px"
   }
  },
  "360": {
-  ".range-select": {
-   "color": "rgba(41, 40, 36, 0.7)",
-   "display": "inline-block",
-   "font-size": "14px",
+  ".fg-filter-label": {
+   "color": "rgb(53, 84, 71)",
+   "display": "block",
+   "font-size": "16px",
    "font-weight": "600",
-   "line-height": "normal",
-   "margin": "0px 0px 0px -4px",
+   "line-height": "24px",
+   "margin": "0px",
+   "padding": "0px"
+  },
+  ".fg-filter-pill": {
+   "color": "rgb(41, 40, 36)",
+   "display": "inline-flex",
+   "font-size": "16px",
+   "font-weight": "400",
+   "line-height": "24px",
+   "margin": "0px",
+   "padding": "6px 12px"
+  },
+  ".fg-filter-value": {
+   "color": "rgba(53, 84, 71, 0.8)",
+   "display": "block",
+   "font-size": "16px",
+   "font-weight": "500",
+   "line-height": "24px",
+   "margin": "0px",
    "padding": "0px"
   },
   ".role-count": {
@@ -120,34 +138,34 @@
    "line-height": "22.5px",
    "margin": "0px",
    "padding": "0px 0px 8px"
-  },
-  ".toolbar-left .fg-check": {
-   "color": "rgba(41, 40, 36, 0.7)",
-   "display": "flex",
-   "font-size": "14px",
-   "font-weight": "600",
-   "line-height": "18.9px",
-   "margin": "0px",
-   "padding": "0px"
-  },
-  ".toolbar-left .fg-link": {
-   "color": "rgb(53, 84, 71)",
-   "display": "block",
-   "font-size": "14px",
-   "font-weight": "600",
-   "line-height": "18.9px",
-   "margin": "0px",
-   "padding": "0px"
   }
  },
  "390": {
-  ".range-select": {
-   "color": "rgba(41, 40, 36, 0.7)",
-   "display": "inline-block",
-   "font-size": "14px",
+  ".fg-filter-label": {
+   "color": "rgb(53, 84, 71)",
+   "display": "block",
+   "font-size": "16px",
    "font-weight": "600",
-   "line-height": "normal",
-   "margin": "0px 0px 0px -4px",
+   "line-height": "24px",
+   "margin": "0px",
+   "padding": "0px"
+  },
+  ".fg-filter-pill": {
+   "color": "rgb(41, 40, 36)",
+   "display": "inline-flex",
+   "font-size": "16px",
+   "font-weight": "400",
+   "line-height": "24px",
+   "margin": "0px",
+   "padding": "6px 12px"
+  },
+  ".fg-filter-value": {
+   "color": "rgba(53, 84, 71, 0.8)",
+   "display": "block",
+   "font-size": "16px",
+   "font-weight": "500",
+   "line-height": "24px",
+   "margin": "0px",
    "padding": "0px"
   },
   ".role-count": {
@@ -167,34 +185,34 @@
    "line-height": "22.5px",
    "margin": "0px",
    "padding": "0px 0px 8px"
-  },
-  ".toolbar-left .fg-check": {
-   "color": "rgba(41, 40, 36, 0.7)",
-   "display": "flex",
-   "font-size": "14px",
-   "font-weight": "600",
-   "line-height": "18.9px",
-   "margin": "0px",
-   "padding": "0px"
-  },
-  ".toolbar-left .fg-link": {
-   "color": "rgb(53, 84, 71)",
-   "display": "block",
-   "font-size": "14px",
-   "font-weight": "600",
-   "line-height": "18.9px",
-   "margin": "0px",
-   "padding": "0px"
   }
  },
  "768": {
-  ".range-select": {
-   "color": "rgba(41, 40, 36, 0.7)",
-   "display": "inline-block",
-   "font-size": "14px",
+  ".fg-filter-label": {
+   "color": "rgb(53, 84, 71)",
+   "display": "block",
+   "font-size": "16px",
    "font-weight": "600",
-   "line-height": "normal",
-   "margin": "0px 0px 0px -4px",
+   "line-height": "24px",
+   "margin": "0px",
+   "padding": "0px"
+  },
+  ".fg-filter-pill": {
+   "color": "rgb(41, 40, 36)",
+   "display": "inline-flex",
+   "font-size": "16px",
+   "font-weight": "400",
+   "line-height": "24px",
+   "margin": "0px",
+   "padding": "6px 12px"
+  },
+  ".fg-filter-value": {
+   "color": "rgba(53, 84, 71, 0.8)",
+   "display": "block",
+   "font-size": "16px",
+   "font-weight": "500",
+   "line-height": "24px",
+   "margin": "0px",
    "padding": "0px"
   },
   ".role-count": {
@@ -214,34 +232,34 @@
    "line-height": "22.5px",
    "margin": "0px",
    "padding": "0px 0px 8px"
-  },
-  ".toolbar-left .fg-check": {
-   "color": "rgba(41, 40, 36, 0.7)",
-   "display": "flex",
-   "font-size": "14px",
-   "font-weight": "600",
-   "line-height": "18.9px",
-   "margin": "0px",
-   "padding": "0px"
-  },
-  ".toolbar-left .fg-link": {
-   "color": "rgb(53, 84, 71)",
-   "display": "block",
-   "font-size": "14px",
-   "font-weight": "600",
-   "line-height": "18.9px",
-   "margin": "0px",
-   "padding": "0px"
   }
  },
  "800": {
-  ".range-select": {
-   "color": "rgba(41, 40, 36, 0.7)",
-   "display": "inline-block",
-   "font-size": "14px",
+  ".fg-filter-label": {
+   "color": "rgb(53, 84, 71)",
+   "display": "block",
+   "font-size": "16px",
    "font-weight": "600",
-   "line-height": "normal",
-   "margin": "0px 0px 0px -4px",
+   "line-height": "24px",
+   "margin": "0px",
+   "padding": "0px"
+  },
+  ".fg-filter-pill": {
+   "color": "rgb(41, 40, 36)",
+   "display": "inline-flex",
+   "font-size": "16px",
+   "font-weight": "400",
+   "line-height": "24px",
+   "margin": "0px",
+   "padding": "6px 12px"
+  },
+  ".fg-filter-value": {
+   "color": "rgba(53, 84, 71, 0.8)",
+   "display": "block",
+   "font-size": "16px",
+   "font-weight": "500",
+   "line-height": "24px",
+   "margin": "0px",
    "padding": "0px"
   },
   ".role-count": {
@@ -261,24 +279,6 @@
    "line-height": "22.5px",
    "margin": "0px",
    "padding": "0px 0px 8px"
-  },
-  ".toolbar-left .fg-check": {
-   "color": "rgba(41, 40, 36, 0.7)",
-   "display": "flex",
-   "font-size": "14px",
-   "font-weight": "600",
-   "line-height": "18.9px",
-   "margin": "0px",
-   "padding": "0px"
-  },
-  ".toolbar-left .fg-link": {
-   "color": "rgb(53, 84, 71)",
-   "display": "block",
-   "font-size": "14px",
-   "font-weight": "600",
-   "line-height": "18.9px",
-   "margin": "0px",
-   "padding": "0px"
   }
  }
 }

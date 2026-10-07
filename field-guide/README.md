@@ -18,6 +18,7 @@ field-guide/
 │   └── radius.json
 ├── build.py           tokens/*.json -> dist/tokens.css (plain Python, no Node)
 ├── dist/tokens.css    GENERATED. Committed. Never edit by hand.
+├── js/filter.js       closes .fg-filter menus on outside click / Escape
 └── css/components.css hand-written components (.fg-*), semantic tokens only
 ```
 
@@ -78,6 +79,9 @@ Scale: 12 / 14 / 15 (body) / 16 / 20 / 24 / 28 / 36, plus 96 for the sign-in wor
 | `.fg-check` / `.fg-checkbox` | Checked = Forest |
 | `.fg-message` + `--success` / `--attention` / `--discovery` | Signal color in fill and left rule, text stays Ink |
 | `.fg-link` | Forest |
+| `.fg-button--ghost` | Forest text, no outline (header "Role preferences") |
+| `.fg-radio` | Checked = Forest check-disc |
+| `.fg-filter` / `.fg-filter-pill` / `.fg-menu` / `.fg-menu-item` | Dropdown filter on `<details>`; include `/field-guide/js/filter.js` for outside-click and Escape |
 
 ## Principles that are build rules
 
