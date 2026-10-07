@@ -254,3 +254,19 @@ same nominal weights changes the page's typographic color.
 - [x] Automated: `Roboto fallback font loads` - every UI weight of the self-hosted
       face actually loads (a 404 otherwise drops silently to generic sans-serif).
       Mutation-tested by removing one woff2 file.
+
+### 2026-10-06 — HOTFIX: Work type filter 500'd in production
+**Shipped:** Work type pill label computed in Python (`work_type_label`) instead of
+a Jinja `map("extract", …)` filter, which doesn't exist in Jinja (it's Ansible's).
+**Rework count:** 1 (reported from production: choosing Remote gave an Internal
+Server Error)
+**Root cause:** *Verification only exercised the default state.* Every check and
+screenshot loaded the dashboard with Work type "Any", which short-circuits before
+the broken filter call; any real selection crashed. Made worse because the choice
+is saved in the session, so the user stayed locked out until it was reset.
+**Standing checks added:**
+- [x] Automated: `dashboard renders with Work type …` / `… Posted …` - loads the
+      dashboard under every filter combination and requires HTTP 200.
+      Mutation-tested against the broken code (failed on all 6 partial selections).
+- [ ] **Exercise every state a control can put the page in**, not just the one it
+      loads in - especially state that persists (session, cookies, DB).

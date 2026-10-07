@@ -169,6 +169,26 @@ def check_toolbar(page, w):
           f"left edge at {info['toolbarLeft']:.1f}px")
 
 
+def check_filter_states(page, base):
+    """Load the dashboard under every Work type combination and every Posted range
+    and require a 200. The default view ("Any", 24 hours) rendered fine while any
+    other Work type selection 500'd - and the selection is saved in the session,
+    so one bad state locks the user out of the dashboard until it's reset."""
+    from itertools import combinations
+    from dashboard.app import RANGES
+    from dashboard.filters import WORK_TYPES
+    keys = list(WORK_TYPES)
+    combos = [c for n in range(len(keys) + 1) for c in combinations(keys, n)]
+    for combo in combos:
+        qs = "work_set=1" + "".join(f"&work={k}" for k in combo)
+        resp = page.goto(f"{base}/?{qs}", wait_until="load")
+        check(resp.status == 200, f"dashboard renders with Work type {'+'.join(combo) or 'none'}", f"HTTP {resp.status}")
+    for key in RANGES:
+        resp = page.goto(f"{base}/?range={key}", wait_until="load")
+        check(resp.status == 200, f"dashboard renders with Posted {key}", f"HTTP {resp.status}")
+    page.goto(f"{base}/?work_set=1&range=24h", wait_until="load")  # leave the session at defaults
+
+
 def check_fallback_font(page, w):
     """The Roboto fallback is self-hosted under its own family name. A bad path or
     route 404s silently and the UI drops to the browser's generic sans-serif, so
@@ -262,6 +282,10 @@ def main():
         with sync_playwright() as p:
             exe = find_chromium()
             browser = p.chromium.launch(executable_path=exe) if exe else p.chromium.launch()
+            ctx = browser.new_context()
+            ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+            check_filter_states(ctx.new_page(), base)
+            ctx.close()
             for (w, h) in VIEWPORTS:
                 mobile = w < MOBILE_MAX_WIDTH
                 ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=mobile, has_touch=mobile)
