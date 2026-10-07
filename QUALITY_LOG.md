@@ -201,3 +201,25 @@ explicit keyword match).
       Anything keyed off "first time seen" (alerts, counters, emails) fires for the
       whole backlog the moment the filter opens. Dry-run it and read the
       notifications it would send.
+
+### 2026-10-06 — Dashboard refresh from Figma (node 117:2047)
+**Shipped:** Work type / Posted dropdown filters (new Field Guide `.fg-filter`,
+`.fg-menu`, `.fg-radio`, ghost button), whole-row job links with hover tint,
+labeled Applied toggle, header "Role preferences". Quality check updated for the
+new toolbar markup, plus a new menu-in-viewport and Escape-closes check.
+**Rework count:** 0 so far (pending review)
+**Caught before shipping:**
+1. *Inherited rule collapsed a new component.* An old `.filters form { display:
+   contents }` from the previous toolbar removed the box of the new menu (also a
+   `<form>`), so menus rendered in-flow instead of floating. Caught by screenshot.
+2. *Check measured against a width the bug itself changes.* The first menu-bounds
+   check compared against `innerWidth`; on a mobile page an overflowing menu widens
+   the layout viewport, so `innerWidth` grew to fit it and the check always passed.
+   Found by mutation-testing the check (shifting the menu off-screen on purpose).
+   Fixed by comparing against the requested viewport width.
+**Standing checks added:**
+- [ ] **Mutation-test every new check.** Break the thing a new check guards
+      (deliberately, then revert) and confirm the check fails before trusting it.
+      A check that can't fail is worse than none.
+- [ ] **Bounds checks use the true viewport width**, never `innerWidth` or
+      `scrollWidth` read after the element under test has rendered.

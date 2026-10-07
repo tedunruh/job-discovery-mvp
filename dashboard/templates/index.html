@@ -4,65 +4,55 @@
   <meta charset="utf-8">
   <title>Scout</title>
   {% include "_field_guide_head.html" %}
+  <script src="/field-guide/js/filter.js" defer></script>
   <style>
-    body { padding: var(--fg-space-6) var(--fg-space-4); }
-    h1 { font-size: var(--fg-font-size-4xl); }
+    /* Layout follows Figma "Scout Job Discovery Dashboard" (117:2047): a 24px page
+       inset, then the header and the list section each inset another 24px. Below
+       680px the inner inset drops so content keeps a 16px side gutter. */
+    body { padding: var(--fg-space-6); }
     header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: var(--fg-space-4) 0;
-      border-bottom: 1px solid var(--fg-color-border-default);
-      margin-bottom: var(--fg-space-8);
+      gap: var(--fg-space-4);
+      padding: var(--fg-space-4) var(--fg-space-6);
+    }
+    h1 { font-size: var(--fg-font-size-4xl); }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--fg-space-1);
+    }
+    .header-actions form { display: contents; }
+
+    .board {
+      margin-top: var(--fg-space-8);
+      padding: var(--fg-space-6);
     }
 
     .toolbar {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
+      gap: var(--fg-space-3) var(--fg-space-4);
       padding-bottom: var(--fg-space-2);
     }
-    .toolbar-left {
+    .filters {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: var(--fg-space-5);
+      gap: var(--fg-space-2);
     }
-    /* The form exists only to submit the checkbox - display:contents drops
-       its own box so the label centers as a direct flex child of
-       .toolbar-left, instead of being pushed off-center by the phantom
-       line-box space a block container adds below inline-flex content. */
-    .toolbar-left form { display: contents; }
-    .range-select,
-    .toolbar-left .fg-check,
-    .toolbar-left .fg-link,
     .role-count {
       margin: 0;
       font-size: var(--fg-font-size-sm);
-      line-height: var(--fg-font-line-height-snug, normal);
-    }
-    .toolbar-left .fg-check,
-    .range-select,
-    .role-count {
+      font-weight: var(--fg-font-weight-medium);
+      line-height: var(--fg-font-line-height-snug);
       color: var(--fg-color-text-secondary);
+      white-space: nowrap;
     }
-    /* Own row above the toolbar: four controls don't fit one line at phone
-       width without the labels wrapping. Native select restyled to read like
-       the toolbar text. */
-    .filters { padding-bottom: var(--fg-space-3); }
-    .filters form { display: contents; }
-    .range-select {
-      font-family: inherit;
-      font-weight: var(--fg-font-weight-demibold);
-      background: transparent;
-      border: 0;
-      padding: 0;
-      margin-left: -4px; /* cancel the native select's inner text inset so it lines up with the toolbar below */
-      cursor: pointer;
-    }
-    .range-select:focus-visible {
-      outline: 2px solid var(--fg-color-action-primary);
-      outline-offset: 2px;
-    }
+
     .more {
       display: flex;
       align-items: center;
@@ -74,171 +64,178 @@
       margin: var(--fg-space-8) 0;
       color: var(--fg-color-text-secondary);
     }
-    .toolbar-left .fg-check { font-weight: var(--fg-font-weight-demibold); }
-    .role-count { font-weight: var(--fg-font-weight-medium); }
 
     ul.postings { list-style: none; margin: 0; padding: 0; }
 
-    /* Grid, not flex-wrap: the three segments need an explicit, deterministic
-       collapse order as the row narrows (view-job label hides first, then
-       meta relocates under lead, actions never moves) rather than whatever
-       flex-wrap's greedy line-filling happens to produce.
-       The meta column is a fixed width rather than auto: each <li> is its
-       own independent grid, so an auto track sizes itself per-row off that
-       row's own text ("Seen on LinkedIn 7 minutes ago" vs "Not seen on
-       LinkedIn") and the column drifts out of alignment between rows. */
+    /* Two equal columns (Figma: "Lead" and "Second", each flex 1). Equal 1fr
+       tracks keep "Discovered" aligned across rows even though each <li> is its
+       own grid. The whole row opens the posting: the title link's ::after covers
+       the row, and the Applied toggle sits above it. */
     .posting {
+      position: relative;
       display: grid;
-      grid-template-columns: minmax(240px, 1fr) 210px auto;
-      grid-template-areas: "lead meta actions";
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       align-items: center;
-      column-gap: var(--fg-space-6);
+      column-gap: var(--fg-space-2);
       row-gap: var(--fg-space-2);
       padding: var(--fg-space-4) 0;
       border-bottom: 1px solid var(--fg-color-border-default);
     }
-    .posting-lead { grid-area: lead; min-width: 0; }
-    .posting-lead p,
-    .posting-meta p {
+    .posting:hover { background: var(--fg-color-surface-hover); }
+    .posting:has(.posting-link:focus-visible) {
+      outline: 3px solid var(--fg-color-action-focus-ring);
+      outline-offset: -3px;
+    }
+    .posting p {
       margin: 0;
       font-weight: var(--fg-font-weight-medium);
       line-height: var(--fg-font-line-height-snug);
     }
-    .posting-title { font-size: var(--fg-font-size-lg); }
+    .posting-lead { min-width: 0; }
+    .posting-title { font-size: var(--fg-font-size-lg); max-width: 500px; }
+    .posting-link { color: inherit; text-decoration: none; outline: none; }
+    .posting-link::after { content: ""; position: absolute; inset: 0; }
     .posting-subline { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
     .posting-source { font-size: var(--fg-font-size-xs); color: var(--fg-color-text-secondary); }
-    .posting-meta {
-      grid-area: meta;
-      font-size: var(--fg-font-size-sm);
-      color: var(--fg-color-text-secondary);
-    }
 
-    .posting-actions {
-      grid-area: actions;
+    .posting-second {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: var(--fg-space-4);
-      justify-self: end;
+      min-width: 0;
     }
-    .view-job {
-      display: flex;
+    .posting-meta { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
+
+    .applied-form { position: relative; z-index: 1; }
+    .applied-toggle {
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
-      gap: var(--fg-space-2);
+      gap: var(--fg-space-3);
       height: var(--fg-size-touch-target);
-      font-weight: var(--fg-font-weight-medium);
+      padding: 0 var(--fg-space-1);
+      background: none;
+      border: 0;
+      border-radius: var(--fg-radius-md);
+      font-family: inherit;
       font-size: var(--fg-font-size-sm);
+      font-weight: var(--fg-font-weight-medium);
       color: var(--fg-color-text-secondary);
-      text-decoration: none;
+      cursor: pointer;
     }
-    .view-job:hover { text-decoration: underline; }
-    .view-job svg { display: block; flex-shrink: 0; }
-
-    .applied-toggle[aria-pressed="true"] { color: var(--fg-color-action-selected); }
-
-    /* Stage 1: drop the "View job post" label, keep the two icon buttons. */
-    @media (max-width: 880px) {
-      .view-job-label { display: none; }
+    .applied-toggle svg { display: block; flex-shrink: 0; }
+    .applied-toggle[aria-pressed="true"] svg { color: var(--fg-color-action-selected); }
+    .applied-toggle:focus-visible {
+      outline: 3px solid var(--fg-color-action-focus-ring);
+      outline-offset: 0;
     }
 
-    /* Stage 2: meta relocates under lead; actions stays pinned top-right,
-       spanning both rows, and never wraps. */
     @media (max-width: 680px) {
-      .posting {
-        grid-template-columns: 1fr auto;
-        grid-template-areas:
-          "lead actions"
-          "meta actions";
-      }
-      .posting-actions {
-        grid-row: 1 / 3;
-        align-self: center;
-      }
+      body { padding: var(--fg-space-6) var(--fg-space-4); }
+      header { padding: 0 0 var(--fg-space-4); }
+      .board { margin-top: var(--fg-space-4); padding: 0; }
+      .posting { grid-template-columns: minmax(0, 1fr); }
     }
   </style>
 </head>
 <body class="fg-page">
   <header>
     <h1 class="fg-display">Scout</h1>
-    <form method="post" action="/logout">
-      <button class="fg-button fg-button--secondary" type="submit">Sign out</button>
-    </form>
+    <div class="header-actions">
+      <a class="fg-button fg-button--ghost" href="/onboarding">Role preferences</a>
+      <form method="post" action="/logout">
+        <button class="fg-button fg-button--secondary" type="submit">Sign out</button>
+      </form>
+    </div>
   </header>
 
-  <div class="filters">
-    <form method="get" action="/">
-      <select class="range-select" name="range" aria-label="Show roles discovered" onchange="this.form.submit()">
-        {% for key, (label, _) in ranges.items() %}
-        <option value="{{ key }}" {{ "selected" if key == posted_range else "" }}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </form>
-  </div>
+  <section class="board" aria-label="Open roles">
+    <div class="toolbar">
+      <div class="filters">
+        {% set work_label = "Any" if not work_types or work_types|length == work_type_options|length else work_types|map("extract", work_type_options)|join(", ") %}
+        <details class="fg-filter" id="filter-work">
+          <summary class="fg-filter-pill">
+            <span class="fg-filter-label">Work type</span>
+            <span class="fg-filter-value">{{ work_label }}</span>
+            <svg class="fg-filter-chevron" width="14" height="8" viewBox="0 0 14 8" fill="none" aria-hidden="true"><path d="M1 1L7 7L13 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </summary>
+          <form class="fg-menu" method="get" action="/">
+            <input type="hidden" name="work_set" value="1">
+            {% for key, label in work_type_options.items() %}
+            <label class="fg-menu-item">
+              <input class="fg-checkbox" type="checkbox" name="work" value="{{ key }}" onchange="this.form.submit()" {{ "checked" if key in work_types else "" }}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </form>
+        </details>
 
-  <div class="toolbar">
-    <div class="toolbar-left">
-      <form method="get" action="/">
-        <input type="hidden" name="remote_us_only" value="{{ 'false' if remote_us_only else 'true' }}">
-        <label class="fg-check">
-          <input class="fg-checkbox" type="checkbox" onchange="this.form.submit()" {{ "checked" if remote_us_only else "" }}>
-          Remote US only
-        </label>
-      </form>
-      <a class="fg-link" href="/onboarding">Edit roles</a>
+        <details class="fg-filter" id="filter-posted">
+          <summary class="fg-filter-pill">
+            <span class="fg-filter-label">Posted</span>
+            <span class="fg-filter-value">{{ ranges[posted_range][1] }}</span>
+            <svg class="fg-filter-chevron" width="14" height="8" viewBox="0 0 14 8" fill="none" aria-hidden="true"><path d="M1 1L7 7L13 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </summary>
+          <form class="fg-menu" method="get" action="/">
+            {% for key, (label, _, _) in ranges.items() %}
+            <label class="fg-menu-item">
+              <input class="fg-radio" type="radio" name="range" value="{{ key }}" onchange="this.form.submit()" {{ "checked" if key == posted_range else "" }}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </form>
+        </details>
+      </div>
+      <p class="role-count">{{ total }} open role{{ "" if total == 1 else "s" }}</p>
     </div>
-    <p class="role-count">{{ total }} open role{{ "" if total == 1 else "s" }}</p>
-  </div>
 
-  {% if not total %}
-  <p class="empty">
-    {% if posted_range == "all" %}No roles found{% else %}No roles discovered in the {{ ranges[posted_range][0]|lower }}{% endif %}{% if remote_us_only %} that are remote in the US{% endif %}.
-    {% if posted_range != "all" %}Try a wider range.{% endif %}
-  </p>
-  {% endif %}
+    {% if not total %}
+    <p class="empty">
+      {% if posted_range == "all" %}No roles found{% else %}No roles discovered {{ ranges[posted_range][1] }}{% endif %}{% if work_label != "Any" %} matching {{ work_label }}{% endif %}.
+      {% if posted_range != "all" %}Try a wider range.{% endif %}
+    </p>
+    {% endif %}
 
-  <ul class="postings">
-    {% for p in postings %}
-    <li class="posting">
-      <div class="posting-lead">
-        <p class="posting-title">{{ p.title }}</p>
-        <p class="posting-subline">{{ p.company_name }}{% if p.location %} • {{ p.location }}{% endif %}</p>
-        <p class="posting-source">Found on {{ p.ats_type|capitalize }}</p>
-      </div>
-      <div class="posting-meta">
-        <p class="discovered">Discovered {{ p.first_seen_at|humanize }}</p>
-      </div>
-      <div class="posting-actions">
-        <a class="view-job" href="/open/{{ p.id }}" target="_blank" rel="noopener" aria-label="View job post">
-          <span class="view-job-label">View job post</span>
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10.6071 2.89286H15.1071V7.39286M14.7857 3.21429L8.03571 9.96428M13.1786 9V13.1786C13.1786 14.2437 12.3151 15.1071 11.25 15.1071H4.82143C3.7563 15.1071 2.89286 14.2437 2.89286 13.1786V6.75C2.89286 5.68488 3.7563 4.82143 4.82143 4.82143H9" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </a>
-        <form method="post" action="/set_applied/{{ p.id }}">
-          <input type="hidden" name="applied" value="{{ 'false' if p.applied else 'true' }}">
-          <button class="fg-icon-button applied-toggle" type="submit" title="{{ 'Applied — click to unmark' if p.applied else 'Mark as applied' }}" aria-label="{{ 'Applied — click to unmark' if p.applied else 'Mark as applied' }}" aria-pressed="{{ 'true' if p.applied else 'false' }}">
-            {% if p.applied %}
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="10" cy="10" r="9" fill="currentColor"/>
-              <path d="M6 10.3L8.6 12.9L14 7.3" stroke="var(--fg-color-text-on-action)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            {% else %}
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="10" cy="10" r="8.25" stroke="currentColor" stroke-width="1.5"/>
-            </svg>
-            {% endif %}
-          </button>
-        </form>
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
+    <ul class="postings">
+      {% for p in postings %}
+      <li class="posting">
+        <div class="posting-lead">
+          <p class="posting-title"><a class="posting-link" href="/open/{{ p.id }}" target="_blank" rel="noopener">{{ p.title }}</a></p>
+          <p class="posting-subline">{{ p.company_name }}{% if p.location %} • {{ p.location }}{% endif %}</p>
+          <p class="posting-source">Found on {{ p.ats_type|capitalize }}</p>
+        </div>
+        <div class="posting-second">
+          <div class="posting-meta">
+            <p>Discovered {{ p.first_seen_at|humanize }}</p>
+            {# LinkedIn line ("Not seen on LinkedIn" / "Seen on LinkedIn 3 hours ago") goes here once LinkedIn sightings are recorded. #}
+          </div>
+          <form class="applied-form" method="post" action="/set_applied/{{ p.id }}">
+            <input type="hidden" name="applied" value="{{ 'false' if p.applied else 'true' }}">
+            <button class="applied-toggle" type="submit" aria-pressed="{{ 'true' if p.applied else 'false' }}" title="{{ 'Applied — click to unmark' if p.applied else 'Mark as applied' }}">
+              {% if p.applied %}
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <circle cx="10" cy="10" r="9" fill="currentColor"/>
+                <path d="M6 10.3L8.6 12.9L14 7.3" stroke="var(--fg-color-text-on-action)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              {% else %}
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <circle cx="10" cy="10" r="8.25" stroke="currentColor" stroke-width="1.5"/>
+              </svg>
+              {% endif %}
+              Applied
+            </button>
+          </form>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
 
-  {% if next_n %}
-  <p class="more">
-    <span class="fg-text-secondary">Showing {{ postings|length }} of {{ total }}</span>
-    <a class="fg-link" href="/?n={{ next_n }}">Show {{ page_size }} more</a>
-  </p>
-  {% endif %}
+    {% if next_n %}
+    <p class="more">
+      <span class="fg-text-secondary">Showing {{ postings|length }} of {{ total }}</span>
+      <a class="fg-link" href="/?n={{ next_n }}">Show {{ page_size }} more</a>
+    </p>
+    {% endif %}
+  </section>
 </body>
 </html>
