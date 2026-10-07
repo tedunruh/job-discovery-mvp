@@ -134,7 +134,24 @@
       body { padding: var(--fg-space-6) var(--fg-space-4); }
       header { padding: 0 0 var(--fg-space-4); }
       .board { margin-top: var(--fg-space-4); padding: 0; }
-      .posting { grid-template-columns: minmax(0, 1fr); }
+      /* Applied moves up beside the title; Discovered drops under the lead.
+         .posting-second dissolves so its two children become grid items. The
+         toggle (44px tall) is pulled up so its center sits on the title's first
+         line rather than on the 44px box's top edge. */
+      .posting {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+          "lead applied"
+          "meta meta";
+      }
+      .posting-lead { grid-area: lead; }
+      .posting-second { display: contents; }
+      .posting-meta { grid-area: meta; }
+      .applied-form {
+        grid-area: applied;
+        align-self: start;
+        margin-top: calc((var(--fg-font-size-lg) * var(--fg-font-line-height-snug) - var(--fg-size-touch-target)) / 2);
+      }
     }
   </style>
 </head>
