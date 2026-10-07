@@ -13,6 +13,8 @@
   /* color.surface */
   --fg-color-surface-page: var(--fg-color-palette-parchment);
   --fg-color-surface-field: var(--fg-color-palette-white);
+  --fg-color-surface-raised: var(--fg-color-palette-parchment);
+  --fg-color-surface-hover: rgb(41 40 36 / 0.1);
 
   /* color.text */
   --fg-color-text-primary: var(--fg-color-palette-ink);
@@ -31,6 +33,8 @@
   --fg-color-action-secondary-hover: rgb(41 40 36 / 0.12);
   --fg-color-action-selected: var(--fg-color-palette-forest);
   --fg-color-action-focus-ring: rgb(53 84 71 / 0.35);
+  --fg-color-action-subtle-text: rgb(53 84 71 / 0.8);
+  --fg-color-action-subtle-border: rgb(53 84 71 / 0.4);
 
   /* color.signal */
   --fg-color-signal-discovery: var(--fg-color-palette-goldenrod);
@@ -41,10 +45,14 @@
   --fg-color-signal-support-subtle: rgb(168 179 156 / 0.25);
   --fg-color-signal-progress-subtle: rgb(53 84 71 / 0.12);
 
+  /* shadow */
+  --fg-shadow-raised: 4px 4px 6px rgb(0 0 0 / 0.16);
+
   /* radius */
   --fg-radius-sm: 4px;
   --fg-radius-md: 6px;
   --fg-radius-lg: 8px;
+  --fg-radius-xl: 12px;
   --fg-radius-full: 999px;
 
   /* space */
@@ -64,7 +72,7 @@
 
   /* font.family */
   --fg-font-family-display: Fraunces, Georgia, serif;
-  --fg-font-family-ui: "Avenir Next", Avenir, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fg-font-family-ui: "Avenir Next", Avenir, "Field Guide Roboto", sans-serif;
 
   /* font */
   --fg-font-display-variation: "SOFT" 0, "WONK" 1;

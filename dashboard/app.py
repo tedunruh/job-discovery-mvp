@@ -14,7 +14,7 @@ from dashboard.auth import (
     too_many_recent_links,
     verify_magic_link,
 )
-from dashboard.filters import is_remote_us
+from dashboard.filters import WORK_TYPES, work_type
 from db.db import (
     SESSION_TTL_DAYS,
     create_session,
@@ -53,14 +53,14 @@ def set_session_cookie(response, token):
     response.set_cookie(SESSION_COOKIE, token, max_age=SESSION_TTL_DAYS * 86400, **COOKIE_OPTS)
     return response
 
-# "Discovered within" filter on the dashboard: key -> (label, window). Keyed on
-# first_seen_at (when Scout found it - what each row shows as "Discovered").
+# "Posted" filter on the dashboard: key -> (menu label, pill value, window). Keyed
+# on first_seen_at (when Scout found it - what each row shows as "Discovered").
 # 24h is the default so the list opens on what's new.
 RANGES = {
-    "24h": ("Past 24 hours", timedelta(hours=24)),
-    "week": ("Past week", timedelta(days=7)),
-    "month": ("Past month", timedelta(days=30)),
-    "all": ("All time", None),
+    "24h": ("24 hours", "within 24 hours", timedelta(hours=24)),
+    "week": ("Last week", "within a week", timedelta(days=7)),
+    "month": ("Last month", "within a month", timedelta(days=30)),
+    "all": ("All time", "any time", None),
 }
 DEFAULT_RANGE = "24h"
 
@@ -72,9 +72,9 @@ MAX_SHOWN = 1000
 FIELD_GUIDE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "field-guide")
 
 
-@app.route("/field-guide/<any(dist, css):folder>/<path:filename>")
+@app.route("/field-guide/<any(dist, css, js, fonts):folder>/<path:filename>")
 def field_guide_static(folder, filename):
-    """Serve the Field Guide design system (tokens + component CSS) to templates."""
+    """Serve the Field Guide design system (tokens, component CSS, fonts, small scripts) to templates."""
     return send_from_directory(os.path.join(FIELD_GUIDE_DIR, folder), filename)
 
 
@@ -211,21 +211,25 @@ def logout():
 def index():
     user_id = g.user_id
 
-    # The filter controls submit as plain GETs (/?range=week, /?remote_us_only=true).
+    # The filter controls submit as plain GETs (/?range=week, /?work_set=1&work=remote).
     # A GET can be safely replayed - e.g. by Render's wake-up page, which reloads the
     # URL once a sleeping free-tier service is up. A POST-only filter lands on a 405.
-    if "range" in request.args or "remote_us_only" in request.args:
+    # work_set marks a Work type submit, since unchecking every box sends no "work".
+    # remote_us_only is the old toggle's parameter, still honored for saved links.
+    if {"range", "work_set", "remote_us_only"} & request.args.keys():
         session.permanent = True
         if request.args.get("range") in RANGES:
             session["posted_range"] = request.args["range"]
-        if "remote_us_only" in request.args:
-            session["remote_us_only"] = request.args["remote_us_only"] == "true"
+        if "work_set" in request.args:
+            session["work_types"] = [w for w in WORK_TYPES if w in request.args.getlist("work")]
+        elif "remote_us_only" in request.args:
+            session["work_types"] = ["remote"] if request.args["remote_us_only"] == "true" else []
         return redirect(url_for("index"))
 
     posted_range = session.get("posted_range", DEFAULT_RANGE)
     if posted_range not in RANGES:
         posted_range = DEFAULT_RANGE
-    window = RANGES[posted_range][1]
+    window = RANGES[posted_range][2]
     cutoff = datetime.now(timezone.utc) - window if window is not None else None
 
     conn = get_conn()
@@ -240,9 +244,9 @@ def index():
     finally:
         conn.close()
 
-    remote_us_only = session.get("remote_us_only", False)
-    if remote_us_only:
-        postings = [p for p in postings if is_remote_us(p["location"], p["remote_type"])]
+    work_types = selected_work_types()
+    if work_types and len(work_types) < len(WORK_TYPES):  # none or all checked = Any
+        postings = [p for p in postings if work_type(p["location"], p["remote_type"]) in work_types]
     postings = [
         p for p in postings
         if matches_profile(p["title"], p["is_design"], role_categories, keywords)
@@ -258,10 +262,19 @@ def index():
         total=total,
         next_n=limit + PAGE_SIZE if total > limit and limit < MAX_SHOWN else None,
         page_size=PAGE_SIZE,
-        remote_us_only=remote_us_only,
+        work_types=work_types,
+        work_type_options=WORK_TYPES,
         ranges=RANGES,
         posted_range=posted_range,
     )
+
+
+def selected_work_types():
+    """Checked Work type options, in display order. Sessions from before the Work
+    type filter carry the old remote_us_only flag instead; it maps to Remote."""
+    if "work_types" in session:
+        return [w for w in WORK_TYPES if w in session["work_types"]]
+    return ["remote"] if session.get("remote_us_only") else []
 
 
 @app.route("/onboarding", methods=["GET", "POST"])
@@ -293,7 +306,7 @@ def onboarding():
 @require_login
 def toggle_remote_us():
     session.permanent = True
-    session["remote_us_only"] = request.form.get("remote_us_only") == "true"
+    session["work_types"] = ["remote"] if request.form.get("remote_us_only") == "true" else []
     return redirect(url_for("index"))
 
 
