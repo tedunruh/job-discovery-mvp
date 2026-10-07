@@ -169,7 +169,6 @@
   <section class="board" aria-label="Open roles">
     <div class="toolbar">
       <div class="filters">
-        {% set work_label = "Any" if not work_types or work_types|length == work_type_options|length else work_types|map("extract", work_type_options)|join(", ") %}
         <details class="fg-filter" id="filter-work">
           <summary class="fg-filter-pill">
             <span class="fg-filter-label">Work type</span>

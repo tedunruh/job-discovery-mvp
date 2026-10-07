@@ -263,6 +263,7 @@ def index():
         next_n=limit + PAGE_SIZE if total > limit and limit < MAX_SHOWN else None,
         page_size=PAGE_SIZE,
         work_types=work_types,
+        work_label=work_type_label(work_types),
         work_type_options=WORK_TYPES,
         ranges=RANGES,
         posted_range=posted_range,
@@ -275,6 +276,14 @@ def selected_work_types():
     if "work_types" in session:
         return [w for w in WORK_TYPES if w in session["work_types"]]
     return ["remote"] if session.get("remote_us_only") else []
+
+
+def work_type_label(work_types):
+    """Pill text for the Work type filter: "Any" when none or all are checked,
+    otherwise the checked options' labels ("Remote, Hybrid")."""
+    if not work_types or len(work_types) == len(WORK_TYPES):
+        return "Any"
+    return ", ".join(WORK_TYPES[w] for w in work_types)
 
 
 @app.route("/onboarding", methods=["GET", "POST"])
