@@ -214,3 +214,9 @@ CREATE INDEX IF NOT EXISTS idx_companies_tier ON companies (tier);
 -- The person's Work type preference, so alerts follow the same parameters as the dashboard.
 -- NULL = never chosen (the app default applies: Remote); empty = Any.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS work_types TEXT[];
+
+-- Rippling (ats.rippling.com/<slug>/jobs) joins the supported platforms. The original column
+-- CHECK is replaced; safe to re-run.
+ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_ats_type_check;
+ALTER TABLE companies ADD CONSTRAINT companies_ats_type_check
+    CHECK (ats_type IN ('greenhouse', 'lever', 'ashby', 'workday', 'workable', 'rippling'));
