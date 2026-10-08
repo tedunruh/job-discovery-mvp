@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from collectors import ashby, greenhouse, lever, workable, workday
+from collectors import ashby, greenhouse, lever, rippling, workable, workday
 from collectors.filters import is_design_role
 from dashboard.filters import work_type
 from db.db import (
@@ -52,7 +52,7 @@ COLD_SLICES = 16
 TAIL_WORKERS = 12
 TAIL_CHUNK = 240  # boards fetched per batch, so the time budget can stop the run between batches
 # Per-ATS cap on simultaneous requests, so a few thousand boards don't hammer one host.
-TAIL_PER_ATS = {"greenhouse": 8, "ashby": 5, "lever": 4, "workable": 4, "workday": 2}
+TAIL_PER_ATS = {"greenhouse": 8, "ashby": 5, "lever": 4, "workable": 4, "rippling": 4, "workday": 2}
 TAIL_COMMIT_EVERY = 100
 # Past this, don't start more tail work this run (the next run picks it up); keeps a run
 # well inside the 15 min cadence even if an ATS is slow.
@@ -68,6 +68,7 @@ COLLECTORS = {
     "ashby": ashby.fetch,
     "workday": workday.fetch,
     "workable": workable.fetch,
+    "rippling": rippling.fetch,
 }
 # Same, but cheaper where the ATS allows it (Greenhouse without full job descriptions).
 TAIL_COLLECTORS = dict(COLLECTORS, greenhouse=lambda ident: greenhouse.fetch(ident, light=True))

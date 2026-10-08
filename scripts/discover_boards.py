@@ -49,7 +49,11 @@ SOURCES = {
     "lever": (["jobs.lever.co/*", "jobs.eu.lever.co/*"], re.compile(r"lever\.co/([A-Za-z0-9_-]+)", re.I)),
     "ashby": (["jobs.ashbyhq.com/*"], re.compile(r"ashbyhq\.com/([A-Za-z0-9._%-]+)", re.I)),
     "workable": (["apply.workable.com/*"], re.compile(r"workable\.com/([A-Za-z0-9_-]+)", re.I)),
+    "rippling": (["ats.rippling.com/*"], re.compile(r"ats\.rippling\.com/([A-Za-z0-9_-]+)", re.I)),
+    "workday": (["*.myworkdayjobs.com/*"], "workday"),
 }
+ATS_ORDER = ("greenhouse", "lever", "ashby", "workable", "rippling", "workday")
+WORKDAY_URL = re.compile(r"//([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com/(?:wday/cxs/[a-z0-9-]+/)?(?:[a-z]{2}-[A-Za-z]{2}/)?([A-Za-z0-9_-]+)", re.I)
 # First path segments that are site furniture, not company boards
 NOT_BOARDS = {
     "embed", "api", "static", "assets", "favicon.ico", "robots.txt", "sitemap.xml", "_next", "v1", "v2",
@@ -60,7 +64,7 @@ NOT_BOARDS = {
 SLUG_OK = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$")
 
 # Per-host concurrency while validating (kept modest on purpose)
-WORKERS = {"greenhouse": 6, "lever": 4, "ashby": 5, "workable": 5}
+WORKERS = {"greenhouse": 6, "lever": 4, "ashby": 5, "workable": 3, "rippling": 4, "workday": 3}
 TIMEOUT = 25
 MAX_WAIT = 120  # seconds; a longer Retry-After means "go away", so we stop instead of waiting
 # Titles that say "design" but mean hardware, civil, chip or other non-UX work
@@ -112,13 +116,38 @@ def latest_crawls(n):
     return [c["id"] for c in r.json()[:n]]
 
 
-def harvest(n_crawls):
+def _extract(ats, rx, url):
+    """The board name for this ATS found in a URL, or None. Workday needs tenant, instance and
+    site together ("workiva.wd503/careers"); everything else is one path segment."""
+    if rx == "workday":
+        m = WORKDAY_URL.search(url)
+        if not m:
+            return None
+        site = urllib.parse.unquote(m.group(3))
+        if site.lower() in NOT_BOARDS or site.lower() in ("job", "jobs", "wday", "login", "userhome", "details"):
+            return None
+        return f"{m.group(1).lower()}.{m.group(2).lower()}/{site}"
+    m = rx.search(url)
+    if not m:
+        return None
+    name = urllib.parse.unquote(m.group(1))
+    if name.lower() in NOT_BOARDS or not SLUG_OK.match(name):
+        return None
+    return name
+
+
+def harvest(n_crawls, only=None):
     os.makedirs(WORKDIR, exist_ok=True)
     crawls = latest_crawls(n_crawls)
-    print(f"Harvesting from {len(crawls)} crawl(s): {', '.join(crawls)}")
+    print(f"Harvesting from {len(crawls)} crawl(s): {', '.join(crawls)}" + (f"  [only: {', '.join(only)}]" if only else ""))
     found = defaultdict(dict)  # ats -> {lowercase name: name as seen}
+    existing = json.load(open(TOKENS_PATH)) if os.path.exists(TOKENS_PATH) else {}
+    for ats, names in existing.items():  # keep what earlier harvests found
+        for n in names:
+            found[ats].setdefault(n.lower(), n)
     for ats, (patterns, rx) in SOURCES.items():
-        before = 0
+        if only and ats not in only:
+            continue
         for crawl in crawls:
             for pattern in patterns:
                 base = f"https://index.commoncrawl.org/{crawl}-index"
@@ -139,13 +168,9 @@ def harvest(n_crawls):
                             url = json.loads(line)["url"]
                         except (ValueError, KeyError):
                             continue
-                        m = rx.search(url)
-                        if not m:
-                            continue
-                        name = urllib.parse.unquote(m.group(1))
-                        if name.lower() in NOT_BOARDS or not SLUG_OK.match(name):
-                            continue
-                        found[ats].setdefault(name.lower(), name)
+                        name = _extract(ats, rx, url)
+                        if name:
+                            found[ats].setdefault(name.lower(), name)
                     time.sleep(1)  # be gentle with a free public service
                 print(f"  {ats:10} {crawl} {pattern}: {got_pages}/{pages} pages -> {len(found[ats]):,} distinct so far")
         print(f"{ats}: {len(found[ats]):,} candidate boards\n")
@@ -201,6 +226,44 @@ def validate_one(ats, name):
             data = r.json()
             titles = [j.get("title") for j in data.get("jobs", [])]
             return _titles_result(ats, name, titles, len(r.content), data.get("name"))
+        if ats == "rippling":
+            titles, nbytes, page, total, remote = [], 0, 0, None, 0
+            while page < 30:
+                status, r = http_get(f"https://ats.rippling.com/api/v2/board/{name}/jobs", {"page": page, "pageSize": 100})
+                if status == 404 or not r:
+                    return {"ats": ats, "token": name, "ok": False, "status": status} if page == 0 else _titles_result(ats, name, titles, nbytes)
+                d = r.json(); nbytes += len(r.content)
+                items = d.get("items", [])
+                titles += [i.get("name") for i in items]
+                total = d.get("totalItems", total)
+                page += 1
+                if page >= (d.get("totalPages") or 1) or not items:
+                    break
+            return _titles_result(ats, name, titles, nbytes)
+        if ats == "workday":
+            host, site = name.split("/", 1)
+            tenant, instance = host.split(".", 1)
+            url = f"https://{tenant}.{instance}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs"
+            titles, nbytes, offset, total = [], 0, 0, 0
+            for _ in range(3):  # up to 60 results of the "design" search: enough to size a tenant
+                try:
+                    r = requests.post(url, json={"appliedFacets": {}, "limit": 20, "offset": offset, "searchText": "design"},
+                                      headers=dict(HEADERS, **{"Content-Type": "application/json"}), timeout=TIMEOUT)
+                except requests.RequestException:
+                    r = None
+                if r is None or r.status_code != 200:
+                    return {"ats": ats, "token": name, "ok": False, "status": getattr(r, "status_code", 0)} if offset == 0 else _titles_result(ats, name, titles, nbytes)
+                d = r.json(); nbytes += len(r.content)
+                jobs = d.get("jobPostings", [])
+                titles += [j.get("title") for j in jobs]
+                total = d.get("total", total)
+                offset += 20
+                if not jobs or offset >= total:
+                    break
+                time.sleep(0.3)
+            res = _titles_result(ats, name, titles, nbytes)
+            res["total"] = max(res["total"], total)  # fuzzy 'design' matches reported by Workday
+            return res
     except Exception as e:  # a malformed response is just a failed probe
         return {"ats": ats, "token": name, "ok": False, "status": f"error:{type(e).__name__}"}
     return {"ats": ats, "token": name, "ok": False, "status": "unsupported"}
@@ -218,7 +281,7 @@ def load_results():
     return done
 
 
-def validate(limit):
+def validate(limit, only=None):
     if not os.path.exists(TOKENS_PATH):
         sys.exit("Run `harvest` first.")
     candidates = json.load(open(TOKENS_PATH))
@@ -227,6 +290,8 @@ def validate(limit):
     lock = threading.Lock()
     t0 = time.time()
     for ats, names in candidates.items():
+        if only and ats not in only:
+            continue
         todo = [n for n in names if (ats, n.lower()) not in done][: limit or None]
         print(f"{ats}: {len(names):,} candidates, {len(names) - len([n for n in names if (ats, n.lower()) not in done]):,} already checked, checking {len(todo):,}")
         counter = Counter()
@@ -349,7 +414,7 @@ def report():
     by_ats = defaultdict(list)
     for (ats, token), r in results.items():
         by_ats[ats].append(r)
-    for ats in ("greenhouse", "lever", "ashby", "workable"):
+    for ats in ATS_ORDER:
         rs = by_ats.get(ats, [])
         valid = [r for r in rs if r.get("ok")]
         wd = [r for r in valid if r["design"] > 0]
@@ -419,7 +484,7 @@ def core_report(ok, known):
     print("\n=== Core design roles (the dashboard's 5 categories, applied to every title) ===")
     print(f"{'ATS':10} {'boards w/ core design':>22} {'open core design roles':>23} {'of those, new vs 140':>21} {'agency-like boards':>19}")
     t = Counter()
-    for ats in ("greenhouse", "lever", "ashby", "workable"):
+    for ats in ATS_ORDER:
         rs = [r for r in with_core if r["ats"] == ats]
         new = [r for r in rs if not r["known"]]
         ag = [r for r in rs if r["agency"]]
@@ -430,7 +495,7 @@ def core_report(ok, known):
     print("\n=== STRICT: product / UX / brand / design-management roles, hardware & civil 'design' titles removed ===")
     print(f"{'ATS':10} {'boards':>8} {'open roles':>11} {'new vs 140':>11} {'new, non-agency':>16}")
     ts = Counter()
-    for ats in ("greenhouse", "lever", "ashby", "workable"):
+    for ats in ATS_ORDER:
         rs = [r for r in strict_rows if r["ats"] == ats]
         new = [r for r in rs if not r["known"]]
         na = [r for r in new if not r["agency"]]
@@ -481,9 +546,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("step", choices=["harvest", "validate", "enrich", "workable-search", "report"])
     ap.add_argument("--crawls", type=int, default=3, help="how many recent Common Crawl crawls to read")
+    ap.add_argument("--only", nargs="*", help="harvest only these platforms (e.g. rippling workday)")
     ap.add_argument("--limit", type=int, default=0, help="validate at most N boards per ATS (for a trial run)")
     args = ap.parse_args()
-    {"harvest": lambda: harvest(args.crawls), "validate": lambda: validate(args.limit),
+    {"harvest": lambda: harvest(args.crawls, args.only), "validate": lambda: validate(args.limit, args.only),
      "enrich": enrich, "workable-search": workable_search, "report": report}[args.step]()
 
 
