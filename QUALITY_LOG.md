@@ -270,3 +270,28 @@ is saved in the session, so the user stayed locked out until it was reset.
       Mutation-tested against the broken code (failed on all 6 partial selections).
 - [ ] **Exercise every state a control can put the page in**, not just the one it
       loads in - especially state that persists (session, cookies, DB).
+
+### 2026-10-13 — SC-50: Rippling + scaling Workday
+**Shipped:** Rippling collector (public v2 API, real remote/hybrid/on-site flag), a Workday paging
+fix, a cheap per-tenant change marker, and fair (least-recently-checked-first) scan ordering.
+**Rework count:** 0 user-visible; one self-inflicted production delay (below).
+**Root causes found before shipping:**
+1. *A "total" read from the wrong page.* Workday reports the match count only on the first results
+   page; later pages say 0. The collector read it per page, so every search stopped after two pages
+   (40 results). The four Workday companies already being watched were returning a fraction of
+   their open roles (Wolters Kluwer: 68 of 451). Found by comparing a stored marker to the paged
+   result count while building the change check - not by any alert or error.
+2. *Alphabetical order starves the tail under a backlog.* With a time budget shorter than the
+   work, processing by name meant the same early boards won every run. Fixed by
+   least-recently-checked-first.
+**Self-inflicted incident:** a rolled-back dry run held one transaction (with row locks on live
+`companies`/`source_health` rows) open for ~50 minutes against the production database. The real
+22:00 collector run blocked on those locks and took 23 minutes instead of ~3 until the connection
+dropped. No data lost, one delayed run.
+**Standing checks added:**
+- [ ] **Never hold a long transaction on the live database for a dry run.** Run multi-run or
+      long dry runs on a Neon branch (a copy), not in a rolled-back transaction on production:
+      uncommitted writes still take row locks that block the real scheduler.
+- [ ] **When a loop's stop condition comes from a response field, check it on every page, not
+      only the first.** Page through a case you know is large (hundreds of results) and compare
+      against the reported total.
