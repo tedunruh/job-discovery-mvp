@@ -47,6 +47,20 @@ class SelectTail(unittest.TestCase):
         self.assertNotEqual([x["id"] for x in a], [x["id"] for x in c])
 
 
+class WorkdayCadence(unittest.TestCase):
+    def test_hot_workday_tenants_are_checked_every_other_run_but_each_one_regularly(self):
+        wd = [dict(board(i, "hot"), ats_type="workday") for i in range(1, 41)]
+        other = [board(i, "hot") for i in range(100, 110)]
+        picked_by_slot = [{c["id"] for c in rc.select_tail(wd + other, now=s * rc.RUN_INTERVAL_SECONDS)} for s in range(4)]
+        for p in picked_by_slot:
+            self.assertEqual({c["id"] for c in other}, p & {c["id"] for c in other})  # everything else: every run
+        counts = [len(p & {c["id"] for c in wd}) for p in picked_by_slot]
+        self.assertTrue(all(18 <= n <= 22 for n in counts), counts)  # about half each run
+        for t in range(1, 41):  # no tenant goes more than one run unchecked
+            for s in range(3):
+                self.assertTrue(t in picked_by_slot[s] or t in picked_by_slot[s + 1])
+
+
 class WorkTypeMatching(unittest.TestCase):
     def test_default_when_never_chosen_is_remote(self):
         self.assertTrue(matches_work_type("remote", None))
@@ -93,3 +107,22 @@ class TailFetch(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Fairness(unittest.TestCase):
+    def test_least_recently_checked_first_and_never_checked_leads(self):
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        boards = [dict(board(1, "hot"), last_checked_at=now - timedelta(minutes=5)),
+                  dict(board(2, "hot"), last_checked_at=None),
+                  dict(board(3, "hot"), last_checked_at=now - timedelta(hours=3)),
+                  dict(board(4, "hot"), last_checked_at=now - timedelta(minutes=20))]
+        self.assertEqual([c["id"] for c in rc.order_for_fairness(boards)], [2, 3, 4, 1])
+
+    def test_a_cut_off_board_goes_first_next_time(self):
+        # a run scans only the first two; the other two keep their old timestamps and so lead next run
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        boards = [dict(board(i, "hot"), last_checked_at=now - timedelta(hours=i)) for i in range(1, 5)]
+        order = [c["id"] for c in rc.order_for_fairness(boards)]
+        self.assertEqual(order, [4, 3, 2, 1])

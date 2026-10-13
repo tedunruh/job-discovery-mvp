@@ -220,3 +220,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS work_types TEXT[];
 ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_ats_type_check;
 ALTER TABLE companies ADD CONSTRAINT companies_ats_type_check
     CHECK (ats_type IN ('greenhouse', 'lever', 'ashby', 'workday', 'workable', 'rippling'));
+
+-- Change marker for platforms with no cheap "what's new" feed (Workday: its search is ordered
+-- by relevance, not date). The scanner stores a cheap fingerprint of a board here and only does
+-- a full paged scan when it changes (plus a periodic forced one). NULL = never scanned.
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS scan_marker TEXT;
