@@ -3,6 +3,7 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -27,6 +28,7 @@ from db.db import (
     record_fetch_success,
     record_tail_scan_results,
     record_zero_result,
+    set_scan_markers,
     start_scheduler_run,
     touch_source_health,
     upsert_postings,
@@ -50,9 +52,10 @@ FETCH_WORKERS = 8
 RUN_INTERVAL_SECONDS = 15 * 60
 COLD_SLICES = 16
 TAIL_WORKERS = 12
+WORKDAY_EVERY = 2  # hot Workday tenants are probed every Nth run
 TAIL_CHUNK = 240  # boards fetched per batch, so the time budget can stop the run between batches
 # Per-ATS cap on simultaneous requests, so a few thousand boards don't hammer one host.
-TAIL_PER_ATS = {"greenhouse": 8, "ashby": 5, "lever": 4, "workable": 4, "rippling": 4, "workday": 2}
+TAIL_PER_ATS = {"greenhouse": 8, "ashby": 5, "lever": 4, "workable": 4, "rippling": 4, "workday": 6}
 TAIL_COMMIT_EVERY = 100
 # Past this, don't start more tail work this run (the next run picks it up); keeps a run
 # well inside the 15 min cadence even if an ATS is slow.
@@ -117,9 +120,21 @@ def _fetch_tail(company):
     where result = {"design": [storable design postings], "alive": any real posting came
     back}. Only design postings are kept; everything else is dropped immediately."""
     ats = company["ats_type"]
+    marker = None
     with _ats_slots.get(ats, threading.Semaphore(2)):
         try:
-            postings = TAIL_COLLECTORS[ats](company["ats_identifier"])
+            if ats == "workday":
+                # Workday's search is ordered by relevance, not date, so there's no "newest
+                # first" to read. One cheap request returns a fingerprint; only page through
+                # everything when it changed - or on this tenant's turn in the rotation, in
+                # case one role replaced another and the count didn't move.
+                marker = workday.probe_marker(company["ats_identifier"])
+                forced = company["id"] % COLD_SLICES == _tail_slot()
+                if marker == company.get("scan_marker") and company["full_ingest_at"] is not None and not forced:
+                    return {"unchanged": True, "alive": True, "design": [], "marker": marker}, None
+                postings = workday.fetch_light(company["ats_identifier"])
+            else:
+                postings = TAIL_COLLECTORS[ats](company["ats_identifier"])
         except Exception as e:
             return None, e
     storable = [p for p in postings if _is_storable(p)]
@@ -128,7 +143,7 @@ def _fetch_tail(company):
         if is_design_role(p["title"]):
             p["is_design"] = True
             design.append(p)
-    return {"design": design, "alive": bool(storable)}, None
+    return {"design": design, "alive": bool(storable), "marker": marker}, None
 
 
 def _is_storable(p):
@@ -143,10 +158,25 @@ def select_tail(companies, now=None):
     """Which discovered boards this run scans: every hot one, plus the cold ones whose id falls
     in this run's slice (a stateless rotation: each cold board comes up once per COLD_SLICES runs)."""
     slot = _tail_slot(now)
-    return [
-        c for c in companies
-        if c["tier"] == "hot" or (c["tier"] == "cold" and c["id"] % COLD_SLICES == slot)
-    ]
+    picked = []
+    for c in companies:
+        if c["tier"] == "hot":
+            # Workday tenants cost a request each even when nothing changed, and there are
+            # hundreds: check each every WORKDAY_EVERY runs (30 min) instead of every run.
+            if c["ats_type"] == "workday" and c["id"] % WORKDAY_EVERY != slot % WORKDAY_EVERY:
+                continue
+            picked.append(c)
+        elif c["tier"] == "cold" and c["id"] % COLD_SLICES == slot:
+            picked.append(c)
+    return picked
+
+
+def order_for_fairness(boards):
+    """Least-recently-checked first (never-checked boards lead). When a backlog is bigger than one
+    run's time budget, the budget cuts the list off; ordering by name would let the same early
+    boards win every run and starve the rest. This way the cut-off boards go first next time."""
+    oldest = datetime.min.replace(tzinfo=timezone.utc)
+    return sorted(boards, key=lambda c: c.get("last_checked_at") or oldest)
 
 
 def _run(health_alerts):
@@ -172,7 +202,7 @@ def _run(health_alerts):
             conn.commit()
             return
         core = [c for c in everything if c["tier"] == "core"]
-        tail = select_tail([c for c in everything if c["tier"] != "core"])
+        tail = order_for_fairness(select_tail([c for c in everything if c["tier"] != "core"]))
 
         def fan_out(company, posting, posting_id):
             """Alert every user whose profile AND Work type fit this new role."""
@@ -234,7 +264,9 @@ def _run(health_alerts):
                 # company with 400 postings returning 0 is an anomaly, one with
                 # no design roles this week is not.
                 record_fetch_success(conn, company_id, len(storable))
-                backfill = company["full_ingest_at"] is None
+                # scan_marker == 'rescan' asks for a silent re-scan: used when a collector fix
+                # makes a board return more of its (already open) roles than before.
+                backfill = company["full_ingest_at"] is None or company.get("scan_marker") == "rescan"
                 new_ids = upsert_postings(conn, company_id, storable, backfill=backfill)
 
                 for posting in storable:
@@ -250,6 +282,8 @@ def _run(health_alerts):
                 mark_stale_postings_closed(conn, company_id, [str(p["ats_posting_id"]) for p in storable])
                 if backfill:
                     mark_full_ingest_done(conn, company_id)
+                if company.get("scan_marker") == "rescan":
+                    set_scan_markers(conn, {company_id: None})
             else:
                 # An anomalous empty result (nothing came back, or titles are
                 # blank - the signature of a schema change) shouldn't mass-close
@@ -295,7 +329,7 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
     there are thousands of these and nobody could clear isolations by hand."""
     t0 = time.time()
     stored = get_open_posting_hashes(conn, [c["id"] for c in tail])
-    ok_ids, failed_ids, first_scan_ids = [], [], []
+    ok_ids, failed_ids, first_scan_ids, new_markers, empty_ids = [], [], [], {}, []
     stats = {"scanned": 0, "design_boards": 0, "writes": 0, "unchanged": 0, "empty": 0, "skipped_budget": 0}
 
     with ThreadPoolExecutor(max_workers=TAIL_WORKERS) as pool:
@@ -312,8 +346,14 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
                     continue
                 if not result["alive"]:
                     stats["empty"] += 1  # nothing came back: change nothing, close nothing
+                    empty_ids.append(cid)
                     continue
                 ok_ids.append(cid)
+                if result.get("unchanged"):
+                    stats["unchanged"] += 1  # the change marker didn't move: no scan, no DB work
+                    continue
+                if result.get("marker") is not None:
+                    new_markers[cid] = result["marker"]
                 backfill = company["full_ingest_at"] is None
                 design = result["design"]
                 stored_for = stored.get(cid, {})
@@ -335,7 +375,8 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
                     first_scan_ids.append(cid)
                 if stats["scanned"] % TAIL_COMMIT_EVERY == 0:
                     conn.commit()
-    record_tail_scan_results(conn, ok_ids, failed_ids, first_scan_ids)
+    record_tail_scan_results(conn, ok_ids, failed_ids, first_scan_ids, empty_ids)
+    set_scan_markers(conn, new_markers)
     promoted = promote_hot_boards(conn)
     conn.commit()
     print(

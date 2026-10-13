@@ -257,8 +257,10 @@ def get_companies_to_scan(conn):
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
-            SELECT id, name, ats_type, ats_identifier, full_ingest_at, tier
-            FROM companies WHERE tier <> 'off' ORDER BY name
+            SELECT c.id, c.name, c.ats_type, c.ats_identifier, c.full_ingest_at, c.tier, c.scan_marker,
+                   sh.last_checked_at
+            FROM companies c LEFT JOIN source_health sh ON sh.company_id = c.id
+            WHERE c.tier <> 'off' ORDER BY c.name
             """
         )
         return cur.fetchall()
@@ -566,13 +568,13 @@ def add_company_if_absent(conn, name, ats_type, ats_identifier):
 
 
 
-def record_tail_scan_results(conn, ok_ids, failed_ids, first_scan_ids):
+def record_tail_scan_results(conn, ok_ids, failed_ids, first_scan_ids, empty_ids=()):
     """One round of batched health bookkeeping for a run's worth of discovered boards, instead
     of ~6 queries per board. ok = fetched fine; failed = request error (counted, never alerted
     per board - a few thousand boards means some are always down). first_scan_ids are marked
     scanned so later new design roles can alert."""
     with conn.cursor() as cur:
-        touched = list(set(ok_ids) | set(failed_ids))
+        touched = list(set(ok_ids) | set(failed_ids) | set(empty_ids))
         if touched:
             cur.execute(
                 "INSERT INTO source_health (company_id) SELECT unnest(%s::int[]) ON CONFLICT (company_id) DO NOTHING",
@@ -588,6 +590,10 @@ def record_tail_scan_results(conn, ok_ids, failed_ids, first_scan_ids):
                 """,
                 (list(ok_ids),),
             )
+        if empty_ids:
+            # Returned nothing: leave success/failure state alone, but note it was checked so it
+            # doesn't sit at the front of the queue forever.
+            cur.execute("UPDATE source_health SET last_checked_at = now() WHERE company_id = ANY(%s)", (list(empty_ids),))
         if failed_ids:
             cur.execute(
                 """
@@ -626,3 +632,16 @@ def get_open_posting_hashes(conn, company_ids):
         for cid, ats_id, h in cur.fetchall():
             result.setdefault(cid, {})[ats_id] = h
     return result
+
+
+def set_scan_markers(conn, markers):
+    """Store each board's latest change marker ({company_id: marker}; None clears it)."""
+    if not markers:
+        return
+    with conn.cursor() as cur:
+        psycopg2.extras.execute_values(
+            cur,
+            "UPDATE companies c SET scan_marker = v.marker FROM (VALUES %s) AS v(id, marker) WHERE c.id = v.id",
+            [(cid, m) for cid, m in markers.items()],
+            template="(%s::int, %s::text)",
+        )

@@ -4,6 +4,7 @@
     python scripts/import_discovered.py --tier hot              # boards with a design-title match
     python scripts/import_discovered.py --tier cold             # valid boards with none yet
     python scripts/import_discovered.py --tier all
+    python scripts/import_discovered.py --tier hot --ats rippling   # one platform only
 
 Imported boards are tier 'hot' (they have, or had, a design role: scanned every run) or 'cold'
 (scanned in a rotating slice, ~every 4 hours). Both store design roles only. Nothing is scanned
@@ -42,6 +43,7 @@ def pretty(token):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tier", choices=["hot", "cold", "all"], required=True)
+    ap.add_argument("--ats", nargs="*", help="import only these platforms (e.g. rippling); default is all")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -60,6 +62,9 @@ def main():
 
     rows, skipped = [], {"already in directory": 0, "agency-like": 0, "not a working board": 0, "other tier": 0}
     for (ats, tok), r in results.items():
+        if args.ats and ats not in args.ats:
+            skipped["other platform"] = skipped.get("other platform", 0) + 1
+            continue
         if not r.get("ok"):
             skipped["not a working board"] += 1
             continue
