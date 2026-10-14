@@ -12,6 +12,7 @@ from collectors.filters import is_design_role
 from dashboard.filters import work_type
 from db.db import (
     content_hash,
+    ensure_conn,
     finish_scheduler_run,
     get_all_user_keywords,
     get_all_user_role_categories,
@@ -53,7 +54,8 @@ RUN_INTERVAL_SECONDS = 15 * 60
 COLD_SLICES = 16
 TAIL_WORKERS = 12
 WORKDAY_EVERY = 2  # hot Workday tenants are probed every Nth run
-TAIL_CHUNK = 240  # boards fetched per batch, so the time budget can stop the run between batches
+TAIL_CHUNK = 48  # boards fetched per batch: the time budget is only checked between batches, and a batch
+# of Workday first scans (several seconds each) must not be able to overrun it by minutes
 # Per-ATS cap on simultaneous requests, so a few thousand boards don't hammer one host.
 TAIL_PER_ATS = {"greenhouse": 8, "ashby": 5, "lever": 4, "workable": 4, "rippling": 4, "workday": 6}
 TAIL_COMMIT_EVERY = 100
@@ -171,6 +173,27 @@ def select_tail(companies, now=None):
     return picked
 
 
+def _deliver(new_postings_by_user, health_alerts):
+    """Send the alerts collected so far, then clear them. Called after the core companies and
+    again after the discovered boards: alerts are marked as sent in the database as they are
+    created, so they must go out before anything slow or fallible runs - otherwise a crash in
+    between would lose them for good."""
+    if not new_postings_by_user:
+        return
+    n_users = len(new_postings_by_user)
+    print(f"{sum(len(b['postings']) for b in new_postings_by_user.values())} alert(s) for {n_users} user(s) — sending notifications")
+    failures = 0
+    for bucket in list(new_postings_by_user.values()):
+        if not notify_new_postings(bucket["postings"], bucket["ntfy_topic"]):
+            failures += 1
+    new_postings_by_user.clear()
+    if failures:
+        health_alerts.append(
+            f"Push notification failed for {failures} of {n_users} user(s) this run — they won't be "
+            f"told about their new posting(s) (still visible on the dashboard)."
+        )
+
+
 def order_for_fairness(boards):
     """Least-recently-checked first (never-checked boards lead). When a backlog is bigger than one
     run's time budget, the budget cuts the list off; ordering by name would let the same early
@@ -181,9 +204,7 @@ def order_for_fairness(boards):
 
 def _run(health_alerts):
     conn = get_conn()
-    new_postings_count = 0
     new_postings_by_user = {}  # user_id -> {"ntfy_topic": str, "postings": [...]}
-    notify_failures = 0
     try:
         run_id, gap_minutes = start_scheduler_run(conn)
         conn.commit()
@@ -204,10 +225,8 @@ def _run(health_alerts):
         core = [c for c in everything if c["tier"] == "core"]
         tail = order_for_fairness(select_tail([c for c in everything if c["tier"] != "core"]))
 
-        def fan_out(company, posting, posting_id):
+        def fan_out(conn, company, posting, posting_id):
             """Alert every user whose profile AND Work type fit this new role."""
-            nonlocal new_postings_count
-            new_postings_count += 1
             wtype = work_type(posting.get("location"), posting.get("remote_type"))
             for user in all_users:
                 if not matches_profile(
@@ -278,7 +297,7 @@ def _run(health_alerts):
                         # this, a newly added company would alert you to every role it
                         # already had open.
                         continue
-                    fan_out(company, posting, posting_id)
+                    fan_out(conn, company, posting, posting_id)
                 mark_stale_postings_closed(conn, company_id, [str(p["ats_posting_id"]) for p in storable])
                 if backfill:
                     mark_full_ingest_done(conn, company_id)
@@ -299,38 +318,55 @@ def _run(health_alerts):
 
             conn.commit()
         print(f"core: {len(core)} companies in {time.time() - t_core:.0f}s")
+        conn.commit()
+        _deliver(new_postings_by_user, health_alerts)  # before the slow part, not after it
 
         # ---- discovered boards: design roles only, lean DB path ---------------------------
         if tail:
-            _scan_tail(conn, tail, health_alerts, fan_out)
+            try:
+                conn = _scan_tail(conn, tail, health_alerts, fan_out)
+            except Exception as e:  # noqa: BLE001
+                # Never let the discovered-board scan take down the run: the core results are
+                # already saved and delivered. Report it and carry on with a usable connection.
+                print(f"discovered-board scan failed: {type(e).__name__}: {e}")
+                health_alerts.append(f"Discovered-board scan failed this run: {type(e).__name__}: {e}")
+                try:
+                    conn.rollback()
+                except Exception:  # noqa: BLE001
+                    pass
+                conn = ensure_conn(conn)
 
         finish_scheduler_run(conn, run_id)
         conn.commit()
     finally:
         conn.close()
 
-    if new_postings_by_user:
-        print(f"{new_postings_count} new posting(s) across {len(new_postings_by_user)} user(s) — sending notifications")
-        for bucket in new_postings_by_user.values():
-            if not notify_new_postings(bucket["postings"], bucket["ntfy_topic"]):
-                notify_failures += 1
-        if notify_failures:
-            health_alerts.append(
-                f"Push notification failed for {notify_failures} of {len(new_postings_by_user)} "
-                f"user(s) this run — they won't be told about their new posting(s) "
-                f"(still visible on the dashboard)."
-            )
+    _deliver(new_postings_by_user, health_alerts)  # alerts found by the discovered-board scan
 
 
 def _scan_tail(conn, tail, health_alerts, fan_out):
     """Scan this run's discovered boards. Only design roles are stored. The common case - a
     board with no design roles that never had any - costs no database work at all; health
     bookkeeping is batched. A zero-result board is simply skipped (never isolated or mass-closed):
-    there are thousands of these and nobody could clear isolations by hand."""
+    there are thousands of these and nobody could clear isolations by hand.
+
+    Works in small batches: fetch a batch (the database connection sits idle meanwhile), reconnect
+    if the server dropped it, write, then save progress - so a long run never holds a long idle
+    connection or loses what it already did. Returns the connection to use afterwards."""
     t0 = time.time()
     stored = get_open_posting_hashes(conn, [c["id"] for c in tail])
-    ok_ids, failed_ids, first_scan_ids, new_markers, empty_ids = [], [], [], {}, []
-    stats = {"scanned": 0, "design_boards": 0, "writes": 0, "unchanged": 0, "empty": 0, "skipped_budget": 0}
+    stats = {"scanned": 0, "design_boards": 0, "writes": 0, "unchanged": 0, "empty": 0, "skipped_budget": 0,
+             "ok": 0, "failed": 0, "first_scans": 0}
+    acc = {"ok": [], "failed": [], "first": [], "empty": [], "markers": {}}
+
+    def flush(conn):
+        record_tail_scan_results(conn, acc["ok"], acc["failed"], acc["first"], acc["empty"])
+        set_scan_markers(conn, acc["markers"])
+        conn.commit()
+        stats["ok"] += len(acc["ok"]); stats["failed"] += len(acc["failed"]); stats["first_scans"] += len(acc["first"])
+        for k in ("ok", "failed", "first", "empty"):
+            acc[k] = []
+        acc["markers"] = {}
 
     with ThreadPoolExecutor(max_workers=TAIL_WORKERS) as pool:
         for start in range(0, len(tail), TAIL_CHUNK):
@@ -338,22 +374,25 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
                 stats["skipped_budget"] = len(tail) - start  # next run picks these up
                 break
             chunk = tail[start:start + TAIL_CHUNK]
-            for company, (result, error) in zip(chunk, pool.map(_fetch_tail, chunk)):
+            conn.commit()  # nothing pending while we wait on the network
+            results = list(pool.map(_fetch_tail, chunk))
+            conn = ensure_conn(conn)
+            for company, (result, error) in zip(chunk, results):
                 cid = company["id"]
                 stats["scanned"] += 1
                 if error is not None:
-                    failed_ids.append(cid)
+                    acc["failed"].append(cid)
                     continue
                 if not result["alive"]:
                     stats["empty"] += 1  # nothing came back: change nothing, close nothing
-                    empty_ids.append(cid)
+                    acc["empty"].append(cid)
                     continue
-                ok_ids.append(cid)
+                acc["ok"].append(cid)
                 if result.get("unchanged"):
                     stats["unchanged"] += 1  # the change marker didn't move: no scan, no DB work
                     continue
                 if result.get("marker") is not None:
-                    new_markers[cid] = result["marker"]
+                    acc["markers"][cid] = result["marker"]
                 backfill = company["full_ingest_at"] is None
                 design = result["design"]
                 stored_for = stored.get(cid, {})
@@ -368,29 +407,27 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
                         for posting in design:
                             posting_id = new_ids.get(str(posting["ats_posting_id"]))
                             if posting_id is not None:
-                                fan_out(company, posting, posting_id)
+                                fan_out(conn, company, posting, posting_id)
                     mark_stale_postings_closed(conn, cid, [str(p["ats_posting_id"]) for p in design])
                     stats["writes"] += 1
                 if backfill:
-                    first_scan_ids.append(cid)
-                if stats["scanned"] % TAIL_COMMIT_EVERY == 0:
-                    conn.commit()
-    record_tail_scan_results(conn, ok_ids, failed_ids, first_scan_ids, empty_ids)
-    set_scan_markers(conn, new_markers)
+                    acc["first"].append(cid)
+            flush(conn)  # progress is saved after every batch
     promoted = promote_hot_boards(conn)
     conn.commit()
     print(
         f"discovered boards: scanned {stats['scanned']} in {time.time() - t0:.0f}s | "
-        f"{len(ok_ids)} ok, {len(failed_ids)} failed, {stats['empty']} empty | "
+        f"{stats['ok']} ok, {stats['failed']} failed, {stats['empty']} empty | "
         f"{stats['design_boards']} with design roles, {stats['unchanged']} unchanged (no DB work), {stats['writes']} wrote | "
-        f"{len(first_scan_ids)} first scans | {promoted} promoted to hot"
+        f"{stats['first_scans']} first scans | {promoted} promoted to hot"
         + (f" | {stats['skipped_budget']} skipped (time budget)" if stats["skipped_budget"] else "")
     )
-    if len(failed_ids) >= TAIL_FAILURE_ALERT_MIN and len(failed_ids) > TAIL_FAILURE_ALERT_RATIO * max(stats["scanned"], 1):
+    if stats["failed"] >= TAIL_FAILURE_ALERT_MIN and stats["failed"] > TAIL_FAILURE_ALERT_RATIO * max(stats["scanned"], 1):
         health_alerts.append(
-            f"{len(failed_ids)} of {stats['scanned']} discovered job boards failed this run "
+            f"{stats['failed']} of {stats['scanned']} discovered job boards failed this run "
             f"(more than {TAIL_FAILURE_ALERT_RATIO:.0%}) - an ATS may be down or blocking us."
         )
+    return conn
 
 
 if __name__ == "__main__":

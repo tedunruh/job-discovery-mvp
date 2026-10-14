@@ -19,6 +19,23 @@ def get_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
 
 
+def ensure_conn(conn):
+    """Return `conn` if it still works, else a fresh connection (and close the dead one). A
+    connection that sat idle for minutes while the scanner waited on the network can be dropped
+    by the server ("SSL connection has been closed unexpectedly") - callers commit before they
+    wait so nothing is lost, then call this before touching the database again."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        return conn
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001
+            pass
+        return get_conn()
+
+
 def upsert_company(conn, name, ats_type, ats_identifier):
     with conn.cursor() as cur:
         cur.execute(
