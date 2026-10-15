@@ -1,0 +1,50 @@
+{#- Field Guide component macros. Components whose markup is more than one class
+    on a native element live here, so every screen (and the /field-guide gallery)
+    renders the same markup. Import with:
+        {% import "_fg.html" as fg %}
+    Styles: field-guide/css/components.css. -#}
+
+{#- Down chevron used by filter pills; rotates when the menu opens. -#}
+{% macro chevron() -%}
+<svg class="fg-filter-chevron" width="14" height="8" viewBox="0 0 14 8" fill="none" aria-hidden="true"><path d="M1 1L7 7L13 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- endmacro %}
+
+{#- Toggle: one item's on/off status (e.g. Applied). Use inside a form that
+    posts the flipped value; pressed=True shows the Forest check-disc.
+    Constraint: the label stays the same in both states - the disc carries the
+    state, the title explains the action. -#}
+{% macro toggle(label, pressed=False, title="", type="submit", extra_class="") -%}
+<button class="fg-toggle {{ extra_class }}" type="{{ type }}" aria-pressed="{{ 'true' if pressed else 'false' }}"{% if title %} title="{{ title }}"{% endif %}>
+  {%- if pressed %}
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <circle cx="10" cy="10" r="9" fill="currentColor"/>
+    <path d="M6 10.3L8.6 12.9L14 7.3" stroke="var(--fg-color-text-on-action)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  {%- else %}
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <circle cx="10" cy="10" r="8.25" stroke="currentColor" stroke-width="1.5"/>
+  </svg>
+  {%- endif %}
+  {{ label }}
+</button>
+{%- endmacro %}
+
+{#- Filter: pill that opens a dropdown menu. The caller supplies the menu body
+    (fg-menu-item rows with fg-checkbox for multi-select or fg-radio for
+    single-select). Page must load /field-guide/js/filter.js.
+        {% call fg.filter("filter-posted", "Posted", "within a week") %}
+          <form class="fg-menu" ...> ... </form>
+        {% endcall %}
+    Constraint: value always shows the current choice ("Any" when unfiltered).
+    static=True (gallery specimens only) keeps it out of filter.js's one-open /
+    close-on-outside-click behaviour. -#}
+{% macro filter(id, label, value, open=False, static=False) -%}
+<details class="fg-filter" id="{{ id }}"{% if open %} open{% endif %}{% if static %} data-fg-static{% endif %}>
+  <summary class="fg-filter-pill">
+    <span class="fg-filter-label">{{ label }}</span>
+    <span class="fg-filter-value">{{ value }}</span>
+    {{ chevron() }}
+  </summary>
+  {{ caller() }}
+</details>
+{%- endmacro %}

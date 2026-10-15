@@ -86,6 +86,31 @@ def field_guide_static(folder, filename):
     return send_from_directory(os.path.join(FIELD_GUIDE_DIR, folder), filename)
 
 
+def _field_guide_tokens():
+    """Flattened Field Guide tokens for the gallery, read from tokens/*.json via
+    field-guide/build.py so swatches and the type scale can't drift from the
+    source. Returns {group: [(dotted.path, css var name, resolved value, description)]}."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("fg_build", os.path.join(FIELD_GUIDE_DIR, "build.py"))
+    build = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(build)
+    tokens = build.flatten(build.load_tokens())
+    raw = build.load_tokens()
+
+    def describe(path):
+        node = raw
+        for part in path.split("."):
+            node = node.get(part, {})
+        return node.get("$description", "") if isinstance(node, dict) else ""
+
+    groups = {}
+    for path, (value, token_type, ext) in tokens.items():
+        group = path.rsplit(".", 1)[0]
+        css = build.to_css(build.resolve(value, tokens), token_type, ext)
+        groups.setdefault(group, []).append((path, build.css_name(path), css, describe(path)))
+    return groups
+
+
 @app.errorhandler(405)
 def method_not_allowed(_error):
     """A POST-only URL requested as a plain page load. The usual cause is Render's
@@ -314,6 +339,14 @@ def work_type_label(work_types):
     if not work_types or len(work_types) == len(WORK_TYPES):
         return "Any"
     return ", ".join(WORK_TYPES[w] for w in work_types)
+
+
+@app.route("/field-guide")
+@require_login
+def field_guide_gallery():
+    """The component gallery: every Field Guide token and component, rendered
+    live from the shared CSS and macros. The catalog of approved controls."""
+    return render_template("field_guide.html", tokens=_field_guide_tokens())
 
 
 @app.route("/onboarding", methods=["GET", "POST"])
