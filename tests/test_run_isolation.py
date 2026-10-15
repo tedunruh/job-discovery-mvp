@@ -16,7 +16,9 @@ class Conn:
 
 CORE = {"id": 1, "name": "CoreCo", "ats_type": "greenhouse", "ats_identifier": "coreco",
         "full_ingest_at": "2026-10-01", "tier": "core", "scan_marker": None, "last_checked_at": None}
-TAIL = {"id": 2, "name": "TailCo", "ats_type": "workday", "ats_identifier": "t.wd1/x",
+# A Greenhouse board, not Workday: Workday tenants are only picked on some runs (by clock), and
+# this test must not depend on the time of day.
+TAIL = {"id": 2, "name": "TailCo", "ats_type": "greenhouse", "ats_identifier": "tailco",
         "full_ingest_at": None, "tier": "hot", "scan_marker": None, "last_checked_at": None}
 USER = {"id": 7, "ntfy_topic": "topic-7", "work_types": []}
 
