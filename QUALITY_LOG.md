@@ -230,28 +230,14 @@ new toolbar markup, plus a new menu-in-viewport and Escape-closes check.
 - [ ] **Bounds checks use the true viewport width**, never `innerWidth` or
       `scrollWidth` read after the element under test has rendered.
 
-### 2026-10-06 — Roboto as the UI fallback font
-**Shipped:** UI stack is now Avenir Next → Avenir → Roboto → sans-serif (was
--apple-system → Segoe UI → Roboto), and Roboto 400/500/600 loads from Google Fonts
-so non-Apple devices get it even where it isn't installed (Windows).
-**Rework count:** 0
-**Note for verification:** the cloud preview can't reach Google Fonts and has no
-Avenir Next, so screenshots were silently rendering in DejaVu, not the real type.
-Installed Roboto and Fraunces locally (from the @fontsource npm packages) so the
-quality check and screenshots now render the actual fallback; Roboto is the
-wider of the two UI faces, so toolbar fit is checked against the worst case.
-
-### 2026-10-06 — Roboto fallback one weight lighter; Applied gap 4px
-**Shipped:** Roboto is now self-hosted as "Field Guide Roboto" (field-guide/fonts,
-OFL-1.1) with each weight mapped one step lighter (400→300, 500→400, 600→500) so it
-matches Avenir Next's color. Applied toggle icon-to-label gap 12px → 4px.
-**Rework count:** 1 (reviewer judged Roboto too heavy at matching weights and the
-Applied gap too wide, after the previous entry shipped)
+### 2026-10-06 — UI fallback font for non-Apple devices
+**Shipped:** a self-hosted fallback face for devices without Avenir Next, each weight
+mapped one step lighter so it keeps Avenir's color. Fonts installed locally so the
+quality check and screenshots render real type rather than the container's default.
+**Rework count:** 1 (first pass read too heavy at matching weights; Applied gap too wide)
 **Root cause:** *Font substitution judged by family, not by rendered weight.*
-Roboto Medium is visibly heavier than Avenir Next Medium; swapping families at the
-same nominal weights changes the page's typographic color.
 **Standing checks added:**
-- [x] Automated: `Roboto fallback font loads` - every UI weight of the self-hosted
+- [x] Automated: `UI fallback font loads` - every UI weight of the self-hosted
       face actually loads (a 404 otherwise drops silently to generic sans-serif).
       Mutation-tested by removing one woff2 file.
 
@@ -336,19 +322,19 @@ variable-bound component sets, and a Field Guide gallery page of instances.
 
 ### 2026-10-15 — Field Guide gallery broke the typeface rule
 **Shipped:** removed monospace from the code gallery (class/token names now use
-the UI font with slight tracking) and Roboto Mono from the Figma gallery page.
+the UI font with slight tracking) and the monospace face from the Figma gallery page.
 **Rework count:** 1 (reported by Ted: "you didn't even follow the font guidelines")
 **Root causes:**
 1. *Wrote an exception to a rule instead of following it.* To make `--fg-…` read
    as two hyphens I set token names in monospace and documented it as a
    "gallery-only exception" - the rule says never add another typeface, full stop.
 2. *Assumed a font was unavailable instead of testing it.* Figma text was set in
-   Roboto because Avenir Next didn't appear in the font list; loading it was
+   a substitute face because Avenir Next didn't appear in the font list; loading it was
    never attempted. (It genuinely can't load in the Figma MCP runtime - it's a
    local font on Ted's Mac - but that was found only after the report.)
 **Standing checks added:**
 - [x] Automated: `only Field Guide typefaces` - every rendered text element's
-      first-choice family must be Fraunces, Avenir Next or Field Guide Roboto,
+      first-choice family must be Fraunces, Avenir Next or its fallback face,
       on every page. Verified against the monospace version (failed, naming `code`).
 - [ ] **No self-granted exceptions to CLAUDE.md rules.** If a rule blocks a
       reasonable goal, ask - don't write the exception into a comment.
@@ -370,7 +356,7 @@ longer fall back to the browser's 400. Regular is reserved for Fraunces.
 **Root cause of the gap:** the base style never set a weight, so any text without
 an explicit weight silently rendered Regular - including onboarding subtext/hints.
 **Standing checks added:**
-- [x] Automated: the typeface check now also fails any Avenir/Roboto text whose
+- [x] Automated: the typeface check now also fails any UI text whose
       computed weight is below 500. Verified against the old base style (failed on
       onboarding subtext and hints).
 
@@ -409,3 +395,15 @@ templates audited, no title-case labels.
 need Avenir Next Medium 16 by hand - the MCP runtime can't load Avenir Next.
 **Standing checks:**
 - [ ] Manual: new UI copy is sentence case (proper names excepted).
+
+### 2026-10-15 — Fallback font no longer named in docs, gallery or Figma
+**Shipped:** every mention of the fallback typeface removed from CLAUDE.md, the README,
+the gallery, token descriptions, code comments, check names and this log. Its family is
+now "Field Guide UI" and its files `fonts/ui-*.woff2`; the font's license stays as
+`fonts/LICENSE.txt` (the open font license requires shipping it with the files).
+**Rework count:** 1 (Ted: the fallback was my implementation choice, not a design rule,
+so it shouldn't be documented as part of the system)
+**Root cause:** *Documented an implementation detail as if it were design intent.*
+The design rule is "Fraunces and Avenir Next only"; how non-Apple devices cope is plumbing.
+**Standing checks:**
+- [ ] Manual: docs and the gallery describe Ted's design decisions, not workarounds I chose.
