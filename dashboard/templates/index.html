@@ -7,10 +7,34 @@
   {% include "_field_guide_head.html" %}
   <script src="/field-guide/js/filter.js" defer></script>
   <style>
-    /* Layout follows Figma "Scout Job Discovery Dashboard" (117:2047): a 24px page
-       inset, then the header and the list section each inset another 24px. Below
-       680px the inner inset drops so content keeps a 16px side gutter. */
-    body { padding: var(--fg-space-6); }
+    /* Layout follows Figma "Scout Job Discovery Dashboard" (226:849): a Sage band
+       with topographic contours behind the header, then the list in a raised
+       Parchment card. Page inset is 24px top/bottom, 16px sides. */
+    body {
+      position: relative;
+      padding: var(--fg-space-6) var(--fg-space-4);
+    }
+    body > :not(.band) { position: relative; z-index: 1; }
+
+    /* Decorative band: full width, 277px tall (Figma frame 226:850), clips the
+       contours. The contour artwork keeps its Figma offset from the right edge. */
+    .band {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 277px;
+      overflow: hidden;
+      background: var(--fg-color-signal-support-subtle);
+      pointer-events: none;
+    }
+    .topography {
+      position: absolute;
+      top: -28.5px;
+      right: -92px;
+      color: var(--fg-color-signal-attention-subtle);
+    }
+
     header {
       display: flex;
       align-items: center;
@@ -22,13 +46,16 @@
     .header-actions {
       display: flex;
       align-items: center;
-      gap: var(--fg-space-1);
+      gap: var(--fg-space-2);
     }
     .header-actions form { display: contents; }
 
     .board {
-      margin-top: var(--fg-space-8);
+      margin-top: calc(var(--fg-space-8) + var(--fg-space-1));
       padding: var(--fg-space-6);
+      background: var(--fg-color-surface-raised);
+      border-radius: var(--fg-radius-xl);
+      box-shadow: var(--fg-shadow-raised);
     }
 
     .toolbar {
@@ -58,15 +85,24 @@
       display: flex;
       align-items: center;
       gap: var(--fg-space-4);
-      margin: var(--fg-space-6) 0 var(--fg-space-8);
+      margin: var(--fg-space-4) 0 0 var(--fg-space-4);
       font-size: var(--fg-font-size-sm);
     }
     .empty {
-      margin: var(--fg-space-8) 0;
+      margin: var(--fg-space-6) var(--fg-space-4) var(--fg-space-2);
       color: var(--fg-color-text-secondary);
     }
 
-    ul.postings { list-style: none; margin: 0; padding: 0; }
+    /* Rows are separated by space, not rules (Figma 226:894: 8px gap, 16px row
+       padding, 4px radius so the hover fill reads as a soft tile). */
+    ul.postings {
+      list-style: none;
+      margin: var(--fg-space-2) 0 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--fg-space-2);
+    }
 
     /* Two equal columns (Figma: "Lead" and "Second", each flex 1). Equal 1fr
        tracks keep "Discovered" aligned across rows even though each <li> is its
@@ -79,8 +115,8 @@
       align-items: center;
       column-gap: var(--fg-space-2);
       row-gap: var(--fg-space-2);
-      padding: var(--fg-space-4) 0;
-      border-bottom: 1px solid var(--fg-color-border-default);
+      padding: var(--fg-space-4);
+      border-radius: var(--fg-radius-sm);
     }
     .posting:hover { background: var(--fg-color-surface-hover); }
     .posting:has(.posting-link:focus-visible) {
@@ -111,9 +147,11 @@
     .applied-form { position: relative; z-index: 1; }
 
     @media (max-width: 680px) {
-      body { padding: var(--fg-space-6) var(--fg-space-4); }
       header { padding: 0 0 var(--fg-space-4); }
-      .board { margin-top: var(--fg-space-4); padding: 0; }
+      .board { margin-top: var(--fg-space-4); padding: var(--fg-space-3); }
+      .posting { padding: var(--fg-space-3); }
+      .more { margin-left: var(--fg-space-3); }
+      .empty { margin-left: var(--fg-space-3); margin-right: var(--fg-space-3); }
       /* Applied moves up beside the title; Discovered drops under the lead.
          .posting-second dissolves so its two children become grid items. The
          toggle (44px tall) is pulled up so its center sits on the title's first
@@ -136,6 +174,7 @@
   </style>
 </head>
 <body class="fg-page">
+  <div class="band" aria-hidden="true">{% include "_topography.svg" %}</div>
   <header>
     <h1 class="fg-display">Scout</h1>
     <div class="header-actions">
