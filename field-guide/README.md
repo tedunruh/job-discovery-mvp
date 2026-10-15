@@ -116,7 +116,7 @@ Scale: 12 / 14 / 15 (body) / 16 / 20 / 24 / 28 / 36, plus 96 for the sign-in wor
 
 **Control type** (set by Ted in the Figma Components page, 2026-10-15): all
 control text is 16px. Labels on things you act on - buttons, links, checkbox /
-radio / toggle labels, menu rows, filter labels - are **demibold**. Values and
+radio / toggle labels, menu rows, filter labels, field labels - are **demibold**. Values and
 messages - input values, filter values, message copy - are **medium**. 12-14px
 is for supporting text only (metadata, hints, counts, section notes).
 

@@ -112,7 +112,7 @@
 .fg-label {
   padding: 0 var(--fg-space-3);
   font-family: var(--fg-font-family-ui);
-  font-size: var(--fg-font-size-sm);
+  font-size: var(--fg-font-size-lg);
   font-weight: var(--fg-font-weight-demibold);
   color: var(--fg-color-text-primary);
 }
