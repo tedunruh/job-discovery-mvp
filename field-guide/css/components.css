@@ -2,6 +2,10 @@
    Load after dist/tokens.css. Class prefix: .fg-  */
 
 /* ---------- Base ---------- */
+/* Control type (Ted, Figma Components page, 2026-10-15): all control text is
+   16px (--fg-font-size-lg). Labels on things you act on - buttons, links,
+   checkbox/radio/toggle labels, menu rows, filter labels - are demibold.
+   Values and messages - input values, filter values, message copy - are medium. */
 :root { color-scheme: light; }
 
 .fg-page {
@@ -28,6 +32,7 @@
 
 .fg-link {
   color: var(--fg-color-action-primary);
+  font-size: var(--fg-font-size-lg);
   font-weight: var(--fg-font-weight-demibold);
   text-decoration: none;
 }
@@ -51,7 +56,7 @@
   min-height: 36px;
   padding: var(--fg-space-2) var(--fg-space-3);
   font-family: var(--fg-font-family-ui);
-  font-size: var(--fg-font-size-sm);
+  font-size: var(--fg-font-size-lg);
   font-weight: var(--fg-font-weight-demibold);
   line-height: var(--fg-font-line-height-tight);
   border-radius: var(--fg-radius-lg);
@@ -117,6 +122,7 @@
   padding: var(--fg-space-3);
   font-family: var(--fg-font-family-ui);
   font-size: var(--fg-font-size-lg); /* 16px keeps iOS from zooming on focus */
+  font-weight: var(--fg-font-weight-medium);
   color: var(--fg-color-text-primary);
   background: var(--fg-color-surface-field);
   border: 1px solid var(--fg-color-border-strong);
@@ -130,6 +136,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--fg-space-2);
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-demibold);
   cursor: pointer;
 }
 .fg-checkbox {
@@ -170,7 +178,8 @@
   padding: var(--fg-space-3);
   border-radius: var(--fg-radius-sm);
   border-left: 3px solid transparent;
-  font-size: var(--fg-font-size-sm);
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-medium);
   line-height: var(--fg-font-line-height-body);
   color: var(--fg-color-text-primary);
   text-align: left;
@@ -274,8 +283,8 @@
   align-items: center;
   gap: var(--fg-space-3);
   min-height: var(--fg-size-touch-target);
-  font-size: var(--fg-font-size-sm);
-  font-weight: var(--fg-font-weight-medium);
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-demibold);
   color: var(--fg-color-text-secondary);
   white-space: nowrap;
   cursor: pointer;
@@ -297,8 +306,8 @@
   border: 0;
   border-radius: var(--fg-radius-md);
   font-family: inherit;
-  font-size: var(--fg-font-size-sm);
-  font-weight: var(--fg-font-weight-medium);
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-demibold);
   color: var(--fg-color-text-secondary);
   cursor: pointer;
 }
