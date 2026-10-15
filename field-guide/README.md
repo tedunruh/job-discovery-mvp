@@ -118,8 +118,9 @@ Scale: 12 / 14 / 15 (body) / 16 / 20 / 24 / 28 / 36, plus 96 for the sign-in wor
 
 **Control type** (set by Ted in the Figma Components page, 2026-10-15): all
 control text is 16px. Labels on things you act on - buttons, links, checkbox /
-radio / toggle labels, menu rows, filter labels, field labels - are **demibold**. Values and
-messages - input values, filter values, message copy - are **medium**. 12-14px
+radio labels, menu rows, filter labels, field labels - are **demibold**. Values, messages
+and status labels - input values, filter values, message copy, the toggle's "Applied" -
+are **medium** (Ted, 2026-10-15: demibold read too strong for a status). 12-14px
 is for supporting text only (metadata, hints, counts, section notes).
 
 ## Components (Sprint 1)
@@ -148,4 +149,6 @@ is for supporting text only (metadata, hints, counts, section notes).
 4. **Free text is always left-aligned.** A container can be centered on the page, but
    wrapping text inside it (messages, descriptions, body copy) aligns left. Only short
    single-line headings or wordmarks may center.
-5. Ask: does this feel calm, human, purposeful, like someone looking out for me?
+5. **Sentence case, always.** Buttons, links, labels and headings capitalize only the
+   first word and proper names ("Role preferences"; "Sign out").
+6. Ask: does this feel calm, human, purposeful, like someone looking out for me?
