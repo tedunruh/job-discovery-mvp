@@ -310,3 +310,26 @@ new screen was reconstructed from memory - the root of visual drift.
       class exists in components.css with no example on /field-guide.
       Mutation-tested (added a stray `.fg-badge`, check failed naming it).
 - [x] /field-guide joins the viewport, overflow and mobile-width checks at all six sizes.
+
+### 2026-10-15 — Field Guide mirrored into Figma (variables, components, gallery)
+**Shipped:** `_Primitives` + `Semantic` variable collections (95 variables, scoped,
+aliased, WEB code syntax), `Elevation/Raised` effect style, a Components page of
+variable-bound component sets, and a Field Guide gallery page of instances.
+**Rework count:** 0 reported; 4 caught before handoff
+**Caught before handoff:**
+1. *Vector resized to a box distorts its path.* Check marks drawn as a path then
+   `resize()`d to 18×18 stretched into slashes. Draw paths at native size and
+   position them instead.
+2. *`resize()` after hug sizing pins the frame (twice).* The gallery frame and 32
+   swatches were created as hug-content auto-layout, then resized for width -
+   which silently resets both axes to fixed, collapsing them. Set width, then
+   set the primary axis back to AUTO.
+3. *Default frame clipping cuts effects.* Menu shadows were clipped by their
+   parent frames; gallery layout frames now have clipsContent off.
+4. *Wrong component-property key.* Looked up a text property by its default
+   value ("Option") instead of its name ("Label").
+**Standing checks added:**
+- [ ] **Figma builds: after any `resize()`, re-set `primaryAxisSizingMode` /
+      `counterAxisSizingMode` explicitly, and screenshot every composed frame**
+      before reporting - all four issues above were invisible in the returned
+      structure and obvious in the first screenshot.
