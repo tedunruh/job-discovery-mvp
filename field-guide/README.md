@@ -90,14 +90,14 @@ exist, add a semantic token rather than reaching for a palette value.
 | Color | Hex | Role | Use for |
 |---|---|---|---|
 | Parchment | `#f6f2e9` | Canvas | Page backgrounds, large surfaces, empty states. Dominant everywhere. |
-| Ink | `#292824` | Voice | Text, icons, high emphasis. Secondary at 70%, tertiary at 45%. |
+| Ink | `#292824` | Voice | Text, icons, high emphasis. Secondary and placeholder (tertiary) at 70%. |
 | Forest | `#355447` | Direction | Primary actions, links, active and selected states, progress |
 | Goldenrod | `#d6a84f` | Discovery | New matches, recommendations, "found for you" |
 | Clay | `#c9785b` | Attention | Warnings, time-sensitive info, secondary destructive actions. Sparingly. |
 | Sage | `#a8b39c` | Support | Tags, secondary statuses, subtle backgrounds |
 
 Contrast on Parchment: Ink 13.2:1, Ink 70% 5.2:1, Forest 7.5:1,
-Clay 3.0:1, Goldenrod 2.0:1, Sage 2.0:1, Ink 45% 2.6:1 (placeholders only).
+Clay 3.0:1, Goldenrod 2.0:1, Sage 2.0:1. Every text token passes AA (4.5:1) on Parchment.
 Ink on Goldenrod 6.7:1, on Sage 6.7:1, on Clay 4.4:1 (large or bold text only).
 
 ## Typography
