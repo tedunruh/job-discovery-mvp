@@ -373,3 +373,15 @@ an explicit weight silently rendered Regular - including onboarding subtext/hint
 - [x] Automated: the typeface check now also fails any Avenir/Roboto text whose
       computed weight is below 500. Verified against the old base style (failed on
       onboarding subtext and hints).
+
+### 2026-10-15 — Placeholder text passes AA
+**Shipped:** `--fg-color-text-tertiary` (input placeholders) 45% → 70% Ink, 2.6:1 → 5.2:1.
+Secondary text stays at 70% (Ted). Typed values stay distinct at 100% Ink. Figma
+`Semantic/color/text/tertiary` now aliases `ink/70`; the unused `ink/45` primitive is gone.
+**Rework count:** 1 (Ted flagged secondary-text contrast; measuring showed secondary
+already passed at 5.2:1 and only placeholders failed)
+**Root cause:** the tertiary step was picked by look, never measured; README even
+labeled it "placeholders only" as if placeholders were exempt (they aren't, WCAG 1.4.3).
+**Standing checks:**
+- [ ] Manual: any new or changed text-color token gets its ratio on Parchment measured
+      and written in the README contrast line; text tokens must be >= 4.5:1.

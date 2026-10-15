@@ -19,7 +19,7 @@
   /* color.text */
   --fg-color-text-primary: var(--fg-color-palette-ink);
   --fg-color-text-secondary: rgb(41 40 36 / 0.7);
-  --fg-color-text-tertiary: rgb(41 40 36 / 0.45);
+  --fg-color-text-tertiary: rgb(41 40 36 / 0.7);
   --fg-color-text-on-action: var(--fg-color-palette-parchment);
 
   /* color.border */
