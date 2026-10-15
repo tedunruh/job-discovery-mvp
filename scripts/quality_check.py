@@ -351,6 +351,11 @@ def main():
                         if w <= 680:
                             check_applied_alignment(page, w)
                         snapshots[str(w)] = snapshot_styles(page)
+                    # QC_SHOTS=<dir>: save a screenshot of each page/width for a
+                    # side-by-side with the Figma frame.
+                    if os.environ.get("QC_SHOTS"):
+                        name = (path.strip("/") or "dashboard").replace("/", "_")
+                        page.screenshot(path=os.path.join(os.environ["QC_SHOTS"], f"{name}@{w}.png"))
                 ctx.close()
             browser.close()
     finally:
