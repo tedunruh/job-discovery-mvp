@@ -39,7 +39,9 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NTFY_TOPIC: ${{ vars.NTFY_TOPIC }}
           NTFY_HEALTH_TOPIC: ${{ vars.NTFY_HEALTH_TOPIC }}
-          HEALTHCHECK_URL: ${{ vars.HEALTHCHECK_URL }}
+          # The ping URL is a capability (anyone holding it can mark the job healthy), and this repo
+          # is public: store it as a secret. A plain variable still works as a fallback.
+          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL || vars.HEALTHCHECK_URL }}
       - name: Keep dashboard awake (end of run)
         if: always()
         run: bash scripts/keep_awake.sh
