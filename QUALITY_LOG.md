@@ -362,3 +362,50 @@ override removed (the component now owns it). Rule recorded in the README.
 **Process note:** Figma → code changes were read from the components themselves
 (fonts, sizes, fills, spacing per variant) and diffed against the original
 build, rather than eyeballed from a screenshot.
+
+### 2026-10-15 — UI minimum weight is Medium
+**Shipped:** `.fg-page` now sets Medium (500), so body copy, hints and notes no
+longer fall back to the browser's 400. Regular is reserved for Fraunces.
+**Rework count:** 0 (design rule from Ted)
+**Root cause of the gap:** the base style never set a weight, so any text without
+an explicit weight silently rendered Regular - including onboarding subtext/hints.
+**Standing checks added:**
+- [x] Automated: the typeface check now also fails any Avenir/Roboto text whose
+      computed weight is below 500. Verified against the old base style (failed on
+      onboarding subtext and hints).
+
+### 2026-10-15 — Placeholder text passes AA
+**Shipped:** `--fg-color-text-tertiary` (input placeholders) 45% → 70% Ink, 2.6:1 → 5.2:1.
+Secondary text stays at 70% (Ted). Typed values stay distinct at 100% Ink. Figma
+`Semantic/color/text/tertiary` now aliases `ink/70`; the unused `ink/45` primitive is gone.
+**Rework count:** 1 (Ted flagged secondary-text contrast; measuring showed secondary
+already passed at 5.2:1 and only placeholders failed)
+**Root cause:** the tertiary step was picked by look, never measured; README even
+labeled it "placeholders only" as if placeholders were exempt (they aren't, WCAG 1.4.3).
+**Standing checks:**
+- [ ] Manual: any new or changed text-color token gets its ratio on Parchment measured
+      and written in the README contrast line; text tokens must be >= 4.5:1.
+
+### 2026-10-15 — Dashboard to Figma 226:849
+**Shipped:** Sage band (support-subtle, 277px) with the topographic contours from Figma
+behind the header; list moved into a raised Parchment card (radius xl, `--fg-shadow-raised`);
+rows separated by an 8px gap and 16px padding instead of rules, 4px radius for the hover tile;
+page inset 24/16, header-to-card 36px. Contours are `_topography.svg`, exported from the
+Figma path (0.1px rounding, verified by checksum against Figma), stroked with `currentColor`
+= `--fg-color-signal-attention-subtle`. Phone (no Figma frame): card padding 12px, rows 12px.
+**Rework count:** 0
+**Not changed (Figma disagrees with itself):** the frame's "Applied" label is loose text at
+14px Medium; the Toggle component is 16px Demi Bold, which code follows. Asked Ted.
+**Tooling:** `QC_SHOTS=<dir> python scripts/quality_check.py` saves a screenshot per page and
+width for side-by-side review against Figma.
+
+### 2026-10-15 — Toggle label Medium; sentence case written down
+**Shipped:** `.fg-toggle` label ("Applied") 16px Demi Bold → 16px **Medium** (Ted: demibold
+read too strong for a status). Control-type rule updated: status labels join values and
+messages at medium. Sentence case is now a written rule (CLAUDE.md, README principle 5);
+templates audited, no title-case labels.
+**Rework count:** 0
+**Figma not updated:** Toggle component (206:57) and dashboard frame Applied labels still
+need Avenir Next Medium 16 by hand - the MCP runtime can't load Avenir Next.
+**Standing checks:**
+- [ ] Manual: new UI copy is sentence case (proper names excepted).

@@ -90,14 +90,14 @@ exist, add a semantic token rather than reaching for a palette value.
 | Color | Hex | Role | Use for |
 |---|---|---|---|
 | Parchment | `#f6f2e9` | Canvas | Page backgrounds, large surfaces, empty states. Dominant everywhere. |
-| Ink | `#292824` | Voice | Text, icons, high emphasis. Secondary at 70%, tertiary at 45%. |
+| Ink | `#292824` | Voice | Text, icons, high emphasis. Secondary and placeholder (tertiary) at 70%. |
 | Forest | `#355447` | Direction | Primary actions, links, active and selected states, progress |
 | Goldenrod | `#d6a84f` | Discovery | New matches, recommendations, "found for you" |
 | Clay | `#c9785b` | Attention | Warnings, time-sensitive info, secondary destructive actions. Sparingly. |
 | Sage | `#a8b39c` | Support | Tags, secondary statuses, subtle backgrounds |
 
 Contrast on Parchment: Ink 13.2:1, Ink 70% 5.2:1, Forest 7.5:1,
-Clay 3.0:1, Goldenrod 2.0:1, Sage 2.0:1, Ink 45% 2.6:1 (placeholders only).
+Clay 3.0:1, Goldenrod 2.0:1, Sage 2.0:1. Every text token passes AA (4.5:1) on Parchment.
 Ink on Goldenrod 6.7:1, on Sage 6.7:1, on Clay 4.4:1 (large or bold text only).
 
 ## Typography
@@ -110,14 +110,17 @@ Ink on Goldenrod 6.7:1, on Sage 6.7:1, on Clay 4.4:1 (large or bold text only).
   falls back to **Roboto**, self-hosted in `fonts/` as the family "Field Guide Roboto"
   and mapped one weight lighter (400→300, 500→400, 600→500) so it matches Avenir's
   color on the page. See `css/fonts.css`.
+- **Minimum weight for Avenir Next is Medium** (500). Regular (400) is used only by
+  Fraunces. Nothing in the UI face is set lighter than Medium.
 - No other typefaces.
 
 Scale: 12 / 14 / 15 (body) / 16 / 20 / 24 / 28 / 36, plus 96 for the sign-in wordmark.
 
 **Control type** (set by Ted in the Figma Components page, 2026-10-15): all
 control text is 16px. Labels on things you act on - buttons, links, checkbox /
-radio / toggle labels, menu rows, filter labels, field labels - are **demibold**. Values and
-messages - input values, filter values, message copy - are **medium**. 12-14px
+radio labels, menu rows, filter labels, field labels - are **demibold**. Values, messages
+and status labels - input values, filter values, message copy, the toggle's "Applied" -
+are **medium** (Ted, 2026-10-15: demibold read too strong for a status). 12-14px
 is for supporting text only (metadata, hints, counts, section notes).
 
 ## Components (Sprint 1)
@@ -146,4 +149,6 @@ is for supporting text only (metadata, hints, counts, section notes).
 4. **Free text is always left-aligned.** A container can be centered on the page, but
    wrapping text inside it (messages, descriptions, body copy) aligns left. Only short
    single-line headings or wordmarks may center.
-5. Ask: does this feel calm, human, purposeful, like someone looking out for me?
+5. **Sentence case, always.** Buttons, links, labels and headings capitalize only the
+   first word and proper names ("Role preferences"; "Sign out").
+6. Ask: does this feel calm, human, purposeful, like someone looking out for me?
