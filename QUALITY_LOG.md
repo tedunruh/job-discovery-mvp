@@ -352,3 +352,13 @@ the UI font with slight tracking) and Roboto Mono from the Figma gallery page.
       on every page. Verified against the monospace version (failed, naming `code`).
 - [ ] **No self-granted exceptions to CLAUDE.md rules.** If a rule blocks a
       reasonable goal, ask - don't write the exception into a comment.
+
+### 2026-10-15 — Control type from Ted's Figma component edits
+**Shipped:** Ted edited the Figma Components (Avenir Next); his choices pushed to
+code: buttons, links, checkbox/radio/toggle labels and menu rows 14→16px
+demibold; input values and messages 16px medium. Onboarding's local `.fg-check`
+override removed (the component now owns it). Rule recorded in the README.
+**Rework count:** 0 (design change, not a defect)
+**Process note:** Figma → code changes were read from the components themselves
+(fonts, sizes, fills, spacing per variant) and diffed against the original
+build, rather than eyeballed from a screenshot.

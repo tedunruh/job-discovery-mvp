@@ -114,6 +114,12 @@ Ink on Goldenrod 6.7:1, on Sage 6.7:1, on Clay 4.4:1 (large or bold text only).
 
 Scale: 12 / 14 / 15 (body) / 16 / 20 / 24 / 28 / 36, plus 96 for the sign-in wordmark.
 
+**Control type** (set by Ted in the Figma Components page, 2026-10-15): all
+control text is 16px. Labels on things you act on - buttons, links, checkbox /
+radio / toggle labels, menu rows, filter labels - are **demibold**. Values and
+messages - input values, filter values, message copy - are **medium**. 12-14px
+is for supporting text only (metadata, hints, counts, section notes).
+
 ## Components (Sprint 1)
 
 | Class | Notes |
