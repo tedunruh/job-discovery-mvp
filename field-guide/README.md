@@ -37,6 +37,26 @@ page can't drift from what ships. `quality_check.py` fails if any `.fg-` class i
 Flask serves `dist/` and `css/` at `/field-guide/...`. Every template includes
 `dashboard/templates/_field_guide_head.html` for fonts, tokens and components.
 
+## Figma mirror (code → Figma)
+
+Code is the source of truth; the Field Guide Figma file (`w7hKbZWJIgb74guqh5uGUF`)
+mirrors it so designs can be made by hand with the same tokens.
+
+- **Variables:** `_Primitives` (hidden; palette, the alpha steps semantic tokens use,
+  raw dimensions) and `Semantic` (every semantic token, aliased to a primitive,
+  scoped to where it may be used, WEB code syntax = its `var(--fg-…)` name).
+  Goldenrod/Clay/Sage signal tokens are scoped to fills and strokes only - never
+  text fill - so Figma enforces the same rule the code does.
+- **Effect style:** `Elevation/Raised` = `--fg-shadow-raised`.
+- **Not mirrored:** line height and letter spacing (unitless / em values have no
+  clean Figma variable type).
+
+To resync after a token change: run `python field-guide/figma/export_variables.py`
+and execute `field-guide/figma/sync_variables.js` with `const PLAN = <that JSON>;`
+prepended, via the Figma MCP `use_figma` tool (ask Claude: "resync Field Guide
+tokens to Figma"). It updates variables in place by name and reports, rather
+than deletes, anything in Figma that no longer exists in code.
+
 ## Changing a token
 
 1. Edit the JSON in `tokens/`.
