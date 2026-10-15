@@ -23,7 +23,7 @@
       "$description": "Hierarchy comes from Ink opacity, not extra neutrals.",
       "primary":   { "$value": "{color.palette.ink}" },
       "secondary": { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.7 } },
-      "tertiary":  { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.45 } },
+      "tertiary":  { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.7 } },
       "on-action": { "$value": "{color.palette.parchment}" }
     },
     "border": {
