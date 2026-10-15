@@ -57,6 +57,7 @@
     .spec-use { margin: 0 0 var(--fg-space-2); }
     .spec-code {
       display: block;
+      font-family: inherit;
       margin: 0;
       font-size: var(--fg-font-size-xs);
       color: var(--fg-color-text-secondary);
@@ -100,10 +101,13 @@
     }
     .swatch-name { font-size: var(--fg-font-size-sm); font-weight: var(--fg-font-weight-demibold); }
     .swatch-meta { color: var(--fg-color-text-secondary); word-break: break-word; }
-    /* Class and token names are code, set in the browser's monospace so "--fg-…"
-       reads as two hyphens. The one place outside Fraunces/Avenir: developer
-       identifiers in this gallery only, never product UI. */
-    .gallery code { font-size: var(--fg-font-size-xs); }
+    /* Class and token names stay in the UI font (no third typeface). A little
+       tracking keeps the double hyphen in "--fg-…" from reading as one dash. */
+    .gallery code {
+      font-family: inherit;
+      font-size: var(--fg-font-size-xs);
+      letter-spacing: 0.02em;
+    }
     .token-group { margin: var(--fg-space-8) 0 var(--fg-space-2); font-size: var(--fg-font-size-lg); font-weight: var(--fg-font-weight-demibold); }
 
     .type-row {

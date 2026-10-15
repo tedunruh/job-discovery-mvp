@@ -229,6 +229,31 @@ def check_applied_alignment(page, w):
           f"worst offset {max(off):.2f}px" if rows else "no rows")
 
 
+ALLOWED_FONTS = {"fraunces", "avenir next", "field guide roboto"}
+
+
+def check_typefaces(page, path):
+    """Field Guide allows two typefaces (Fraunces, Avenir Next) plus the self-hosted
+    Roboto fallback. Every rendered text element's first-choice family must be one
+    of them - catches a stray monospace, a browser default on a <code>/<button>,
+    or a new font slipped into one template."""
+    bad = page.evaluate(
+        """
+        (allowed) => {
+          const out = new Set();
+          for (const el of document.querySelectorAll('body *')) {
+            if (!el.childNodes.length || ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
+            const first = getComputedStyle(el).fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '').toLowerCase();
+            if (!allowed.includes(first)) out.add(`${el.tagName.toLowerCase()}.${el.className || ''} -> ${first}`);
+          }
+          return [...out].slice(0, 8);
+        }
+        """,
+        sorted(ALLOWED_FONTS),
+    )
+    check(not bad, f"only Field Guide typefaces  [{path}]", "; ".join(bad))
+
+
 def check_gallery_complete(page):
     """Every class components.css defines must be shown in the /field-guide
     gallery. The gallery is the catalog of approved controls - a component added
@@ -310,6 +335,8 @@ def main():
                     if mobile:
                         iw = page.evaluate("window.innerWidth")
                         check(iw == w, f"mobile page reports true width  [{path} @{w}]", f"innerWidth={iw}")
+                    if w == VIEWPORTS[-1][0]:
+                        check_typefaces(page, path)
                     if path == "/field-guide" and w == VIEWPORTS[-1][0]:
                         check_gallery_complete(page)
                     if path == "/login":
