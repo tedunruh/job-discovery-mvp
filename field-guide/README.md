@@ -48,6 +48,17 @@ mirrors it so designs can be made by hand with the same tokens.
   Goldenrod/Clay/Sage signal tokens are scoped to fills and strokes only - never
   text fill - so Figma enforces the same rule the code does.
 - **Effect style:** `Elevation/Raised` = `--fg-shadow-raised`.
+- **Components page:** real Figma components with variants for every state,
+  fills/strokes/padding/radius bound to the Semantic variables: Button
+  (Style × State), Link, Icon button, Checkbox, Radio, Toggle, Text field,
+  Filter pill, Filter menu (built from Checkbox/Radio instances), Message.
+  Each description names its code class or macro. Text is Roboto at the
+  stepped-down weights (the code's non-Apple fallback); swap to Avenir Next
+  locally if you have it.
+- **Field Guide gallery page:** the `/field-guide` page laid out in Figma from
+  instances of those components, same sections and "use this when" notes.
+  A visual mirror, not wired: there's no Code Connect link yet, so a change in
+  code needs a resync (variables) or a rebuild request (components).
 - **Not mirrored:** line height and letter spacing (unitless / em values have no
   clean Figma variable type).
 
