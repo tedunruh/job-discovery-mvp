@@ -241,17 +241,20 @@ def check_typefaces(page, path):
         """
         (allowed) => {
           const out = new Set();
-          for (const el of document.querySelectorAll('body *')) {
+          for (const el of document.querySelectorAll('body *:not(script):not(style):not(noscript):not(template)')) {
             if (!el.childNodes.length || ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
-            const first = getComputedStyle(el).fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '').toLowerCase();
+            const cs = getComputedStyle(el);
+            const first = cs.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '').toLowerCase();
             if (!allowed.includes(first)) out.add(`${el.tagName.toLowerCase()}.${el.className || ''} -> ${first}`);
+            // UI face (Avenir Next / its Roboto fallback) is never lighter than Medium
+            else if (first !== 'fraunces' && parseInt(cs.fontWeight, 10) < 500) out.add(`${el.tagName.toLowerCase()}.${el.className || ''} -> ${first} weight ${cs.fontWeight}`);
           }
           return [...out].slice(0, 8);
         }
         """,
         sorted(ALLOWED_FONTS),
     )
-    check(not bad, f"only Field Guide typefaces  [{path}]", "; ".join(bad))
+    check(not bad, f"only Field Guide typefaces, UI text >= Medium  [{path}]", "; ".join(bad))
 
 
 def check_gallery_complete(page):

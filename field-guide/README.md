@@ -110,6 +110,8 @@ Ink on Goldenrod 6.7:1, on Sage 6.7:1, on Clay 4.4:1 (large or bold text only).
   falls back to **Roboto**, self-hosted in `fonts/` as the family "Field Guide Roboto"
   and mapped one weight lighter (400→300, 500→400, 600→500) so it matches Avenir's
   color on the page. See `css/fonts.css`.
+- **Minimum weight for Avenir Next is Medium** (500). Regular (400) is used only by
+  Fraunces. Nothing in the UI face is set lighter than Medium.
 - No other typefaces.
 
 Scale: 12 / 14 / 15 (body) / 16 / 20 / 24 / 28 / 36, plus 96 for the sign-in wordmark.
