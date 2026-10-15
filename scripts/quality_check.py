@@ -190,7 +190,7 @@ def check_filter_states(page, base):
 
 
 def check_fallback_font(page, w):
-    """The Roboto fallback is self-hosted under its own family name. A bad path or
+    """The UI fallback face is self-hosted under its own family name. A bad path or
     route 404s silently and the UI drops to the browser's generic sans-serif, so
     confirm every weight the UI uses actually loads."""
     loaded = page.evaluate(
@@ -199,7 +199,7 @@ def check_fallback_font(page, w):
           const out = {};
           for (const wt of [400, 500, 600]) {
             try {  // a 404'd file rejects here rather than returning an error status
-              const faces = await document.fonts.load(`${wt} 16px "Field Guide Roboto"`);
+              const faces = await document.fonts.load(`${wt} 16px "Field Guide UI"`);
               out[wt] = faces.length > 0 && faces.every(f => f.status === "loaded");
             } catch (e) { out[wt] = false; }
           }
@@ -208,7 +208,7 @@ def check_fallback_font(page, w):
         """
     )
     bad = [k for k, ok in loaded.items() if not ok]
-    check(not bad, f"Roboto fallback font loads  [@{w}]", "failed weights: " + ", ".join(bad))
+    check(not bad, f"UI fallback font loads  [@{w}]", "failed weights: " + ", ".join(bad))
 
 
 def check_applied_alignment(page, w):
@@ -229,12 +229,12 @@ def check_applied_alignment(page, w):
           f"worst offset {max(off):.2f}px" if rows else "no rows")
 
 
-ALLOWED_FONTS = {"fraunces", "avenir next", "field guide roboto"}
+ALLOWED_FONTS = {"fraunces", "avenir next", "field guide ui"}
 
 
 def check_typefaces(page, path):
     """Field Guide allows two typefaces (Fraunces, Avenir Next) plus the self-hosted
-    Roboto fallback. Every rendered text element's first-choice family must be one
+    UI fallback face. Every rendered text element's first-choice family must be one
     of them - catches a stray monospace, a browser default on a <code>/<button>,
     or a new font slipped into one template."""
     bad = page.evaluate(
@@ -246,7 +246,7 @@ def check_typefaces(page, path):
             const cs = getComputedStyle(el);
             const first = cs.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '').toLowerCase();
             if (!allowed.includes(first)) out.add(`${el.tagName.toLowerCase()}.${el.className || ''} -> ${first}`);
-            // UI face (Avenir Next / its Roboto fallback) is never lighter than Medium
+            // UI face (Avenir Next / its fallback) is never lighter than Medium
             else if (first !== 'fraunces' && parseInt(cs.fontWeight, 10) < 500) out.add(`${el.tagName.toLowerCase()}.${el.className || ''} -> ${first} weight ${cs.fontWeight}`);
           }
           return [...out].slice(0, 8);
