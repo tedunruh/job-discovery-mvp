@@ -24,8 +24,49 @@ field-guide/
 └── css/components.css hand-written components (.fg-*), semantic tokens only
 ```
 
+**Gallery:** `/field-guide` (signed in) renders every token and component, in every
+state, with a "use this when" note. Swatches and the type scale are read from
+`tokens/*.json`; components use the real CSS and the `_fg.html` macros, so the
+page can't drift from what ships. `quality_check.py` fails if any `.fg-` class in
+`components.css` has no example there.
+
+**Macros:** components with more than one-class markup live in
+`dashboard/templates/_fg.html` (`fg.toggle`, `fg.filter`, `fg.chevron`). Import with
+`{% import "_fg.html" as fg %}`; screens and the gallery share them.
+
 Flask serves `dist/` and `css/` at `/field-guide/...`. Every template includes
 `dashboard/templates/_field_guide_head.html` for fonts, tokens and components.
+
+## Figma mirror (code → Figma)
+
+Code is the source of truth; the Field Guide Figma file (`w7hKbZWJIgb74guqh5uGUF`)
+mirrors it so designs can be made by hand with the same tokens.
+
+- **Variables:** `_Primitives` (hidden; palette, the alpha steps semantic tokens use,
+  raw dimensions) and `Semantic` (every semantic token, aliased to a primitive,
+  scoped to where it may be used, WEB code syntax = its `var(--fg-…)` name).
+  Goldenrod/Clay/Sage signal tokens are scoped to fills and strokes only - never
+  text fill - so Figma enforces the same rule the code does.
+- **Effect style:** `Elevation/Raised` = `--fg-shadow-raised`.
+- **Components page:** real Figma components with variants for every state,
+  fills/strokes/padding/radius bound to the Semantic variables: Button
+  (Style × State), Link, Icon button, Checkbox, Radio, Toggle, Text field,
+  Filter pill, Filter menu (built from Checkbox/Radio instances), Message.
+  Each description names its code class or macro. Text is Roboto at the
+  stepped-down weights (the code's non-Apple fallback); swap to Avenir Next
+  locally if you have it.
+- **Field Guide gallery page:** the `/field-guide` page laid out in Figma from
+  instances of those components, same sections and "use this when" notes.
+  A visual mirror, not wired: there's no Code Connect link yet, so a change in
+  code needs a resync (variables) or a rebuild request (components).
+- **Not mirrored:** line height and letter spacing (unitless / em values have no
+  clean Figma variable type).
+
+To resync after a token change: run `python field-guide/figma/export_variables.py`
+and execute `field-guide/figma/sync_variables.js` with `const PLAN = <that JSON>;`
+prepended, via the Figma MCP `use_figma` tool (ask Claude: "resync Field Guide
+tokens to Figma"). It updates variables in place by name and reports, rather
+than deletes, anything in Figma that no longer exists in code.
 
 ## Changing a token
 
@@ -73,6 +114,12 @@ Ink on Goldenrod 6.7:1, on Sage 6.7:1, on Clay 4.4:1 (large or bold text only).
 
 Scale: 12 / 14 / 15 (body) / 16 / 20 / 24 / 28 / 36, plus 96 for the sign-in wordmark.
 
+**Control type** (set by Ted in the Figma Components page, 2026-10-15): all
+control text is 16px. Labels on things you act on - buttons, links, checkbox /
+radio / toggle labels, menu rows, filter labels, field labels - are **demibold**. Values and
+messages - input values, filter values, message copy - are **medium**. 12-14px
+is for supporting text only (metadata, hints, counts, section notes).
+
 ## Components (Sprint 1)
 
 | Class | Notes |
@@ -87,7 +134,8 @@ Scale: 12 / 14 / 15 (body) / 16 / 20 / 24 / 28 / 36, plus 96 for the sign-in wor
 | `.fg-link` | Forest |
 | `.fg-button--ghost` | Forest text, no outline (header "Role preferences") |
 | `.fg-radio` | Checked = Forest check-disc |
-| `.fg-filter` / `.fg-filter-pill` / `.fg-menu` / `.fg-menu-item` | Dropdown filter on `<details>`; include `/field-guide/js/filter.js` for outside-click and Escape |
+| `.fg-filter` / `.fg-filter-pill` / `.fg-menu` / `.fg-menu-item` | Dropdown filter on `<details>` via `fg.filter`; include `/field-guide/js/filter.js` for outside-click and Escape |
+| `.fg-toggle` | One item's on/off status ("Applied") via `fg.toggle`; disc carries the state, label stays fixed |
 
 ## Principles that are build rules
 

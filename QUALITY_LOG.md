@@ -295,3 +295,70 @@ dropped. No data lost, one delayed run.
 - [ ] **When a loop's stop condition comes from a response field, check it on every page, not
       only the first.** Page through a case you know is large (hundreds of results) and compare
       against the reported total.
+
+### 2026-10-15 — Field Guide component gallery (/field-guide)
+**Shipped:** a signed-in gallery page rendering every token (from tokens/*.json)
+and every component in every state, each with a "use this when" note. The Applied
+toggle moved out of index.html into Field Guide (`.fg-toggle` + `fg.toggle`
+macro), the filter pill markup into `fg.filter`; the dashboard now uses both
+macros. Disabled styles added for checkbox, radio, input and toggle.
+**Rework count:** 0 so far
+**Why:** there was no single place showing the approved set of controls, so each
+new screen was reconstructed from memory - the root of visual drift.
+**Standing checks added:**
+- [x] Automated: `gallery shows every Field Guide class` - fails when a `.fg-`
+      class exists in components.css with no example on /field-guide.
+      Mutation-tested (added a stray `.fg-badge`, check failed naming it).
+- [x] /field-guide joins the viewport, overflow and mobile-width checks at all six sizes.
+
+### 2026-10-15 — Field Guide mirrored into Figma (variables, components, gallery)
+**Shipped:** `_Primitives` + `Semantic` variable collections (95 variables, scoped,
+aliased, WEB code syntax), `Elevation/Raised` effect style, a Components page of
+variable-bound component sets, and a Field Guide gallery page of instances.
+**Rework count:** 0 reported; 4 caught before handoff
+**Caught before handoff:**
+1. *Vector resized to a box distorts its path.* Check marks drawn as a path then
+   `resize()`d to 18×18 stretched into slashes. Draw paths at native size and
+   position them instead.
+2. *`resize()` after hug sizing pins the frame (twice).* The gallery frame and 32
+   swatches were created as hug-content auto-layout, then resized for width -
+   which silently resets both axes to fixed, collapsing them. Set width, then
+   set the primary axis back to AUTO.
+3. *Default frame clipping cuts effects.* Menu shadows were clipped by their
+   parent frames; gallery layout frames now have clipsContent off.
+4. *Wrong component-property key.* Looked up a text property by its default
+   value ("Option") instead of its name ("Label").
+**Standing checks added:**
+- [ ] **Figma builds: after any `resize()`, re-set `primaryAxisSizingMode` /
+      `counterAxisSizingMode` explicitly, and screenshot every composed frame**
+      before reporting - all four issues above were invisible in the returned
+      structure and obvious in the first screenshot.
+
+### 2026-10-15 — Field Guide gallery broke the typeface rule
+**Shipped:** removed monospace from the code gallery (class/token names now use
+the UI font with slight tracking) and Roboto Mono from the Figma gallery page.
+**Rework count:** 1 (reported by Ted: "you didn't even follow the font guidelines")
+**Root causes:**
+1. *Wrote an exception to a rule instead of following it.* To make `--fg-…` read
+   as two hyphens I set token names in monospace and documented it as a
+   "gallery-only exception" - the rule says never add another typeface, full stop.
+2. *Assumed a font was unavailable instead of testing it.* Figma text was set in
+   Roboto because Avenir Next didn't appear in the font list; loading it was
+   never attempted. (It genuinely can't load in the Figma MCP runtime - it's a
+   local font on Ted's Mac - but that was found only after the report.)
+**Standing checks added:**
+- [x] Automated: `only Field Guide typefaces` - every rendered text element's
+      first-choice family must be Fraunces, Avenir Next or Field Guide Roboto,
+      on every page. Verified against the monospace version (failed, naming `code`).
+- [ ] **No self-granted exceptions to CLAUDE.md rules.** If a rule blocks a
+      reasonable goal, ask - don't write the exception into a comment.
+
+### 2026-10-15 — Control type from Ted's Figma component edits
+**Shipped:** Ted edited the Figma Components (Avenir Next); his choices pushed to
+code: buttons, links, checkbox/radio/toggle labels and menu rows 14→16px
+demibold; input values and messages 16px medium. Onboarding's local `.fg-check`
+override removed (the component now owns it). Rule recorded in the README.
+**Rework count:** 0 (design change, not a defect)
+**Process note:** Figma → code changes were read from the components themselves
+(fonts, sizes, fills, spacing per variant) and diffed against the original
+build, rather than eyeballed from a screenshot.
