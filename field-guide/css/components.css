@@ -79,6 +79,8 @@
 .fg-button--ghost:hover { background: var(--fg-color-signal-progress-subtle); }
 .fg-button--block { width: 100%; }
 .fg-button:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Disabled form controls share the button's treatment: same opacity, no pointer. */
+:where(.fg-checkbox, .fg-radio, .fg-input, .fg-toggle):disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* Icon-only button with a 44px hit area. */
 .fg-icon-button {
@@ -279,3 +281,30 @@
   cursor: pointer;
 }
 .fg-menu-item:has(:checked) { color: var(--fg-color-text-primary); }
+
+/* ---------- Toggle ---------- */
+/* A single on/off state on one item, shown as a check-disc plus a label (the
+   dashboard's "Applied"). Not a checkbox: a checkbox picks items from a list;
+   a toggle flips one item's status in place. Markup comes from the fg.toggle
+   macro (dashboard/templates/_fg.html); aria-pressed carries the state. */
+.fg-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fg-space-1);
+  height: var(--fg-size-touch-target);
+  padding: 0 var(--fg-space-1);
+  background: none;
+  border: 0;
+  border-radius: var(--fg-radius-md);
+  font-family: inherit;
+  font-size: var(--fg-font-size-sm);
+  font-weight: var(--fg-font-weight-medium);
+  color: var(--fg-color-text-secondary);
+  cursor: pointer;
+}
+.fg-toggle svg { display: block; flex-shrink: 0; }
+.fg-toggle[aria-pressed="true"] svg { color: var(--fg-color-action-selected); }
+.fg-toggle:focus-visible {
+  outline: 3px solid var(--fg-color-action-focus-ring);
+  outline-offset: 0;
+}

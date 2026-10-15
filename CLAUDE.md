@@ -11,8 +11,13 @@ All UI is styled through **Field Guide**, the design system in `field-guide/`. R
 Rules:
 - Never hard-code a color, font, font size, spacing or radius value in a template or component.
   Use a `var(--fg-…)` semantic token. Layout widths and breakpoints are fine as raw px.
-- Reuse `.fg-*` components from `field-guide/css/components.css` before writing new CSS.
-  A new reusable pattern goes there, not inline in one template.
+- **The gallery at `/field-guide` is the catalog of approved controls.** Before building a
+  screen, pick from it. Reuse `.fg-*` classes from `field-guide/css/components.css` and the
+  macros in `dashboard/templates/_fg.html` (`fg.toggle`, `fg.filter`); never copy their markup.
+- A new component goes into Field Guide first: CSS in `components.css`, a macro in `_fg.html`
+  if its markup is more than one class on a native element, and a spec row with every state
+  in `dashboard/templates/field_guide.html`. `quality_check.py` fails if a `.fg-` class is
+  missing from the gallery.
 - Every template includes `{% include "_field_guide_head.html" %}` and uses `<body class="fg-page">`.
 - To change a token: edit `field-guide/tokens/*.json`, run `python field-guide/build.py`,
   commit the JSON and `field-guide/dist/tokens.css` together. Never edit `dist/` by hand.
