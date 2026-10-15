@@ -61,6 +61,23 @@ class WorkdayCadence(unittest.TestCase):
                 self.assertTrue(t in picked_by_slot[s] or t in picked_by_slot[s + 1])
 
 
+class BigWorkdayTenants(unittest.TestCase):
+    def test_huge_tenants_are_checked_hourly_and_small_ones_every_other_run(self):
+        small = [dict(board(i, "hot"), ats_type="workday", scan_marker="design:30") for i in range(1, 41)]
+        big = [dict(board(i, "hot"), ats_type="workday", scan_marker="design:1800") for i in range(101, 141)]
+        picks = [{c["id"] for c in rc.select_tail(small + big, now=s * rc.RUN_INTERVAL_SECONDS)} for s in range(8)]
+        for s_ in range(8):
+            self.assertTrue(18 <= len(picks[s_] & {c["id"] for c in small}) <= 22)   # ~half of the small ones each run
+            self.assertTrue(7 <= len(picks[s_] & {c["id"] for c in big}) <= 13)      # ~a quarter of the big ones
+        for t in range(101, 141):  # every big tenant is still checked at least once in 4 runs
+            self.assertTrue(any(t in picks[s_] for s_ in range(4)))
+
+    def test_a_tenant_with_no_marker_yet_counts_as_small(self):
+        self.assertEqual(rc._marker_total({"scan_marker": None}), 0)
+        self.assertEqual(rc._marker_total({"scan_marker": "design:451"}), 451)
+        self.assertEqual(rc._marker_total({"scan_marker": "rescan"}), 0)
+
+
 class WorkTypeMatching(unittest.TestCase):
     def test_default_when_never_chosen_is_remote(self):
         self.assertTrue(matches_work_type("remote", None))

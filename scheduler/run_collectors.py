@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import threading
 import time
@@ -54,6 +55,10 @@ RUN_INTERVAL_SECONDS = 15 * 60
 COLD_SLICES = 16
 TAIL_WORKERS = 12
 WORKDAY_EVERY = 2  # hot Workday tenants are probed every Nth run
+# Huge enterprise tenants (their "design" search matches hundreds+ of postings, mostly noise)
+# churn nearly every run, so each probe turns into a 25-page scan. Check those hourly.
+WORKDAY_BIG_TOTAL = 400
+WORKDAY_BIG_EVERY = 4
 TAIL_CHUNK = 48  # boards fetched per batch: the time budget is only checked between batches, and a batch
 # of Workday first scans (several seconds each) must not be able to overrun it by minutes
 # Per-ATS cap on simultaneous requests, so a few thousand boards don't hammer one host.
@@ -156,6 +161,12 @@ def _tail_slot(now=None):
     return int((now if now is not None else time.time()) // RUN_INTERVAL_SECONDS) % COLD_SLICES
 
 
+def _marker_total(company):
+    """The match count in a Workday tenant's stored change marker ("design:451" -> 451), or 0."""
+    m = re.fullmatch(r"design:(\d+)", company.get("scan_marker") or "")
+    return int(m.group(1)) if m else 0
+
+
 def select_tail(companies, now=None):
     """Which discovered boards this run scans: every hot one, plus the cold ones whose id falls
     in this run's slice (a stateless rotation: each cold board comes up once per COLD_SLICES runs)."""
@@ -165,8 +176,10 @@ def select_tail(companies, now=None):
         if c["tier"] == "hot":
             # Workday tenants cost a request each even when nothing changed, and there are
             # hundreds: check each every WORKDAY_EVERY runs (30 min) instead of every run.
-            if c["ats_type"] == "workday" and c["id"] % WORKDAY_EVERY != slot % WORKDAY_EVERY:
-                continue
+            if c["ats_type"] == "workday":
+                every = WORKDAY_BIG_EVERY if _marker_total(c) >= WORKDAY_BIG_TOTAL else WORKDAY_EVERY
+                if c["id"] % every != slot % every:
+                    continue
             picked.append(c)
         elif c["tier"] == "cold" and c["id"] % COLD_SLICES == slot:
             picked.append(c)
