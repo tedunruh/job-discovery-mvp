@@ -385,3 +385,16 @@ labeled it "placeholders only" as if placeholders were exempt (they aren't, WCAG
 **Standing checks:**
 - [ ] Manual: any new or changed text-color token gets its ratio on Parchment measured
       and written in the README contrast line; text tokens must be >= 4.5:1.
+
+### 2026-10-15 — Dashboard to Figma 226:849
+**Shipped:** Sage band (support-subtle, 277px) with the topographic contours from Figma
+behind the header; list moved into a raised Parchment card (radius xl, `--fg-shadow-raised`);
+rows separated by an 8px gap and 16px padding instead of rules, 4px radius for the hover tile;
+page inset 24/16, header-to-card 36px. Contours are `_topography.svg`, exported from the
+Figma path (0.1px rounding, verified by checksum against Figma), stroked with `currentColor`
+= `--fg-color-signal-attention-subtle`. Phone (no Figma frame): card padding 12px, rows 12px.
+**Rework count:** 0
+**Not changed (Figma disagrees with itself):** the frame's "Applied" label is loose text at
+14px Medium; the Toggle component is 16px Demi Bold, which code follows. Asked Ted.
+**Tooling:** `QC_SHOTS=<dir> python scripts/quality_check.py` saves a screenshot per page and
+width for side-by-side review against Figma.
