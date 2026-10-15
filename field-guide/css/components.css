@@ -5,7 +5,8 @@
 /* Control type (Ted, Figma Components page, 2026-10-15): all control text is
    16px (--fg-font-size-lg). Labels on things you act on - buttons, links,
    checkbox/radio/toggle labels, menu rows, filter labels - are demibold.
-   Values and messages - input values, filter values, message copy - are medium. */
+   Values and messages - input values, filter values, message copy - are medium.
+   Minimum weight for Avenir Next (UI) text is medium; regular is Fraunces only. */
 :root { color-scheme: light; }
 
 .fg-page {
@@ -14,6 +15,7 @@
   color: var(--fg-color-text-primary);
   font-family: var(--fg-font-family-ui);
   font-size: var(--fg-font-size-md);
+  font-weight: var(--fg-font-weight-medium); /* Avenir Next never lighter than Medium */
   line-height: var(--fg-font-line-height-body);
 }
 

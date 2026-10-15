@@ -362,3 +362,14 @@ override removed (the component now owns it). Rule recorded in the README.
 **Process note:** Figma → code changes were read from the components themselves
 (fonts, sizes, fills, spacing per variant) and diffed against the original
 build, rather than eyeballed from a screenshot.
+
+### 2026-10-15 — UI minimum weight is Medium
+**Shipped:** `.fg-page` now sets Medium (500), so body copy, hints and notes no
+longer fall back to the browser's 400. Regular is reserved for Fraunces.
+**Rework count:** 0 (design rule from Ted)
+**Root cause of the gap:** the base style never set a weight, so any text without
+an explicit weight silently rendered Regular - including onboarding subtext/hints.
+**Standing checks added:**
+- [x] Automated: the typeface check now also fails any Avenir/Roboto text whose
+      computed weight is below 500. Verified against the old base style (failed on
+      onboarding subtext and hints).
