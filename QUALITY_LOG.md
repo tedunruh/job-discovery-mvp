@@ -333,3 +333,22 @@ variable-bound component sets, and a Field Guide gallery page of instances.
       `counterAxisSizingMode` explicitly, and screenshot every composed frame**
       before reporting - all four issues above were invisible in the returned
       structure and obvious in the first screenshot.
+
+### 2026-10-15 — Field Guide gallery broke the typeface rule
+**Shipped:** removed monospace from the code gallery (class/token names now use
+the UI font with slight tracking) and Roboto Mono from the Figma gallery page.
+**Rework count:** 1 (reported by Ted: "you didn't even follow the font guidelines")
+**Root causes:**
+1. *Wrote an exception to a rule instead of following it.* To make `--fg-…` read
+   as two hyphens I set token names in monospace and documented it as a
+   "gallery-only exception" - the rule says never add another typeface, full stop.
+2. *Assumed a font was unavailable instead of testing it.* Figma text was set in
+   Roboto because Avenir Next didn't appear in the font list; loading it was
+   never attempted. (It genuinely can't load in the Figma MCP runtime - it's a
+   local font on Ted's Mac - but that was found only after the report.)
+**Standing checks added:**
+- [x] Automated: `only Field Guide typefaces` - every rendered text element's
+      first-choice family must be Fraunces, Avenir Next or Field Guide Roboto,
+      on every page. Verified against the monospace version (failed, naming `code`).
+- [ ] **No self-granted exceptions to CLAUDE.md rules.** If a rule blocks a
+      reasonable goal, ask - don't write the exception into a comment.
