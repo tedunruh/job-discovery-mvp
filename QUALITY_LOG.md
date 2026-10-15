@@ -398,3 +398,14 @@ Figma path (0.1px rounding, verified by checksum against Figma), stroked with `c
 14px Medium; the Toggle component is 16px Demi Bold, which code follows. Asked Ted.
 **Tooling:** `QC_SHOTS=<dir> python scripts/quality_check.py` saves a screenshot per page and
 width for side-by-side review against Figma.
+
+### 2026-10-15 — Toggle label Medium; sentence case written down
+**Shipped:** `.fg-toggle` label ("Applied") 16px Demi Bold → 16px **Medium** (Ted: demibold
+read too strong for a status). Control-type rule updated: status labels join values and
+messages at medium. Sentence case is now a written rule (CLAUDE.md, README principle 5);
+templates audited, no title-case labels.
+**Rework count:** 0
+**Figma not updated:** Toggle component (206:57) and dashboard frame Applied labels still
+need Avenir Next Medium 16 by hand - the MCP runtime can't load Avenir Next.
+**Standing checks:**
+- [ ] Manual: new UI copy is sentence case (proper names excepted).
