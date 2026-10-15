@@ -18,8 +18,8 @@ field-guide/
 │   └── radius.json
 ├── build.py           tokens/*.json -> dist/tokens.css (plain Python, no Node)
 ├── dist/tokens.css    GENERATED. Committed. Never edit by hand.
-├── css/fonts.css      @font-face for the Roboto fallback (one weight lighter)
-├── fonts/             self-hosted Roboto woff2 + license
+├── css/fonts.css      @font-face for the UI fallback face
+├── fonts/             self-hosted fallback woff2 + license
 ├── js/filter.js       closes .fg-filter menus on outside click / Escape
 └── css/components.css hand-written components (.fg-*), semantic tokens only
 ```
@@ -52,9 +52,7 @@ mirrors it so designs can be made by hand with the same tokens.
   fills/strokes/padding/radius bound to the Semantic variables: Button
   (Style × State), Link, Icon button, Checkbox, Radio, Toggle, Text field,
   Filter pill, Filter menu (built from Checkbox/Radio instances), Message.
-  Each description names its code class or macro. Text is Roboto at the
-  stepped-down weights (the code's non-Apple fallback); swap to Avenir Next
-  locally if you have it.
+  Each description names its code class or macro. Text is Avenir Next.
 - **Field Guide gallery page:** the `/field-guide` page laid out in Figma from
   instances of those components, same sections and "use this when" notes.
   A visual mirror, not wired: there's no Code Connect link yet, so a change in
@@ -106,10 +104,8 @@ Ink on Goldenrod 6.7:1, on Sage 6.7:1, on Clay 4.4:1 (large or bold text only).
   Wordmark, editorial headlines, introductions, discovery moments.
   Always with `font-variation-settings: "SOFT" 0, "WONK" 1`.
 - **Avenir Next** (`--fg-font-family-ui`): clarity. Everything else.
-  Avenir Next ships with Apple devices only (no web license), so everywhere else
-  falls back to **Roboto**, self-hosted in `fonts/` as the family "Field Guide Roboto"
-  and mapped one weight lighter (400→300, 500→400, 600→500) so it matches Avenir's
-  color on the page. See `css/fonts.css`.
+  Avenir Next ships with Apple devices only, so other devices get a self-hosted
+  fallback face (`css/fonts.css`).
 - **Minimum weight for Avenir Next is Medium** (500). Regular (400) is used only by
   Fraunces. Nothing in the UI face is set lighter than Medium.
 - No other typefaces.
