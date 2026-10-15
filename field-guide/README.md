@@ -24,6 +24,16 @@ field-guide/
 └── css/components.css hand-written components (.fg-*), semantic tokens only
 ```
 
+**Gallery:** `/field-guide` (signed in) renders every token and component, in every
+state, with a "use this when" note. Swatches and the type scale are read from
+`tokens/*.json`; components use the real CSS and the `_fg.html` macros, so the
+page can't drift from what ships. `quality_check.py` fails if any `.fg-` class in
+`components.css` has no example there.
+
+**Macros:** components with more than one-class markup live in
+`dashboard/templates/_fg.html` (`fg.toggle`, `fg.filter`, `fg.chevron`). Import with
+`{% import "_fg.html" as fg %}`; screens and the gallery share them.
+
 Flask serves `dist/` and `css/` at `/field-guide/...`. Every template includes
 `dashboard/templates/_field_guide_head.html` for fonts, tokens and components.
 
@@ -87,7 +97,8 @@ Scale: 12 / 14 / 15 (body) / 16 / 20 / 24 / 28 / 36, plus 96 for the sign-in wor
 | `.fg-link` | Forest |
 | `.fg-button--ghost` | Forest text, no outline (header "Role preferences") |
 | `.fg-radio` | Checked = Forest check-disc |
-| `.fg-filter` / `.fg-filter-pill` / `.fg-menu` / `.fg-menu-item` | Dropdown filter on `<details>`; include `/field-guide/js/filter.js` for outside-click and Escape |
+| `.fg-filter` / `.fg-filter-pill` / `.fg-menu` / `.fg-menu-item` | Dropdown filter on `<details>` via `fg.filter`; include `/field-guide/js/filter.js` for outside-click and Escape |
+| `.fg-toggle` | One item's on/off status ("Applied") via `fg.toggle`; disc carries the state, label stays fixed |
 
 ## Principles that are build rules
 

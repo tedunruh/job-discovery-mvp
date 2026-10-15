@@ -2,11 +2,12 @@
 // Adds what <details> lacks: only one menu open at a time, close on an outside
 // click, close on Escape (returning focus to the pill).
 (function () {
-  function filters() { return document.querySelectorAll("details.fg-filter"); }
+  // Specimens marked data-fg-static (the /field-guide gallery) are left alone.
+  function filters() { return document.querySelectorAll("details.fg-filter:not([data-fg-static])"); }
 
   document.addEventListener("toggle", function (e) {
     var d = e.target;
-    if (!d.matches || !d.matches("details.fg-filter") || !d.open) return;
+    if (!d.matches || !d.matches("details.fg-filter:not([data-fg-static])") || !d.open) return;
     filters().forEach(function (other) { if (other !== d) other.open = false; });
   }, true);
 

@@ -1,0 +1,401 @@
+{% import "_fg.html" as fg %}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Field Guide — Scout</title>
+  {% include "_field_guide_head.html" %}
+  <script src="/field-guide/js/filter.js" defer></script>
+  <style>
+    /* Gallery layout only. Every example below uses the real Field Guide classes
+       and macros; nothing here restyles a component. */
+    body { padding: var(--fg-space-6); }
+    .gallery { max-width: 1120px; margin: 0 auto; }
+    .gallery-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--fg-space-4);
+      padding: var(--fg-space-4) 0 var(--fg-space-6);
+      border-bottom: 1px solid var(--fg-color-border-default);
+    }
+    .gallery-header h1 { font-size: var(--fg-font-size-4xl); }
+    .gallery-intro {
+      max-width: 640px;
+      margin: var(--fg-space-6) 0 0;
+      color: var(--fg-color-text-secondary);
+    }
+    .gallery-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--fg-space-2) var(--fg-space-4);
+      margin: var(--fg-space-4) 0 0;
+      padding: 0;
+      list-style: none;
+      font-size: var(--fg-font-size-sm);
+    }
+
+    .gallery h2 {
+      margin: var(--fg-space-16) 0 var(--fg-space-2);
+      font-size: var(--fg-font-size-3xl);
+    }
+    .gallery-lede { margin: 0 0 var(--fg-space-6); color: var(--fg-color-text-secondary); }
+
+    /* One spec row per component: description on the left, live states right. */
+    .spec {
+      display: grid;
+      grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+      gap: var(--fg-space-6);
+      padding: var(--fg-space-6) 0;
+      border-top: 1px solid var(--fg-color-border-subtle);
+    }
+    .spec h3 {
+      margin: 0 0 var(--fg-space-1);
+      font-size: var(--fg-font-size-xl);
+      font-weight: var(--fg-font-weight-demibold);
+    }
+    .spec-use { margin: 0 0 var(--fg-space-2); }
+    .spec-code {
+      display: block;
+      margin: 0;
+      font-size: var(--fg-font-size-xs);
+      color: var(--fg-color-text-secondary);
+      word-break: break-word;
+    }
+    .states {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: var(--fg-space-6) var(--fg-space-8);
+    }
+    .state {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--fg-space-2);
+      min-width: 0;
+    }
+    .state-label {
+      font-size: var(--fg-font-size-xs);
+      font-weight: var(--fg-font-weight-medium);
+      color: var(--fg-color-text-secondary);
+    }
+    .state--wide { flex: 1 1 280px; max-width: 360px; }
+    .state--menu { min-height: 230px; }  /* room for the open menu to hang below */
+
+    /* Foundations */
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--fg-space-4);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .swatch { display: flex; flex-direction: column; gap: var(--fg-space-1); font-size: var(--fg-font-size-xs); }
+    .swatch-chip {
+      height: 56px;
+      border-radius: var(--fg-radius-md);
+      border: 1px solid var(--fg-color-border-subtle);
+    }
+    .swatch-name { font-size: var(--fg-font-size-sm); font-weight: var(--fg-font-weight-demibold); }
+    .swatch-meta { color: var(--fg-color-text-secondary); word-break: break-word; }
+    /* Class and token names are code, set in the browser's monospace so "--fg-…"
+       reads as two hyphens. The one place outside Fraunces/Avenir: developer
+       identifiers in this gallery only, never product UI. */
+    .gallery code { font-size: var(--fg-font-size-xs); }
+    .token-group { margin: var(--fg-space-8) 0 var(--fg-space-2); font-size: var(--fg-font-size-lg); font-weight: var(--fg-font-weight-demibold); }
+
+    .type-row {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      gap: var(--fg-space-4);
+      align-items: baseline;
+      padding: var(--fg-space-3) 0;
+      border-top: 1px solid var(--fg-color-border-subtle);
+    }
+    .type-row .swatch-meta { font-size: var(--fg-font-size-xs); }
+    .type-sample { margin: 0; line-height: var(--fg-font-line-height-tight); overflow-wrap: anywhere; }
+
+    .scale { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--fg-space-4); }
+    .scale-item { display: flex; flex-direction: column; gap: var(--fg-space-1); font-size: var(--fg-font-size-xs); }
+    .space-bar { height: var(--fg-space-4); background: var(--fg-color-action-primary); border-radius: 2px; }
+    .radius-box { width: 64px; height: 64px; border: 1.5px solid var(--fg-color-action-primary); background: var(--fg-color-signal-progress-subtle); }
+    .shadow-box { width: 160px; height: 64px; border-radius: var(--fg-radius-md); background: var(--fg-color-surface-raised); }
+
+    @media (max-width: 680px) {
+      body { padding: var(--fg-space-6) var(--fg-space-4); }
+      .spec { grid-template-columns: minmax(0, 1fr); gap: var(--fg-space-4); }
+      .type-row { grid-template-columns: minmax(0, 1fr); gap: var(--fg-space-1); }
+    }
+  </style>
+</head>
+<body class="fg-page">
+<div class="gallery">
+  <header class="gallery-header">
+    <h1 class="fg-display">Field Guide</h1>
+    <a class="fg-button fg-button--ghost" href="/">Back to roles</a>
+  </header>
+  <p class="gallery-intro">Every token and component Scout is built from, rendered from the live code. If a control isn't here, it isn't part of the system yet: add it to Field Guide before using it on a screen.</p>
+  <ul class="gallery-nav">
+    <li><a class="fg-link" href="#color">Color</a></li>
+    <li><a class="fg-link" href="#type">Type</a></li>
+    <li><a class="fg-link" href="#space">Space &amp; shape</a></li>
+    <li><a class="fg-link" href="#buttons">Buttons</a></li>
+    <li><a class="fg-link" href="#selection">Selection</a></li>
+    <li><a class="fg-link" href="#inputs">Inputs</a></li>
+    <li><a class="fg-link" href="#filters">Filters</a></li>
+    <li><a class="fg-link" href="#messages">Messages</a></li>
+  </ul>
+
+  {# ===================== Foundations ===================== #}
+  <h2 id="color" class="fg-display">Color</h2>
+  <p class="gallery-lede">Parchment gives Scout a place to live, Ink a voice, Forest direction. Goldenrod, Clay and Sage mark moments and are never text on Parchment.</p>
+  <ul class="swatches">
+    {% for path, var, value, desc in tokens["color.palette"] %}
+    <li class="swatch" data-token="{{ var }}">
+      <span class="swatch-chip" style="background: var({{ var }})"></span>
+      <span class="swatch-name">{{ path.split(".")[-1]|capitalize }}</span>
+      <span class="swatch-meta">{{ value }} · <code>{{ var }}</code></span>
+      {% if desc %}<span class="swatch-meta">{{ desc }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% for group in ["color.surface", "color.text", "color.border", "color.action", "color.signal"] %}
+  <p class="token-group">{{ group.split(".")[-1]|capitalize }}</p>
+  <ul class="swatches">
+    {% for path, var, value, desc in tokens[group] %}
+    <li class="swatch" data-token="{{ var }}">
+      <span class="swatch-chip" style="background: var({{ var }})"></span>
+      <span class="swatch-name">{{ path.split(".", 2)[-1] }}</span>
+      <span class="swatch-meta"><code>{{ var }}</code></span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
+
+  <h2 id="type" class="fg-display">Type</h2>
+  <p class="gallery-lede">Fraunces is Scout's personality, for headlines and discovery moments. Avenir Next (Roboto, one weight lighter, off Apple devices) is Scout's clarity, for everything else.</p>
+  <div class="type-row">
+    <span class="swatch-meta">Display · <code>.fg-display</code><br><code>--fg-font-family-display</code></span>
+    <p class="type-sample fg-display" style="font-size: var(--fg-font-size-2xl)">Hey, I found something for you.</p>
+  </div>
+  {% for path, var, value, desc in tokens["font.size"]|reverse %}
+  {% if path != "font.size.wordmark" %}
+  <div class="type-row">
+    <span class="swatch-meta">{{ path.split(".")[-1] }} · {{ value }}<br><code>{{ var }}</code>{% if desc %}<br>{{ desc }}{% endif %}</span>
+    <p class="type-sample" style="font-size: var({{ var }})">Senior Product Designer, Design Systems</p>
+  </div>
+  {% endif %}
+  {% endfor %}
+  <div class="type-row">
+    <span class="swatch-meta">Secondary text · <code>.fg-text-secondary</code></span>
+    <p class="type-sample fg-text-secondary">Discord • Remote - United States</p>
+  </div>
+
+  <h2 id="space" class="fg-display">Space &amp; shape</h2>
+  <p class="token-group">Spacing</p>
+  <div class="scale">
+    {% for path, var, value, desc in tokens["space"] %}
+    <div class="scale-item"><span class="space-bar" style="width: var({{ var }})"></span><span>{{ value }}</span><span class="swatch-meta"><code>{{ var }}</code></span></div>
+    {% endfor %}
+  </div>
+  <p class="token-group">Radius</p>
+  <div class="scale">
+    {% for path, var, value, desc in tokens["radius"] %}
+    <div class="scale-item"><span class="radius-box" style="border-radius: var({{ var }})"></span><span>{{ path.split(".")[-1] }} · {{ value }}</span><span class="swatch-meta"><code>{{ var }}</code></span></div>
+    {% endfor %}
+  </div>
+  <p class="token-group">Elevation</p>
+  <div class="scale">
+    {% for path, var, value, desc in tokens["shadow"] %}
+    <div class="scale-item"><span class="shadow-box" style="box-shadow: var({{ var }})"></span><span>{{ path.split(".")[-1] }}</span><span class="swatch-meta"><code>{{ var }}</code> · menus only</span></div>
+    {% endfor %}
+  </div>
+
+  {# ===================== Components ===================== #}
+  <h2 id="buttons" class="fg-display">Buttons &amp; links</h2>
+  <p class="gallery-lede">Forest leads. If Scout wants you to move, Forest shows you where to go.</p>
+
+  <section class="spec" data-component="button-primary">
+    <div>
+      <h3>Primary button</h3>
+      <p class="spec-use">Use for the one action Scout wants you to take next. At most one per view.</p>
+      <code class="spec-code">.fg-button.fg-button--primary</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Default</span><button class="fg-button fg-button--primary" type="button">Send sign-in link</button></div>
+      <div class="state"><span class="state-label">Disabled</span><button class="fg-button fg-button--primary" type="button" disabled>Send sign-in link</button></div>
+      <div class="state state--wide"><span class="state-label">Block (full width, narrow forms)</span><button class="fg-button fg-button--primary fg-button--block" type="button">Continue to dashboard</button></div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="button-secondary">
+    <div>
+      <h3>Secondary button</h3>
+      <p class="spec-use">Use for an alternate or exit action that shouldn't compete with the primary, like Sign out.</p>
+      <code class="spec-code">.fg-button.fg-button--secondary</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Default</span><button class="fg-button fg-button--secondary" type="button">Sign out</button></div>
+      <div class="state"><span class="state-label">Disabled</span><button class="fg-button fg-button--secondary" type="button" disabled>Sign out</button></div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="button-ghost">
+    <div>
+      <h3>Ghost button</h3>
+      <p class="spec-use">Use for navigation that sits in a header or toolbar, where an outline would be too loud.</p>
+      <code class="spec-code">.fg-button.fg-button--ghost</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Default</span><a class="fg-button fg-button--ghost" href="#buttons">Role preferences</a></div>
+      <div class="state"><span class="state-label">Disabled</span><button class="fg-button fg-button--ghost" type="button" disabled>Role preferences</button></div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="icon-button">
+    <div>
+      <h3>Icon button</h3>
+      <p class="spec-use">Use when an action is clearer as an icon alone. Always give it an aria-label; the hit area stays 44px.</p>
+      <code class="spec-code">.fg-icon-button · icon uses currentColor</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Default</span>
+        <button class="fg-icon-button" type="button" aria-label="Open job post">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M10.6071 2.89286H15.1071V7.39286M14.7857 3.21429L8.03571 9.96428M13.1786 9V13.1786C13.1786 14.2437 12.3151 15.1071 11.25 15.1071H4.82143C3.7563 15.1071 2.89286 14.2437 2.89286 13.1786V6.75C2.89286 5.68488 3.7563 4.82143 4.82143 4.82143H9" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="link">
+    <div>
+      <h3>Link</h3>
+      <p class="spec-use">Use for inline navigation inside text or a short row, like "Show 50 more".</p>
+      <code class="spec-code">.fg-link</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Default</span><a class="fg-link" href="#buttons">Show 50 more</a></div>
+    </div>
+  </section>
+
+  <h2 id="selection" class="fg-display">Selection</h2>
+  <p class="gallery-lede">Checkbox picks from a list, radio picks one, toggle flips one item's status. Checked is always Forest.</p>
+
+  <section class="spec" data-component="checkbox">
+    <div>
+      <h3>Checkbox</h3>
+      <p class="spec-use">Use to pick any number of options from a list, like role categories or work types.</p>
+      <code class="spec-code">label.fg-check &gt; input.fg-checkbox</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Unchecked</span><label class="fg-check"><input class="fg-checkbox" type="checkbox"> Content design</label></div>
+      <div class="state"><span class="state-label">Checked</span><label class="fg-check"><input class="fg-checkbox" type="checkbox" checked> Product &amp; UX design</label></div>
+      <div class="state"><span class="state-label">Disabled</span><label class="fg-check"><input class="fg-checkbox" type="checkbox" disabled> UX research</label></div>
+      <div class="state"><span class="state-label">Checked, disabled</span><label class="fg-check"><input class="fg-checkbox" type="checkbox" checked disabled> UX research</label></div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="radio">
+    <div>
+      <h3>Radio</h3>
+      <p class="spec-use">Use to pick exactly one of a few options, like a time range.</p>
+      <code class="spec-code">label.fg-check &gt; input.fg-radio</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Unselected</span><label class="fg-check"><input class="fg-radio" type="radio" name="g-radio"> Last week</label></div>
+      <div class="state"><span class="state-label">Selected</span><label class="fg-check"><input class="fg-radio" type="radio" name="g-radio" checked> 24 hours</label></div>
+      <div class="state"><span class="state-label">Disabled</span><label class="fg-check"><input class="fg-radio" type="radio" name="g-radio-d" disabled> Last month</label></div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="toggle">
+    <div>
+      <h3>Toggle</h3>
+      <p class="spec-use">Use to flip one item's status in place, like marking a role Applied. The label stays the same; the disc shows the state.</p>
+      <code class="spec-code">{% raw %}{{ fg.toggle("Applied", pressed=…) }}{% endraw %} · .fg-toggle</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Off</span>{{ fg.toggle("Applied", pressed=False, type="button") }}</div>
+      <div class="state"><span class="state-label">On</span>{{ fg.toggle("Applied", pressed=True, type="button") }}</div>
+    </div>
+  </section>
+
+  <h2 id="inputs" class="fg-display">Inputs</h2>
+
+  <section class="spec" data-component="text-input">
+    <div>
+      <h3>Text field</h3>
+      <p class="spec-use">Use for short free-text entry. Always pair it with a visible label; hints go below in secondary text.</p>
+      <code class="spec-code">.fg-field &gt; label.fg-label + input.fg-input</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide"><span class="state-label">Empty</span>
+        <div class="fg-field" style="width: 100%"><label class="fg-label" for="g-email">email</label><input class="fg-input" id="g-email" type="email" placeholder="you@example.com"></div>
+      </div>
+      <div class="state state--wide"><span class="state-label">Filled</span>
+        <div class="fg-field" style="width: 100%"><label class="fg-label" for="g-roles">Other roles</label><input class="fg-input" id="g-roles" type="text" value="product manager, data scientist"></div>
+      </div>
+      <div class="state state--wide"><span class="state-label">Disabled</span>
+        <div class="fg-field" style="width: 100%"><label class="fg-label" for="g-dis">email</label><input class="fg-input" id="g-dis" type="email" value="ted@example.com" disabled></div>
+      </div>
+    </div>
+  </section>
+
+  <h2 id="filters" class="fg-display">Filters</h2>
+
+  <section class="spec" data-component="filter">
+    <div>
+      <h3>Filter pill and menu</h3>
+      <p class="spec-use">Use to narrow a list. The pill always shows the current choice ("Any" when unfiltered). Checkboxes in the menu for several choices, radios for one.</p>
+      <code class="spec-code">{% raw %}{% call fg.filter(id, label, value) %} .fg-menu &gt; .fg-menu-item {% endcall %}{% endraw %}</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Closed</span>
+        {% call fg.filter("g-filter-closed", "Work type", "Any") %}
+        <div class="fg-menu">
+          <label class="fg-menu-item"><input class="fg-checkbox" type="checkbox"> Remote</label>
+        </div>
+        {% endcall %}
+      </div>
+      <div class="state state--menu"><span class="state-label">Open, multi-select</span>
+        {% call fg.filter("g-filter-multi", "Work type", "Remote", open=True, static=True) %}
+        <div class="fg-menu">
+          <label class="fg-menu-item"><input class="fg-checkbox" type="checkbox" checked> Remote</label>
+          <label class="fg-menu-item"><input class="fg-checkbox" type="checkbox"> Hybrid</label>
+          <label class="fg-menu-item"><input class="fg-checkbox" type="checkbox"> On-site</label>
+        </div>
+        {% endcall %}
+      </div>
+      <div class="state state--menu"><span class="state-label">Open, single-select</span>
+        {% call fg.filter("g-filter-single", "Posted", "within 24 hours", open=True, static=True) %}
+        <div class="fg-menu">
+          <label class="fg-menu-item"><input class="fg-radio" type="radio" name="g-menu-radio" checked> 24 hours</label>
+          <label class="fg-menu-item"><input class="fg-radio" type="radio" name="g-menu-radio"> Last week</label>
+          <label class="fg-menu-item"><input class="fg-radio" type="radio" name="g-menu-radio"> Last month</label>
+          <label class="fg-menu-item"><input class="fg-radio" type="radio" name="g-menu-radio"> All time</label>
+        </div>
+        {% endcall %}
+      </div>
+    </div>
+  </section>
+
+  <h2 id="messages" class="fg-display">Messages</h2>
+  <p class="gallery-lede">Color supports meaning; it never carries it alone. The signal color sits in the fill and left rule; the words stay Ink.</p>
+
+  <section class="spec" data-component="message">
+    <div>
+      <h3>Message</h3>
+      <p class="spec-use">Use for a short status the person should read now. Success for confirmations, Attention (Clay) for problems, Discovery (Goldenrod) for "found something for you".</p>
+      <code class="spec-code">.fg-message.fg-message--success | --attention | --discovery</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide"><span class="state-label">Success</span><p class="fg-message fg-message--success">If that email is on the list, a sign-in link is on its way.</p></div>
+      <div class="state state--wide"><span class="state-label">Attention</span><p class="fg-message fg-message--attention">That link is invalid, expired, or already used.</p></div>
+      <div class="state state--wide"><span class="state-label">Discovery</span><p class="fg-message fg-message--discovery">Hey, I found something for you: 3 new roles match your profile.</p></div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

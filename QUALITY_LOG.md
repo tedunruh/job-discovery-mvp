@@ -295,3 +295,18 @@ dropped. No data lost, one delayed run.
 - [ ] **When a loop's stop condition comes from a response field, check it on every page, not
       only the first.** Page through a case you know is large (hundreds of results) and compare
       against the reported total.
+
+### 2026-10-15 — Field Guide component gallery (/field-guide)
+**Shipped:** a signed-in gallery page rendering every token (from tokens/*.json)
+and every component in every state, each with a "use this when" note. The Applied
+toggle moved out of index.html into Field Guide (`.fg-toggle` + `fg.toggle`
+macro), the filter pill markup into `fg.filter`; the dashboard now uses both
+macros. Disabled styles added for checkbox, radio, input and toggle.
+**Rework count:** 0 so far
+**Why:** there was no single place showing the approved set of controls, so each
+new screen was reconstructed from memory - the root of visual drift.
+**Standing checks added:**
+- [x] Automated: `gallery shows every Field Guide class` - fails when a `.fg-`
+      class exists in components.css with no example on /field-guide.
+      Mutation-tested (added a stray `.fg-badge`, check failed naming it).
+- [x] /field-guide joins the viewport, overflow and mobile-width checks at all six sizes.

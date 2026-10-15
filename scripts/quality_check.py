@@ -229,6 +229,18 @@ def check_applied_alignment(page, w):
           f"worst offset {max(off):.2f}px" if rows else "no rows")
 
 
+def check_gallery_complete(page):
+    """Every class components.css defines must be shown in the /field-guide
+    gallery. The gallery is the catalog of approved controls - a component added
+    to the CSS but not the gallery is invisible to whoever builds the next screen."""
+    import re
+    css = open(os.path.join(ROOT, "field-guide", "css", "components.css")).read()
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)  # ignore classes named in comments
+    classes = sorted(set(re.findall(r"\.(fg-[a-z0-9-]+)", css)))
+    missing = page.evaluate("(cls) => cls.filter(c => !document.querySelector('.' + c))", classes)
+    check(not missing, "gallery shows every Field Guide class", "missing: " + ", ".join(missing))
+
+
 def check_filter_menus(page, w):
     """Open each filter menu in turn; it must land fully inside the viewport (a
     menu anchored to a pill near the right edge can hang off a phone screen).
@@ -291,13 +303,15 @@ def main():
                 ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=mobile, has_touch=mobile)
                 ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
                 page = ctx.new_page()
-                for path in ("/login", "/onboarding", "/"):
+                for path in ("/login", "/onboarding", "/", "/field-guide"):
                     # /login redirects nowhere for anonymous *and* signed-in users; the rest need the cookie.
                     page.goto(base + path, wait_until="load")
                     check_page_basics(page, path, w)
                     if mobile:
                         iw = page.evaluate("window.innerWidth")
                         check(iw == w, f"mobile page reports true width  [{path} @{w}]", f"innerWidth={iw}")
+                    if path == "/field-guide" and w == VIEWPORTS[-1][0]:
+                        check_gallery_complete(page)
                     if path == "/login":
                         check_login_artwork(page, w, h)
                     if path == "/":
