@@ -50,3 +50,62 @@ way a second time. After finishing a change, log it there: what shipped, how
 many corrections it took to get right, and why (a named root cause, not "bug
 fixed"). If a rework cause is new and mechanically preventable, add a check for
 it so it catches the next one automatically instead of relying on memory.
+
+## Working on Scout (read this first in a new session)
+
+**What it is.** Scout scans public job boards (~8.7k across Greenhouse, Ashby, Lever, Workable,
+Workday, Rippling) every 15 minutes, stores roles in **Postgres on Neon (not SQLite)**, shows
+them on a Flask dashboard, and sends per-person push alerts through ntfy. Invite-only alpha.
+Sprint history, incidents and open items: `docs/SPRINTS.md`. Process lessons: `QUALITY_LOG.md`.
+
+**Where things run**
+- **Collector:** GitHub Actions `collect.yml`, dispatched every 15 min by cron-job.org, runs
+  `scheduler/run_collectors.py`. Public repo = free minutes. A run takes ~6-10 min; one at a
+  time (concurrency group, 25 min timeout).
+- **Dashboard:** Render free web service. It sleeps after 15 idle minutes;
+  `scripts/keep_awake.sh` (called from the workflow) pings it 6 AM-midnight Central.
+- **Other services:** Neon Postgres, Resend (sign-in email), ntfy.sh (alerts), healthchecks.io
+  (outage watchdog; the collector pings after each completed run and `/fail` on a crash).
+- **Config** is env vars / GitHub secrets, never in the repo: `DATABASE_URL`, `RESEND_API_KEY`,
+  `RESEND_FROM`, `SECRET_KEY`, `NTFY_HEALTH_TOPIC`, `HEALTHCHECK_URL` (+ `RENDER_API_KEY` locally).
+  Locally they live in `.env.local` (git-ignored); `private/` (git-ignored) holds invite material.
+  Never print, commit or paste values. The repo is **public**: no tester names, topics or keys.
+
+**Code map**
+| Path | What |
+|---|---|
+| `collectors/` | one module per platform (`fetch(identifier)`), `filters.py` (design title gate), `detect.py` (find a company's board) |
+| `scheduler/run_collectors.py` | the run: core companies, then discovered boards in batches; alerts; health |
+| `db/db.py`, `db/schema.sql` | all SQL. Schema changes are additive `ALTER ... IF NOT EXISTS` blocks at the end of `schema.sql`; apply them to Neon *before* pushing code that needs them |
+| `role_categories.py` | the one matcher for dashboard and alerts (`matches_profile`, `matches_work_type`) |
+| `dashboard/` | Flask app, templates (Field Guide design system, see above) |
+| `scripts/` | `quality_check.py` (UI checks), `engagement.py`, `actions_usage.py`, `discover_boards.py`, `import_discovered.py`, `add_companies.py` |
+| `tests/` | `python -m unittest discover tests` (offline) |
+
+**Data model in brief.** `companies.tier`: `core` (original ~140: every role stored), `hot` /
+`cold` (discovered boards: design roles only; hot every run, cold in a ~4h rotation), `off`
+(kill switch). Everyone sees every company (`user_companies` is unused); a person's role
+categories, keywords and saved Work type decide what they see and are alerted about. A board's
+**first scan is silent**. `source_health` tracks failures; `scan_marker` is Workday's change
+fingerprint (`'rescan'` = silent re-scan).
+
+**Runbook**
+- Health: last runs in `scheduler_runs` (should be ~6-10 min, finished); `source_health` statuses;
+  `python scripts/engagement.py 7` for per-person use; `python scripts/actions_usage.py`.
+- Switch a board/batch off: `UPDATE companies SET tier='off' WHERE ...` (reversible).
+- Add boards: `scripts/discover_boards.py` (harvest/validate/enrich/report, read-only) then
+  `scripts/import_discovered.py --tier hot --ats <platform>`; import in **batches** and watch two runs.
+- Deploy: push to `main` auto-deploys the dashboard; the collector uses `main` at dispatch.
+  Check Render's deploy status via its API and `scheduler_runs` for the next run.
+
+**Working agreements (learned the hard way)**
+- The assistant has **no GitHub credentials**: the user pushes. Run `git status` / `git log`
+  first (the user often commits themselves). Never force-push without explicit steps; a Pull/Sync
+  button re-merges rewritten history.
+- **Don't build what wasn't asked.** A company-tracking page was built from a decision card and
+  removed. Ask or confirm before adding user-facing features. Keep solutions simple.
+- Run tests and `scripts/quality_check.py` before committing; gate on the result, not on exit
+  codes of a pipeline. Log process lessons in `QUALITY_LOG.md`.
+- Dry runs against production: never hold a long transaction (it blocked a real run). Use a
+  **Neon branch** for anything long or multi-run.
+- Verify, don't assume: check deploys, runs and real data after every change.
