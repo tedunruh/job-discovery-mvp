@@ -109,3 +109,7 @@ fingerprint (`'rescan'` = silent re-scan).
 - Dry runs against production: never hold a long transaction (it blocked a real run). Use a
   **Neon branch** for anything long or multi-run.
 - Verify, don't assume: check deploys, runs and real data after every change.
+- **One chat per sprint, named `Scout — <year> Q<n> Sprint <n>`** (a range for a chat that spans
+  several: `Scout — 2026 Q4 Sprints 1–2`). Open it in this repo's folder and file it in the
+  sidebar's **Scout** group. At the start of a sprint chat, rename it to match; at the end,
+  update `docs/SPRINTS.md` so the next chat can pick up from it.

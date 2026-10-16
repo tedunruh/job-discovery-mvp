@@ -1,6 +1,8 @@
 # Scout sprint log
 
 A new chat per sprint, opened in this repo's folder, starts by reading `CLAUDE.md` and this file.
+Chats are named `Scout — <year> Q<n> Sprint <n>` (e.g. `Scout — 2026 Q4 Sprints 1–2`) and filed in the
+sidebar's **Scout** group. Update this log at the end of each sprint.
 
 ## Sprint 1 (done)
 Remote-US filter, multi-tenancy (per-person data, magic-link sign-in), dashboard polish, design
