@@ -269,6 +269,28 @@ def check_gallery_complete(page):
     check(not missing, "gallery shows every Field Guide class", "missing: " + ", ".join(missing))
 
 
+# Every control a finger has to hit is at least this tall (Ted, SC-46). Filter
+# pills follow the dashboard Figma (36px) and a chip's remove button sits inside
+# its 44px chip, so they're not listed here.
+CONTROL_SELECTORS = (".fg-button, .fg-input, .fg-select select, .fg-check, .fg-segment, "
+                     ".fg-chip, .fg-chip-add, .fg-toggle, .fg-icon-button, .fg-menu-item, button.fg-link")
+
+
+def check_control_heights(page):
+    """Controls in the gallery are all >= the touch target (44px)."""
+    short = page.evaluate(
+        """
+        (sel) => [...document.querySelectorAll(sel)]
+          .filter(e => e.getClientRects().length)
+          .map(e => [e.className || e.tagName, Math.round(e.getBoundingClientRect().height)])
+          .filter(([, h]) => h < 44)
+          .map(([c, h]) => `${c} ${h}px`)
+        """,
+        CONTROL_SELECTORS,
+    )
+    check(not short, "every control is at least 44px tall", "; ".join(sorted(set(short))[:8]))
+
+
 def check_filter_menus(page, w):
     """Open each filter menu in turn; it must land fully inside the viewport (a
     menu anchored to a pill near the right edge can hang off a phone screen).
@@ -342,6 +364,7 @@ def main():
                         check_typefaces(page, path)
                     if path == "/field-guide" and w == VIEWPORTS[-1][0]:
                         check_gallery_complete(page)
+                        check_control_heights(page)
                     if path == "/login":
                         check_login_artwork(page, w, h)
                     if path == "/":

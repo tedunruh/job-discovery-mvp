@@ -40,8 +40,18 @@
   text-decoration: none;
 }
 .fg-link:hover { text-decoration: underline; }
+/* A link-style action that does something on the page (not navigation) is a
+   <button class="fg-link">: same look, 44px hit area. */
+button.fg-link {
+  min-height: var(--fg-size-touch-target);
+  padding: 0;
+  background: none;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
 
-:where(.fg-button, .fg-input, .fg-checkbox, .fg-icon-button, .fg-link):focus-visible {
+:where(.fg-button, .fg-input, .fg-checkbox, .fg-icon-button, .fg-link, .fg-select select, .fg-chip-remove, .fg-chip-add, .fg-wordmark):focus-visible {
   outline: 3px solid var(--fg-color-action-focus-ring);
   outline-offset: 2px;
 }
@@ -56,8 +66,8 @@
   justify-content: center;
   gap: var(--fg-space-2);
   box-sizing: border-box;
-  min-height: 36px;
-  padding: var(--fg-space-2) var(--fg-space-3);
+  min-height: var(--fg-size-touch-target); /* every control is 44px tall */
+  padding: var(--fg-space-2) var(--fg-space-4);
   font-family: var(--fg-font-family-ui);
   font-size: var(--fg-font-size-lg);
   font-weight: var(--fg-font-weight-demibold);
@@ -86,7 +96,15 @@
 }
 .fg-button--ghost:hover { background: var(--fg-color-signal-progress-subtle); }
 .fg-button--block { width: 100%; }
-.fg-button:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Disabled buttons stay readable (secondary text on the secondary fill, 5.0:1)
+   instead of fading the whole button; the flat fill says "not yet". */
+.fg-button:disabled,
+.fg-button:disabled:hover {
+  background: var(--fg-color-action-secondary-fill);
+  color: var(--fg-color-text-secondary);
+  border-color: transparent;
+  cursor: not-allowed;
+}
 /* Disabled form controls share the button's treatment: same opacity, no pointer. */
 :where(.fg-checkbox, .fg-radio, .fg-input, .fg-toggle):disabled { opacity: 0.45; cursor: not-allowed; }
 
@@ -130,6 +148,7 @@
   background: var(--fg-color-surface-field);
   border: 1px solid var(--fg-color-border-strong);
   border-radius: var(--fg-radius-sm);
+  min-height: var(--fg-size-touch-target);
 }
 .fg-input::placeholder { color: var(--fg-color-text-tertiary); }
 .fg-input:focus { border-color: var(--fg-color-action-primary); }
@@ -139,6 +158,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--fg-space-2);
+  min-height: var(--fg-size-touch-target);
   font-size: var(--fg-font-size-lg);
   font-weight: var(--fg-font-weight-demibold);
   cursor: pointer;
@@ -319,4 +339,585 @@
 .fg-toggle:focus-visible {
   outline: 3px solid var(--fg-color-action-focus-ring);
   outline-offset: 0;
+}
+
+/* ======================================================================
+   Profile components (SC-46). Built for the resume and profile screens;
+   usable anywhere. Every control is 44px tall (--fg-size-touch-target).
+   ====================================================================== */
+
+/* ---------- Utilities ---------- */
+/* Hides an element visually but keeps it for screen readers and keyboards
+   (the file input inside a dropzone's button). */
+.fg-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* A row of actions or chips that wraps on narrow screens. */
+.fg-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fg-space-2) var(--fg-space-3);
+}
+
+/* ---------- Page shell ---------- */
+/* Shared header: wordmark on the left, context (step, page name or actions)
+   on the right. The same pattern on onboarding and settings. */
+.fg-shell {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1184px;
+  margin: 0 auto;
+  padding: 0 var(--fg-space-8);
+}
+.fg-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fg-space-3) var(--fg-space-4);
+  padding: var(--fg-space-6) 0;
+}
+.fg-wordmark {
+  font-family: var(--fg-font-family-display);
+  font-variation-settings: var(--fg-font-display-variation);
+  font-weight: var(--fg-font-weight-regular);
+  font-size: var(--fg-font-size-3xl);
+  letter-spacing: var(--fg-font-letter-spacing-tight);
+  line-height: var(--fg-font-line-height-tight);
+  color: var(--fg-color-text-primary);
+  text-decoration: none;
+}
+.fg-header-context {
+  font-size: var(--fg-font-size-md);
+  color: var(--fg-color-text-secondary);
+}
+/* Page intro: Fraunces headline in Scout's voice, then a lede. */
+.fg-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-3);
+  max-width: 680px;
+}
+.fg-display--page { font-size: var(--fg-font-size-4xl); }
+.fg-lede {
+  margin: 0;
+  font-size: var(--fg-font-size-xl);
+  line-height: var(--fg-font-line-height-body);
+  color: var(--fg-color-text-secondary);
+  text-align: left;
+}
+/* Fraunces at reading size, for a sentence in Scout's voice inside a card. */
+.fg-voice {
+  margin: 0;
+  font-family: var(--fg-font-family-display);
+  font-variation-settings: var(--fg-font-display-variation);
+  font-weight: var(--fg-font-weight-regular);
+  font-size: var(--fg-font-size-xl);
+  line-height: var(--fg-font-line-height-snug);
+  color: var(--fg-color-text-primary);
+}
+
+/* Main column plus a sticky side panel; the panel drops below on narrow screens. */
+.fg-split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--fg-space-8);
+}
+.fg-split-main {
+  flex: 999 1 560px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-5);
+}
+.fg-side-panel {
+  flex: 1 1 300px;
+  max-width: 380px;
+  min-width: 0;
+  position: sticky;
+  top: var(--fg-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-4);
+}
+
+/* ---------- Card ---------- */
+/* Card: a step lighter than the page with a hairline border, flat (no shadow;
+   Ted preferred this over the raised look for long forms). Title, help, body. */
+.fg-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-4);
+  padding: var(--fg-space-6);
+  background: var(--fg-color-surface-card);
+  border: 1px solid var(--fg-color-border-subtle);
+  border-radius: var(--fg-radius-xl);
+}
+/* Something changed and not yet saved: a Forest outline marks it. */
+.fg-card--emphasis { border-color: var(--fg-color-action-primary); box-shadow: inset 0 0 0 1px var(--fg-color-action-primary); }
+/* Scout suggests something: Goldenrod tint (Discovery), words stay Ink. */
+.fg-card--discovery {
+  background-color: var(--fg-color-surface-card);
+  background-image: linear-gradient(var(--fg-color-signal-discovery-subtle), var(--fg-color-signal-discovery-subtle));
+}
+.fg-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--fg-space-2) var(--fg-space-4);
+}
+.fg-card-title {
+  margin: 0;
+  font-size: var(--fg-font-size-xl);
+  font-weight: var(--fg-font-weight-demibold);
+  line-height: var(--fg-font-line-height-snug);
+  color: var(--fg-color-text-primary);
+}
+.fg-card-help {
+  margin: var(--fg-space-1) 0 0;
+  font-size: var(--fg-font-size-md);
+  line-height: var(--fg-font-line-height-body);
+  color: var(--fg-color-text-secondary);
+  text-align: left;
+}
+/* Group label above a run of cards: names what the next cards decide. */
+.fg-group-label { margin-top: var(--fg-space-3); }
+.fg-eyebrow {
+  margin: 0;
+  font-size: var(--fg-font-size-sm);
+  font-weight: var(--fg-font-weight-demibold);
+  line-height: var(--fg-font-line-height-snug);
+  color: var(--fg-color-text-secondary);
+}
+
+/* ---------- Chips ---------- */
+/* A chip is one saved value (a title, a skill). Sage tint, Ink words.
+   Deal-breaker: Clay outline and tint. New: Goldenrod ring plus a "New" tag. */
+.fg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fg-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fg-chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fg-space-1);
+  min-height: var(--fg-size-touch-target);
+  padding: 0 var(--fg-space-1) 0 var(--fg-space-4);
+  border: 1.5px solid transparent;
+  border-radius: var(--fg-radius-full);
+  background: var(--fg-color-signal-support-subtle);
+  color: var(--fg-color-text-primary);
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-medium);
+}
+.fg-chip--avoid {
+  background: var(--fg-color-signal-attention-subtle);
+  border-color: var(--fg-color-signal-attention);
+}
+.fg-chip--new { box-shadow: 0 0 0 2px var(--fg-color-signal-discovery); }
+.fg-chip-tag {
+  padding: 0 var(--fg-space-1);
+  border-radius: var(--fg-radius-sm);
+  background: var(--fg-color-signal-discovery);
+  color: var(--fg-color-text-primary);
+  font-size: var(--fg-font-size-xs);
+  font-weight: var(--fg-font-weight-demibold);
+  line-height: var(--fg-font-line-height-body);
+}
+.fg-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: calc(var(--fg-size-touch-target) - var(--fg-space-2));
+  height: calc(var(--fg-size-touch-target) - var(--fg-space-2));
+  padding: 0;
+  border: 0;
+  border-radius: var(--fg-radius-full);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.fg-chip-remove:hover { background: var(--fg-color-surface-hover); }
+.fg-chip-remove svg { display: block; }
+.fg-chip-add {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fg-space-1);
+  min-height: var(--fg-size-touch-target);
+  padding: 0 var(--fg-space-4);
+  border: 1.5px dashed var(--fg-color-action-primary);
+  border-radius: var(--fg-radius-full);
+  background: transparent;
+  color: var(--fg-color-action-primary);
+  font-family: inherit;
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-demibold);
+  cursor: pointer;
+}
+.fg-chip-add:hover { background: var(--fg-color-signal-progress-subtle); }
+.fg-chip-add svg { display: block; flex: none; }
+
+/* ---------- Select ---------- */
+/* Same box as .fg-input, with a chevron, so every field on a form matches. */
+.fg-select { position: relative; display: block; }
+.fg-select select {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--fg-size-touch-target);
+  padding: var(--fg-space-3) var(--fg-space-8) var(--fg-space-3) var(--fg-space-3);
+  font-family: var(--fg-font-family-ui);
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-medium);
+  color: var(--fg-color-text-primary);
+  background: var(--fg-color-surface-field);
+  border: 1px solid var(--fg-color-border-strong);
+  border-radius: var(--fg-radius-sm);
+  cursor: pointer;
+}
+.fg-select select:focus { border-color: var(--fg-color-action-primary); }
+.fg-select option { font-weight: var(--fg-font-weight-medium); }
+.fg-select select:disabled { opacity: 0.45; cursor: not-allowed; }
+.fg-select svg {
+  position: absolute;
+  right: var(--fg-space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--fg-color-text-secondary);
+  pointer-events: none;
+}
+
+/* ---------- Fieldset (checkbox or radio group) ---------- */
+.fg-fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--fg-space-6);
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.fg-legend {
+  margin: 0 0 var(--fg-space-1);
+  padding: 0;
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-demibold);
+  color: var(--fg-color-text-primary);
+}
+
+/* ---------- Segmented control ---------- */
+/* One choice from a short ordered set (a level). Real radio inputs, so arrow
+   keys move the choice and screen readers announce a group. */
+.fg-segmented {
+  min-width: 0;
+  max-width: 100%; /* fieldsets don't shrink to their container by default */
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.fg-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fg-space-2);
+}
+.fg-segment {
+  position: relative;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--fg-size-touch-target);
+  padding: 0 var(--fg-space-4);
+  border: 1.5px solid var(--fg-color-action-subtle-border);
+  border-radius: var(--fg-radius-lg);
+  color: var(--fg-color-action-primary);
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-demibold);
+  cursor: pointer;
+}
+.fg-segment input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.fg-segment:hover { background: var(--fg-color-signal-progress-subtle); }
+.fg-segment:has(:checked) {
+  background: var(--fg-color-action-selected);
+  border-color: var(--fg-color-action-selected);
+  color: var(--fg-color-text-on-action);
+}
+.fg-segment:has(:focus-visible) {
+  outline: 3px solid var(--fg-color-action-focus-ring);
+  outline-offset: 2px;
+}
+.fg-segment:has(:disabled) { opacity: 0.45; cursor: not-allowed; }
+
+/* ---------- Add row ---------- */
+/* A text field with its own Add button, for adding one value to a list. */
+.fg-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fg-space-2);
+}
+.fg-add-row .fg-field { flex: 1 1 260px; }
+
+/* ---------- Status strip ---------- */
+/* Is Scout watching? A dot plus words; the dot never carries the state alone. */
+.fg-status {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fg-space-3);
+  padding: var(--fg-space-2) var(--fg-space-2) var(--fg-space-2) var(--fg-space-5);
+  background: var(--fg-color-surface-card);
+  border: 1px solid var(--fg-color-border-subtle);
+  border-radius: var(--fg-radius-xl);
+}
+.fg-status-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fg-space-2);
+  margin: 0;
+  font-size: var(--fg-font-size-lg);
+}
+.fg-status-title { font-weight: var(--fg-font-weight-demibold); }
+.fg-status-detail { color: var(--fg-color-text-secondary); }
+.fg-status-dot {
+  box-sizing: border-box;
+  flex: none;
+  width: var(--fg-space-3);
+  height: var(--fg-space-3);
+  border-radius: var(--fg-radius-full);
+  background: var(--fg-color-action-primary);
+}
+.fg-status--paused .fg-status-dot {
+  background: transparent;
+  border: 2px solid var(--fg-color-text-secondary);
+}
+
+/* ---------- Action bar ---------- */
+/* Sticks to the bottom of a long form: a note on the left, actions right. */
+.fg-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: var(--fg-color-surface-page);
+  border-top: 1px solid var(--fg-color-border-subtle);
+}
+.fg-action-bar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fg-space-3);
+  padding-top: var(--fg-space-4);
+  padding-bottom: var(--fg-space-4);
+}
+.fg-action-bar-note {
+  flex: 1 1 260px;
+  margin: 0;
+  font-size: var(--fg-font-size-md);
+  color: var(--fg-color-text-secondary);
+}
+
+/* ---------- File row ---------- */
+.fg-file-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fg-space-4);
+}
+.fg-file {
+  display: flex;
+  align-items: center;
+  gap: var(--fg-space-3);
+  min-width: 0;
+}
+.fg-file-text { min-width: 0; }
+.fg-file-icon { flex: none; display: block; color: var(--fg-color-action-primary); }
+.fg-file-name {
+  margin: 0;
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-demibold);
+  overflow-wrap: anywhere;
+}
+.fg-file-meta {
+  margin: 0;
+  font-size: var(--fg-font-size-md);
+  color: var(--fg-color-text-secondary);
+}
+
+/* ---------- Dropzone ---------- */
+/* Where a file goes. Drop it, or use the button (a label for a hidden file input). */
+.fg-dropzone {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--fg-space-5);
+  padding: var(--fg-space-8);
+  background: var(--fg-color-surface-card);
+  border: 2px dashed var(--fg-color-action-primary);
+  border-radius: var(--fg-radius-xl);
+}
+.fg-dropzone--inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--fg-space-5);
+}
+.fg-dropzone.is-dragover { background: var(--fg-color-signal-progress-subtle); }
+.fg-dropzone-title {
+  margin: 0;
+  font-size: var(--fg-font-size-xl);
+  font-weight: var(--fg-font-weight-demibold);
+  line-height: var(--fg-font-line-height-snug);
+}
+.fg-dropzone--inline .fg-dropzone-title { font-size: var(--fg-font-size-lg); }
+.fg-dropzone-hint {
+  margin: 0;
+  font-size: var(--fg-font-size-lg);
+  color: var(--fg-color-text-secondary);
+}
+/* The label that opens the file picker shows focus for its hidden input. */
+.fg-button:has(input:focus-visible) {
+  outline: 3px solid var(--fg-color-action-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---------- List ---------- */
+/* Rows of short records (work history, a preview of roles). */
+.fg-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fg-list-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--fg-space-1) var(--fg-space-4);
+  padding: var(--fg-space-3) 0;
+  border-top: 1px solid var(--fg-color-border-subtle);
+}
+.fg-list-title {
+  margin: 0;
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-demibold);
+}
+.fg-list-meta {
+  margin: 0;
+  font-size: var(--fg-font-size-md);
+  color: var(--fg-color-text-secondary);
+}
+/* Nothing yet: a dashed rule and placeholder bars where rows will appear. */
+.fg-list-row--placeholder {
+  flex-direction: column;
+  border-top-style: dashed;
+  border-top-color: var(--fg-color-border-default);
+}
+.fg-skeleton {
+  display: block;
+  height: var(--fg-space-3);
+  border-radius: var(--fg-radius-sm);
+  background: var(--fg-color-surface-hover);
+}
+.fg-list-empty {
+  margin: 0;
+  padding: var(--fg-space-3) 0;
+  border-top: 1px solid var(--fg-color-border-subtle);
+  font-size: var(--fg-font-size-md);
+  color: var(--fg-color-text-secondary);
+}
+
+/* ---------- Stat ---------- */
+/* A count with its label. Numbers are Ink: a stat reports, it isn't an action. */
+.fg-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-1);
+  margin: 0;
+}
+.fg-stat-value {
+  font-size: var(--fg-font-size-4xl);
+  font-weight: var(--fg-font-weight-demibold);
+  line-height: var(--fg-font-line-height-tight);
+  color: var(--fg-color-text-primary);
+}
+.fg-stat-label {
+  font-size: var(--fg-font-size-sm);
+  line-height: var(--fg-font-line-height-snug);
+  color: var(--fg-color-text-secondary);
+}
+/* Hero stat: number and sentence on one line. */
+.fg-stat--inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--fg-space-2);
+}
+.fg-stat--inline .fg-stat-label { font-size: var(--fg-font-size-lg); color: var(--fg-color-text-primary); }
+/* Several stats side by side. */
+.fg-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fg-space-3);
+}
+.fg-stats .fg-stat-value { font-size: var(--fg-font-size-3xl); }
+
+/* ---------- Before and after ---------- */
+.fg-compare {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--fg-space-2);
+  margin: 0;
+}
+.fg-compare-before,
+.fg-compare-after {
+  font-size: var(--fg-font-size-3xl);
+  font-weight: var(--fg-font-weight-demibold);
+  line-height: var(--fg-font-line-height-tight);
+}
+.fg-compare-before { color: var(--fg-color-text-secondary); }
+.fg-compare-after { color: var(--fg-color-text-primary); }
+.fg-compare-arrow { display: block; align-self: center; color: var(--fg-color-text-secondary); }
+.fg-compare-unit { font-size: var(--fg-font-size-lg); }
+
+@media (max-width: 680px) {
+  .fg-shell { padding: 0 var(--fg-space-4); }
+  .fg-card { padding: var(--fg-space-4); }
+  .fg-dropzone { padding: var(--fg-space-6); }
+  .fg-side-panel { position: static; max-width: none; }
 }

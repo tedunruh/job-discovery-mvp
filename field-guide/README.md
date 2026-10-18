@@ -88,6 +88,7 @@ exist, add a semantic token rather than reaching for a palette value.
 | Color | Hex | Role | Use for |
 |---|---|---|---|
 | Parchment | `#f6f2e9` | Canvas | Page backgrounds, large surfaces, empty states. Dominant everywhere. |
+| Parchment light | `#fbf7ee` | Card | Card fill on settings-style pages, a step lighter than the page. Text on it passes AA. |
 | Ink | `#292824` | Voice | Text, icons, high emphasis. Secondary and placeholder (tertiary) at 70%. |
 | Forest | `#355447` | Direction | Primary actions, links, active and selected states, progress |
 | Goldenrod | `#d6a84f` | Discovery | New matches, recommendations, "found for you" |
@@ -135,6 +136,31 @@ is for supporting text only (metadata, hints, counts, section notes).
 | `.fg-radio` | Checked = Forest check-disc |
 | `.fg-filter` / `.fg-filter-pill` / `.fg-menu` / `.fg-menu-item` | Dropdown filter on `<details>` via `fg.filter`; include `/field-guide/js/filter.js` for outside-click and Escape |
 | `.fg-toggle` | One item's on/off status ("Applied") via `fg.toggle`; disc carries the state, label stays fixed |
+
+**Profile components (SC-46).** Every control is 44px tall (`--fg-size-touch-target`);
+`quality_check.py` fails any shorter control in the gallery.
+
+| Macro / class | Notes |
+|---|---|
+| `fg.header(context)` · `.fg-shell` `.fg-header` `.fg-wordmark` | One header for onboarding and settings: wordmark left, context right |
+| `fg.intro(title, lede)` · `.fg-display--page` `.fg-lede` | Fraunces headline in Scout's voice, then what to do here |
+| `fg.card(id, title, help)` · `.fg-card` `--emphasis` `--discovery` | Flat card on `--fg-color-surface-card` (a step lighter than Parchment) with a hairline border. Emphasis = unsaved change (Forest outline) |
+| `fg.suggestion(eyebrow, statement, help)` · `.fg-voice` | Scout suggests a change: Goldenrod tint, statement in Fraunces |
+| `fg.group_label(title, help)` · `.fg-eyebrow` | Sentence case, 14px demibold, secondary; never all caps |
+| `.fg-split` `.fg-split-main` `.fg-side-panel` | Main column plus sticky side panel; panel drops below on phones |
+| `fg.chip(label, variant, new)` `fg.chip_add(label)` · `.fg-chips` | Sage tint, Ink words. `avoid` = deal-breaker (Clay outline). `new` = Goldenrod ring + "New" tag |
+| `fg.select(id, label, options)` · `.fg-select` | Same box as `.fg-input`, with a chevron |
+| `fg.checkbox_group(name, legend, options)` · `.fg-fieldset` `.fg-legend` | A set of checkboxes answering one question |
+| `fg.segmented(name, legend, options)` · `.fg-segmented` `.fg-segment` | One of a short ordered set; real radios (arrow keys work) |
+| `fg.add_row(id, label)` · `.fg-add-row` | Field plus its own Add button |
+| `fg.status(title, detail, paused)` · `.fg-status` | Is Scout watching; the words carry the state, not the dot |
+| `fg.action_bar(note)` · `.fg-action-bar` | Sticky bottom bar with a note and the save actions |
+| `fg.file_row(name, meta)` · `fg.dropzone(id, title, hint)` | A file the person added; where a file goes (`inline=True` inside a card) |
+| `fg.list_row(title, meta, detail)` · `fg.list_placeholder()` · `.fg-list-empty` | Short records, placeholder shape, empty line |
+| `fg.stat(value, label)` · `.fg-stats` · `fg.compare(before, after, unit)` | Counts are Ink, not Forest: a stat reports, it doesn't ask you to act |
+| `.fg-row` · `.fg-visually-hidden` · `button.fg-link` | Wrapping action row; screen-reader-only text; link look for an on-page action |
+
+Disabled buttons use the secondary fill with secondary text (5.0:1) rather than fading.
 
 ## Principles that are build rules
 

@@ -35,7 +35,7 @@
       font-size: var(--fg-font-size-sm);
     }
 
-    .gallery h2 {
+    .gallery > h2 {  /* section headings only; card titles inside specimens keep their own style */
       margin: var(--fg-space-16) 0 var(--fg-space-2);
       font-size: var(--fg-font-size-3xl);
     }
@@ -150,6 +150,9 @@
     <li><a class="fg-link" href="#inputs">Inputs</a></li>
     <li><a class="fg-link" href="#filters">Filters</a></li>
     <li><a class="fg-link" href="#messages">Messages</a></li>
+    <li><a class="fg-link" href="#chips">Chips</a></li>
+    <li><a class="fg-link" href="#layout">Layout</a></li>
+    <li><a class="fg-link" href="#content">Content</a></li>
   </ul>
 
   {# ===================== Foundations ===================== #}
@@ -281,6 +284,7 @@
     </div>
     <div class="states">
       <div class="state"><span class="state-label">Default</span><a class="fg-link" href="#buttons">Show 50 more</a></div>
+      <div class="state"><span class="state-label">As a button (acts on the page)</span><button class="fg-link" type="button">Add a role</button></div>
     </div>
   </section>
 
@@ -326,6 +330,30 @@
     </div>
   </section>
 
+  <section class="spec" data-component="checkbox-group">
+    <div>
+      <h3>Checkbox group</h3>
+      <p class="spec-use">Use when a set of checkboxes answers one question, like work type. The legend is the question.</p>
+      <code class="spec-code">{% raw %}{{ fg.checkbox_group(name, legend, options, checked) }}{% endraw %} · fieldset.fg-fieldset &gt; legend.fg-legend</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide"><span class="state-label">Some checked</span>{{ fg.checkbox_group("g-work", "Work type", ["Remote", "Hybrid", "Onsite"], checked=["Remote", "Hybrid"]) }}</div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="segmented">
+    <div>
+      <h3>Segmented control</h3>
+      <p class="spec-use">Use to pick one of a short, ordered set, like a level. It is a radio group: arrow keys move the choice.</p>
+      <code class="spec-code">{% raw %}{{ fg.segmented(name, legend, options, selected) }}{% endraw %} · .fg-segmented .fg-segment</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide"><span class="state-label">Nothing chosen yet</span>{{ fg.segmented("g-level-none", "Your level", ["Mid", "Senior", "Staff"]) }}</div>
+      <div class="state state--wide"><span class="state-label">Chosen</span>{{ fg.segmented("g-level", "Your level", ["Mid", "Senior", "Staff"], selected="Senior") }}</div>
+      <div class="state state--wide"><span class="state-label">Disabled</span>{{ fg.segmented("g-level-dis", "Your level", ["Mid", "Senior", "Staff"], selected="Senior", disabled=True) }}</div>
+    </div>
+  </section>
+
   <h2 id="inputs" class="fg-display">Inputs</h2>
 
   <section class="spec" data-component="text-input">
@@ -344,6 +372,29 @@
       <div class="state state--wide"><span class="state-label">Disabled</span>
         <div class="fg-field" style="width: 100%"><label class="fg-label" for="g-dis">email</label><input class="fg-input" id="g-dis" type="email" value="ted@example.com" disabled></div>
       </div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="select">
+    <div>
+      <h3>Select</h3>
+      <p class="spec-use">Use to pick one of a longer list that doesn't need to be visible at once, like a distance. Same box as a text field.</p>
+      <code class="spec-code">{% raw %}{{ fg.select(id, label, options, selected) }}{% endraw %} · .fg-select</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide"><span class="state-label">Default</span>{{ fg.select("g-within", "Within", ["10 miles", "25 miles", "50 miles"], selected="25 miles") }}</div>
+      <div class="state state--wide"><span class="state-label">Disabled</span>{{ fg.select("g-within-dis", "Within", ["25 miles"], disabled=True) }}</div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="add-row">
+    <div>
+      <h3>Add row</h3>
+      <p class="spec-use">Use to add one value to a list (a title, a deal-breaker) when there's nothing to pick from.</p>
+      <code class="spec-code">{% raw %}{{ fg.add_row(id, label, placeholder) }}{% endraw %} · .fg-add-row</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide"><span class="state-label">Empty</span>{{ fg.add_row("g-add", "Add a title", placeholder="For example, Product Manager") }}</div>
     </div>
   </section>
 
@@ -398,6 +449,204 @@
       <div class="state state--wide"><span class="state-label">Success</span><p class="fg-message fg-message--success">If that email is on the list, a sign-in link is on its way.</p></div>
       <div class="state state--wide"><span class="state-label">Attention</span><p class="fg-message fg-message--attention">That link is invalid, expired, or already used.</p></div>
       <div class="state state--wide"><span class="state-label">Discovery</span><p class="fg-message fg-message--discovery">Hey, I found something for you: 3 new roles match your profile.</p></div>
+    </div>
+  </section>
+
+  <h2 id="chips" class="fg-display">Chips</h2>
+  <p class="gallery-lede">A chip is one saved value. The words say what it is; Sage, Clay and Goldenrod only support them.</p>
+
+  <section class="spec" data-component="chip">
+    <div>
+      <h3>Chip</h3>
+      <p class="spec-use">Use for values the person can see at a glance and remove one at a time, like role titles and skills. End the row with an Add pill.</p>
+      <code class="spec-code">{% raw %}ul.fg-chips &gt; {{ fg.chip(label) }} … {{ fg.chip_add(label) }}{% endraw %}</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide"><span class="state-label">Default, removable</span><ul class="fg-chips">{{ fg.chip("Product Designer") }}{{ fg.chip_add("Add a title") }}</ul></div>
+      <div class="state"><span class="state-label">Deal-breaker</span><ul class="fg-chips">{{ fg.chip("Contract only", variant="avoid") }}</ul></div>
+      <div class="state"><span class="state-label">New since your last visit</span><ul class="fg-chips">{{ fg.chip("Staff Product Designer", new=True) }}</ul></div>
+      <div class="state"><span class="state-label">Read only</span><ul class="fg-chips">{{ fg.chip("Figma", removable=False) }}</ul></div>
+    </div>
+  </section>
+
+  <h2 id="layout" class="fg-display">Layout</h2>
+  <p class="gallery-lede">The frame every settings-style screen shares: header, intro, cards in a main column, a side panel, and an action bar.</p>
+
+  <section class="spec" data-component="header">
+    <div>
+      <h3>Page header</h3>
+      <p class="spec-use">Use at the top of onboarding and settings pages. Wordmark left; context right (where you are, or a step).</p>
+      <code class="spec-code">{% raw %}{{ fg.header(context) }}{% endraw %} · .fg-shell &gt; .fg-header</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide"><span class="state-label">Onboarding</span><div class="fg-shell" style="padding: 0">{{ fg.header("Step 2 of 2", href="#layout") }}</div></div>
+      <div class="state state--wide"><span class="state-label">Settings</span><div class="fg-shell" style="padding: 0">{{ fg.header("Settings", href="#layout") }}</div></div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="intro">
+    <div>
+      <h3>Page intro</h3>
+      <p class="spec-use">Use once per page: a headline in Scout's voice (Fraunces), then a lede saying what to do here.</p>
+      <code class="spec-code">{% raw %}{{ fg.intro(title, lede) }}{% endraw %} · .fg-display--page .fg-lede</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide" style="max-width: none">{{ fg.intro("Here's what I'll watch for.", "Check that this sounds like you, and fix anything that's off.") }}</div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="card">
+    <div>
+      <h3>Card</h3>
+      <p class="spec-use">Use for one setting or one block of related information: a title, help text that says why it matters, then the controls. Emphasis marks an unsaved change; Discovery marks a suggestion from Scout.</p>
+      <code class="spec-code">{% raw %}{% call(part) fg.card(id, title, help) %}…{% endcall %} · {% call fg.suggestion(eyebrow, statement, help) %}…{% endcall %}{% endraw %} · .fg-card --emphasis --discovery</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide">
+        <span class="state-label">Default</span>
+        {% call(part) fg.card("g-card", "Roles I'll watch for", "The job titles I'll match postings against.") %}<ul class="fg-chips">{{ fg.chip("Product Designer") }}</ul>{% endcall %}
+      </div>
+      <div class="state state--wide">
+        <span class="state-label">With header actions</span>
+        {% call(part) fg.card("g-card-act", "Your work history", "Optional.", actions=True) %}{% if part == "actions" %}<button class="fg-link" type="button">Edit</button>{% else %}<ul class="fg-list">{{ fg.list_row("Product Designer", "Fieldstone", "2018 to 2021") }}</ul>{% endif %}{% endcall %}
+      </div>
+      <div class="state state--wide">
+        <span class="state-label">Emphasis (unsaved change)</span>
+        {% call(part) fg.card("g-card-em", eyebrow="With your unsaved change", extra_class="fg-card--emphasis") %}{{ fg.compare("12", "15", "roles a week") }}{% endcall %}
+      </div>
+      <div class="state state--wide">
+        <span class="state-label">Summary (eyebrow, no title)</span>
+        {% call(part) fg.card("g-card-sum", eyebrow="This week") %}<div class="fg-stats">{{ fg.stat("21", "reached you") }}{{ fg.stat("9", "you opened") }}{{ fg.stat("2", "you applied to") }}</div>{% endcall %}
+      </div>
+      <div class="state state--wide">
+        <span class="state-label">Discovery (a suggestion)</span>
+        {% call fg.suggestion("Something I noticed", "You've opened 6 Staff roles and no Mid ones.", "Want me to include Staff in what I watch for?") %}<button class="fg-button fg-button--secondary" type="button">Yes, add Staff</button><button class="fg-link" type="button">Not now</button>{% endcall %}
+      </div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="group-label">
+    <div>
+      <h3>Group label</h3>
+      <p class="spec-use">Use above a run of cards to say what they decide together. Sentence case, never all caps.</p>
+      <code class="spec-code">{% raw %}{{ fg.group_label(title, help) }}{% endraw %} · .fg-eyebrow</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide">{{ fg.group_label("What I'll match on", "These decide which postings reach you at all.") }}</div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="split">
+    <div>
+      <h3>Main column and side panel</h3>
+      <p class="spec-use">Use when a long form has a live summary beside it. The panel sticks while the main column scrolls, and drops below it on phones.</p>
+      <code class="spec-code">.fg-split &gt; .fg-split-main + aside.fg-side-panel</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide" style="max-width: none; width: 100%">
+        <div class="fg-split">
+          <div class="fg-split-main">{% call(part) fg.card("g-split-a", "Your level") %}{{ fg.segmented("g-split-level", "Level", ["Senior", "Staff"], selected="Senior") }}{% endcall %}</div>
+          <aside class="fg-side-panel" aria-label="Preview">{% call(part) fg.card("g-split-b", "If you'd started last week") %}{{ fg.stat("14", "roles would have reached you", inline=True) }}{% endcall %}</aside>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="status">
+    <div>
+      <h3>Status strip</h3>
+      <p class="spec-use">Use at the top of settings to say whether Scout is watching. The dot never carries the state alone; the words do.</p>
+      <code class="spec-code">{% raw %}{% call fg.status(title, detail, paused) %}button{% endcall %}{% endraw %} · .fg-status</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide" style="max-width: none; width: 100%">
+        <span class="state-label">Watching</span>
+        {% call fg.status("I'm watching.", "Alerts have been on since Oct 6.") %}<button class="fg-button fg-button--secondary" type="button">Pause alerts</button>{% endcall %}
+      </div>
+      <div class="state state--wide" style="max-width: none; width: 100%">
+        <span class="state-label">Paused</span>
+        {% call fg.status("Alerts are paused.", "Nothing will reach you until you turn them back on.", paused=True) %}<button class="fg-button fg-button--primary" type="button">Resume alerts</button>{% endcall %}
+      </div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="action-bar">
+    <div>
+      <h3>Action bar</h3>
+      <p class="spec-use">Use at the bottom of a long form so the save action is always in reach. The note says what saving will do, or what's still missing.</p>
+      <code class="spec-code">{% raw %}{% call fg.action_bar(note) %}buttons{% endcall %}{% endraw %} · .fg-action-bar</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide" style="max-width: none; width: 100%">
+        <span class="state-label">Ready</span>
+        {% call fg.action_bar("You can change any of this later in Settings.") %}<button class="fg-button fg-button--secondary" type="button">Save and finish later</button><button class="fg-button fg-button--primary" type="button">Looks right, start watching</button>{% endcall %}
+      </div>
+      <div class="state state--wide" style="max-width: none; width: 100%">
+        <span class="state-label">Not ready yet</span>
+        {% call fg.action_bar("Add a title, a level and a work type to continue.") %}<button class="fg-button fg-button--secondary" type="button">Save and finish later</button><button class="fg-button fg-button--primary" type="button" disabled>Looks right, start watching</button>{% endcall %}
+      </div>
+    </div>
+  </section>
+
+  <h2 id="content" class="fg-display">Content</h2>
+
+  <section class="spec" data-component="dropzone">
+    <div>
+      <h3>Dropzone</h3>
+      <p class="spec-use">Use where a file is the next step. Drop a file or use the button; the button opens the file picker. Inline sits inside a card.</p>
+      <code class="spec-code">{% raw %}{{ fg.dropzone(id, title, hint, button, inline) }}{% endraw %} · .fg-dropzone</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide"><span class="state-label">Default</span>{{ fg.dropzone("g-drop", "Drop your resume here", "A PDF works best.") }}</div>
+      <div class="state state--wide"><span class="state-label">File dragged over</span><div class="fg-dropzone is-dragover"><p class="fg-dropzone-title">Drop it to add it</p></div></div>
+      <div class="state state--wide"><span class="state-label">Inline, in a card</span>{{ fg.dropzone("g-drop-inline", "No resume yet", "Add a PDF and I'll fill in what I can.", button="Add a resume", inline=True) }}</div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="file-row">
+    <div>
+      <h3>File row</h3>
+      <p class="spec-use">Use to show a file the person has added, with what they can do to it.</p>
+      <code class="spec-code">{% raw %}{% call fg.file_row(name, meta) %}buttons{% endcall %}{% endraw %} · .fg-file-row</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide" style="max-width: none; width: 100%">{% call fg.file_row("Alex-Rivera-Resume.pdf", "Added today") %}<button class="fg-button fg-button--secondary" type="button">View</button><button class="fg-button fg-button--secondary" type="button">Replace</button>{% endcall %}</div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="list">
+    <div>
+      <h3>List rows</h3>
+      <p class="spec-use">Use for short records: work history, a preview of roles. Placeholder rows hold the shape until there's data; the empty line says what to do.</p>
+      <code class="spec-code">{% raw %}ul.fg-list &gt; {{ fg.list_row(title, meta, detail) }}{% endraw %} · .fg-list-row--placeholder · .fg-list-empty</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide"><span class="state-label">Rows</span><ul class="fg-list" style="width: 100%">{{ fg.list_row("Senior Product Designer", "Northwind Health", "2021 to now") }}{{ fg.list_row("Product Designer", "Fieldstone", "2018 to 2021") }}</ul></div>
+      <div class="state state--wide"><span class="state-label">Placeholder</span><ul class="fg-list" style="width: 100%">{{ fg.list_placeholder() }}{{ fg.list_placeholder("50%", "70%") }}</ul></div>
+      <div class="state state--wide"><span class="state-label">Empty</span><p class="fg-list-empty" style="width: 100%">Nothing here yet. You can add roles now or come back later.</p></div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="stat">
+    <div>
+      <h3>Stat</h3>
+      <p class="spec-use">Use for a count that tells the person how their search is going. Numbers are Ink: a stat reports, it doesn't ask you to act.</p>
+      <code class="spec-code">{% raw %}{{ fg.stat(value, label, inline) }}{% endraw %} · .fg-stats for a row of three</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide"><span class="state-label">Inline</span>{{ fg.stat("14", "roles would have reached you", inline=True) }}</div>
+      <div class="state state--wide"><span class="state-label">Row of three</span><div class="fg-stats" style="width: 100%">{{ fg.stat("21", "reached you") }}{{ fg.stat("9", "you opened") }}{{ fg.stat("2", "you applied to") }}</div></div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="compare">
+    <div>
+      <h3>Before and after</h3>
+      <p class="spec-use">Use to show what an unsaved change would do, before the person saves it.</p>
+      <code class="spec-code">{% raw %}{{ fg.compare(before, after, unit) }}{% endraw %} · .fg-compare</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide">{{ fg.compare("12", "15", "roles a week") }}</div>
     </div>
   </section>
 </div>

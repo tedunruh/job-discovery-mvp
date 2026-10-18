@@ -48,3 +48,262 @@
   {{ caller() }}
 </details>
 {%- endmacro %}
+
+{#- ===================== Profile components (SC-46) ===================== -#}
+
+{#- Shared page header: wordmark plus context ("Step 2 of 2", "Settings").
+    One pattern for onboarding and settings. -#}
+{% macro header(context="", href="/") -%}
+<header class="fg-header">
+  <a class="fg-wordmark" href="{{ href }}">Scout</a>
+  {%- if context %}
+  <span class="fg-header-context">{{ context }}</span>
+  {%- endif %}
+</header>
+{%- endmacro %}
+
+{#- Page intro: Fraunces headline in Scout's voice and a lede. -#}
+{% macro intro(title, lede="") -%}
+<div class="fg-intro">
+  <h1 class="fg-display fg-display--page">{{ title }}</h1>
+  {%- if lede %}
+  <p class="fg-lede">{{ lede }}</p>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{#- Card with a title and help text. The body is the call block. For actions
+    in the header (links beside the title), pass actions=True and branch on
+    the caller's argument:
+        {% call(part) fg.card("work", "Your work history", "Optional.", actions=True) %}
+          {% if part == "actions" %}<button class="fg-link">Edit</button>
+          {% else %}…rows…{% endif %}
+        {% endcall %} -#}
+{#- eyebrow: a small label instead of a title, for summary cards in a side
+    panel ("This week"); the card is then named by the eyebrow. -#}
+{% macro card(id, title="", help="", extra_class="", actions=False, eyebrow="") -%}
+<section class="fg-card {{ extra_class }}" aria-labelledby="{{ id }}-title">
+  {%- if eyebrow %}
+  <p class="fg-eyebrow" id="{{ id }}-title">{{ eyebrow }}</p>
+  {%- endif %}
+  {%- if title %}
+  <div class="fg-card-head">
+    <div>
+      <h2 class="fg-card-title"{% if not eyebrow %} id="{{ id }}-title"{% endif %}>{{ title }}</h2>
+      {%- if help %}
+      <p class="fg-card-help">{{ help }}</p>
+      {%- endif %}
+    </div>
+    {%- if actions %}
+    <div class="fg-row">{{ caller("actions") }}</div>
+    {%- endif %}
+  </div>
+  {%- endif %}
+  {{ caller("body") }}
+</section>
+{%- endmacro %}
+
+{#- Group label above a run of cards. -#}
+{% macro group_label(title, help="") -%}
+<div class="fg-group-label">
+  <p class="fg-eyebrow">{{ title }}</p>
+  {%- if help %}
+  <p class="fg-card-help">{{ help }}</p>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{#- Icons (aria-hidden; the control around them carries the name). -#}
+{% macro icon_close() -%}
+<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+{%- endmacro %}
+{% macro icon_plus() -%}
+<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+{%- endmacro %}
+{% macro icon_file(size=36) -%}
+<svg class="fg-file-icon" width="{{ size }}" height="{{ size }}" viewBox="0 0 40 40" fill="none" aria-hidden="true"><path d="M10 4h14l8 8v22a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M24 4v8h8" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M14 22h12M14 28h8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+{%- endmacro %}
+
+{#- Chip: one saved value. variant "" (default) or "avoid" (deal-breaker);
+    new=True rings it and adds a "New" tag (Scout added it since last visit).
+    Constraint: the words always say what it is; color only supports. -#}
+{% macro chip(label, variant="", new=False, removable=True) -%}
+<li class="fg-chip{% if variant %} fg-chip--{{ variant }}{% endif %}{% if new %} fg-chip--new{% endif %}">
+  {{ label }}
+  {%- if new %}<span class="fg-chip-tag">New</span>{% endif %}
+  {%- if removable %}
+  <button class="fg-chip-remove" type="button" aria-label="Remove {{ label }}">{{ icon_close() }}</button>
+  {%- endif %}
+</li>
+{%- endmacro %}
+
+{#- Dashed "Add" pill that ends a row of chips. -#}
+{% macro chip_add(label) -%}
+<li><button class="fg-chip-add" type="button">{{ icon_plus() }}{{ label }}</button></li>
+{%- endmacro %}
+
+{#- Select: same box as a text field, with a chevron. options: list of
+    strings or (value, label) pairs. -#}
+{% macro select(id, label, options, selected=None, disabled=False) -%}
+<div class="fg-field">
+  <label class="fg-label" for="{{ id }}">{{ label }}</label>
+  <span class="fg-select">
+    <select id="{{ id }}" name="{{ id }}"{% if disabled %} disabled{% endif %}>
+      {%- for opt in options %}
+      {%- set value, text = (opt if opt is not string else (opt, opt)) %}
+      <option value="{{ value }}"{% if value == selected %} selected{% endif %}>{{ text }}</option>
+      {%- endfor %}
+    </select>
+    <svg width="14" height="8" viewBox="0 0 14 8" fill="none" aria-hidden="true"><path d="M1 1L7 7L13 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </span>
+</div>
+{%- endmacro %}
+
+{#- Checkbox group with a visible legend. checked: list of selected values. -#}
+{% macro checkbox_group(name, legend, options, checked=()) -%}
+<fieldset class="fg-fieldset">
+  <legend class="fg-legend">{{ legend }}</legend>
+  {%- for opt in options %}
+  <label class="fg-check"><input class="fg-checkbox" type="checkbox" name="{{ name }}" value="{{ opt }}"{% if opt in checked %} checked{% endif %}> {{ opt }}</label>
+  {%- endfor %}
+</fieldset>
+{%- endmacro %}
+
+{#- Segmented control: pick one of a short ordered set. Radio inputs inside,
+    so it behaves as a radio group. selected=None shows no choice yet.
+    hide_legend=True when a card title already says it (screen readers still
+    hear the legend). -#}
+{% macro segmented(name, legend, options, selected=None, disabled=False, hide_legend=False) -%}
+<fieldset class="fg-segmented">
+  <legend class="{{ 'fg-visually-hidden' if hide_legend else 'fg-legend' }}">{{ legend }}</legend>
+  <div class="fg-segments">
+    {%- for opt in options %}
+    <label class="fg-segment"><input type="radio" name="{{ name }}" value="{{ opt }}"{% if opt == selected %} checked{% endif %}{% if disabled %} disabled{% endif %}>{{ opt }}</label>
+    {%- endfor %}
+  </div>
+</fieldset>
+{%- endmacro %}
+
+{#- Text field plus its own Add button, for adding one value to a list. -#}
+{% macro add_row(id, label, placeholder="", button="Add") -%}
+<div class="fg-add-row">
+  <div class="fg-field">
+    <label class="fg-label" for="{{ id }}">{{ label }}</label>
+    <input class="fg-input" type="text" id="{{ id }}" name="{{ id }}"{% if placeholder %} placeholder="{{ placeholder }}"{% endif %}>
+  </div>
+  <button class="fg-button fg-button--secondary" type="button">{{ button }}</button>
+</div>
+{%- endmacro %}
+
+{#- Status strip: is Scout watching? The call block holds the action button. -#}
+{% macro status(title, detail="", paused=False) -%}
+<div class="fg-status{% if paused %} fg-status--paused{% endif %}" role="status">
+  <p class="fg-status-text">
+    <span class="fg-status-dot" aria-hidden="true"></span>
+    <span class="fg-status-title">{{ title }}</span>
+    {%- if detail %}
+    <span class="fg-status-detail">{{ detail }}</span>
+    {%- endif %}
+  </p>
+  {{ caller() }}
+</div>
+{%- endmacro %}
+
+{#- Sticky action bar at the bottom of a long form. Call block = buttons. -#}
+{% macro action_bar(note="") -%}
+<div class="fg-action-bar">
+  <div class="fg-shell fg-action-bar-inner">
+    <p class="fg-action-bar-note">{{ note }}</p>
+    <div class="fg-row">{{ caller() }}</div>
+  </div>
+</div>
+{%- endmacro %}
+
+{#- File row: icon, name, meta; call block = actions (View, Replace). -#}
+{% macro file_row(name, meta="") -%}
+<div class="fg-file-row">
+  <div class="fg-file">
+    {{ icon_file() }}
+    <div class="fg-file-text">
+      <p class="fg-file-name">{{ name }}</p>
+      {%- if meta %}
+      <p class="fg-file-meta">{{ meta }}</p>
+      {%- endif %}
+    </div>
+  </div>
+  <div class="fg-row">{{ caller() }}</div>
+</div>
+{%- endmacro %}
+
+{#- Dropzone: where a file goes. The button is a label for a hidden file input.
+    inline=True is the compact row used inside a card. -#}
+{% macro dropzone(id, title, hint="", button="Choose a file", inline=False, accept=".pdf") -%}
+<div class="fg-dropzone{% if inline %} fg-dropzone--inline{% endif %}">
+  {%- if inline %}
+  <div class="fg-file">
+    {{ icon_file() }}
+    <div class="fg-file-text">
+      <p class="fg-dropzone-title">{{ title }}</p>
+      {%- if hint %}<p class="fg-file-meta">{{ hint }}</p>{% endif %}
+    </div>
+  </div>
+  {%- else %}
+  {{ icon_file(40) }}
+  <div>
+    <p class="fg-dropzone-title">{{ title }}</p>
+    {%- if hint %}<p class="fg-dropzone-hint">{{ hint }}</p>{% endif %}
+  </div>
+  {%- endif %}
+  <label class="fg-button fg-button--primary"><input class="fg-visually-hidden" type="file" id="{{ id }}" name="{{ id }}" accept="{{ accept }}">{{ button }}</label>
+</div>
+{%- endmacro %}
+
+{#- List row: title and meta on the left, a detail (dates) on the right. -#}
+{% macro list_row(title, meta="", detail="") -%}
+<li class="fg-list-row">
+  <div>
+    <p class="fg-list-title">{{ title }}</p>
+    {%- if meta %}<p class="fg-list-meta">{{ meta }}</p>{% endif %}
+  </div>
+  {%- if detail %}<p class="fg-list-meta">{{ detail }}</p>{% endif %}
+</li>
+{%- endmacro %}
+
+{#- Placeholder row: where rows will appear once there's data. -#}
+{% macro list_placeholder(w1="60%", w2="80%") -%}
+<li class="fg-list-row fg-list-row--placeholder" aria-hidden="true">
+  <span class="fg-skeleton" style="width: {{ w1 }}"></span>
+  <span class="fg-skeleton" style="width: {{ w2 }}"></span>
+</li>
+{%- endmacro %}
+
+{#- Stat: a count with its label. inline=True puts them on one line. -#}
+{% macro stat(value, label, inline=False) -%}
+<p class="fg-stat{% if inline %} fg-stat--inline{% endif %}">
+  <span class="fg-stat-value">{{ value }}</span>
+  <span class="fg-stat-label">{{ label }}</span>
+</p>
+{%- endmacro %}
+
+{#- Before and after: a number now, the number with the change, and the unit. -#}
+{% macro compare(before, after, unit) -%}
+<p class="fg-compare">
+  <span class="fg-compare-before">{{ before }}</span>
+  <svg class="fg-compare-arrow" width="20" height="12" viewBox="0 0 20 12" fill="none" role="img" aria-label="becomes"><path d="M1 6h17M13 1l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <span class="fg-compare-after">{{ after }}</span>
+  <span class="fg-compare-unit">{{ unit }}</span>
+</p>
+{%- endmacro %}
+
+{#- Suggestion: Scout noticed something and offers a change. Goldenrod tint
+    (Discovery); the statement is in Scout's voice. Call block = actions. -#}
+{% macro suggestion(eyebrow, statement, help="") -%}
+<section class="fg-card fg-card--discovery" aria-label="{{ eyebrow }}">
+  <p class="fg-eyebrow">{{ eyebrow }}</p>
+  <p class="fg-voice">{{ statement }}</p>
+  {%- if help %}
+  <p class="fg-card-help">{{ help }}</p>
+  {%- endif %}
+  <div class="fg-row">{{ caller() }}</div>
+</section>
+{%- endmacro %}
