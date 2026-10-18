@@ -8,12 +8,14 @@
   --fg-color-palette-goldenrod: #d6a84f;
   --fg-color-palette-clay: #c9785b;
   --fg-color-palette-sage: #a8b39c;
+  --fg-color-palette-parchment-light: #fbf7ee;
   --fg-color-palette-white: #ffffff;
 
   /* color.surface */
   --fg-color-surface-page: var(--fg-color-palette-parchment);
   --fg-color-surface-field: var(--fg-color-palette-white);
   --fg-color-surface-raised: var(--fg-color-palette-parchment);
+  --fg-color-surface-card: var(--fg-color-palette-parchment-light);
   --fg-color-surface-hover: rgb(41 40 36 / 0.1);
 
   /* color.text */

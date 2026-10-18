@@ -13,7 +13,7 @@ Rules:
   Use a `var(--fg-…)` semantic token. Layout widths and breakpoints are fine as raw px.
 - **The gallery at `/field-guide` is the catalog of approved controls.** Before building a
   screen, pick from it. Reuse `.fg-*` classes from `field-guide/css/components.css` and the
-  macros in `dashboard/templates/_fg.html` (`fg.toggle`, `fg.filter`); never copy their markup.
+  macros in `dashboard/templates/_fg.html` (`fg.toggle`, `fg.filter`, `fg.card`, `fg.chip`, …); never copy their markup.
 - A new component goes into Field Guide first: CSS in `components.css`, a macro in `_fg.html`
   if its markup is more than one class on a native element, and a spec row with every state
   in `dashboard/templates/field_guide.html`. `quality_check.py` fails if a `.fg-` class is

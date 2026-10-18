@@ -407,3 +407,27 @@ so it shouldn't be documented as part of the system)
 The design rule is "Fraunces and Avenir Next only"; how non-Apple devices cope is plumbing.
 **Standing checks:**
 - [ ] Manual: docs and the gallery describe Ted's design decisions, not workarounds I chose.
+
+### 2026-10-18 — SC-46 profile components into Field Guide
+**Shipped:** 20 components for the resume and profile screens (chips with deal-breaker
+and "new" variants, select, checkbox group, segmented radio group, add row, card with
+eyebrow/emphasis/discovery variants, group label, page header + intro, split with sticky
+side panel, status strip, action bar, file row, dropzone, list rows with placeholder and
+empty states, stat, before-and-after, suggestion), each with a macro and a gallery spec row.
+All controls 44px (Ted). Disabled buttons readable (secondary on secondary fill, 5.0:1)
+instead of 45% fade. New token `surface.card` = palette `parchment-light` #fbf7ee (Ted
+preferred the canvas's flat, lighter card with a hairline border over the raised card);
+mirrored to Figma variables. Canvas "Scout Profile Review" re-skinned from the real macros
+and the real tokens.css/components.css (uploaded to the canvas), so no hex or px remains.
+Also carries the unmerged fallback-font cleanup (3422376) that missed PR #5.
+**Rework count:** 2. (1) Floated fieldset legend squeezed the segmented options to 0px
+and overflowed phones; caught by the overflow check. (2) Gallery-only `.gallery h2` style
+leaked into card titles inside specimens (28px, 64px margin); scoped to `.gallery > h2`.
+**Root causes:** *Fieldset/legend layout quirks* (legends aren't ordinary blocks; floats
+beside a flex row collapse it). *Page-level element selectors in a gallery restyle the
+components it is meant to show faithfully.*
+**Standing checks added:**
+- [x] Automated: `every control is at least 44px tall` on the gallery. Mutation-tested
+      (buttons back to 36px → fails, naming each short button).
+- [ ] Manual: gallery page styles target gallery classes or direct children only,
+      never bare elements a component also uses (h2, p, ul).
