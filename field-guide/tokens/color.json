@@ -9,6 +9,7 @@
       "goldenrod": { "$value": "#d6a84f", "$description": "Scout's discovery. 'Hey, I found something.' Never the only thing carrying meaning." },
       "clay":      { "$value": "#c9785b", "$description": "Scout's attention. Warnings, time-sensitive info. Use sparingly." },
       "sage":      { "$value": "#a8b39c", "$description": "Scout's support. Tags, secondary statuses, subtle backgrounds." },
+      "parchment-light": { "$value": "#fbf7ee", "$description": "Card surface: a step lighter than Parchment so cards lift without a shadow (Ted, SC-46)." },
       "white":     { "$value": "#ffffff", "$description": "Input field fill only." }
     },
     "surface": {
@@ -16,6 +17,7 @@
       "page":  { "$value": "{color.palette.parchment}" },
       "field": { "$value": "{color.palette.white}" },
       "raised": { "$value": "{color.palette.parchment}", "$description": "Menus and popovers. Lifted by shadow, not a new color." },
+      "card":   { "$value": "{color.palette.parchment-light}", "$description": "Cards on settings-style pages: lighter fill and a hairline border, no shadow." },
       "hover":  { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.1 }, "$description": "Row hover tint (Figma dashboard 117:2047)." }
     },
     "text": {
