@@ -13,7 +13,7 @@ Rules:
   Use a `var(--fg-…)` semantic token. Layout widths and breakpoints are fine as raw px.
 - **The gallery at `/field-guide` is the catalog of approved controls.** Before building a
   screen, pick from it. Reuse `.fg-*` classes from `field-guide/css/components.css` and the
-  macros in `dashboard/templates/_fg.html` (`fg.toggle`, `fg.filter`); never copy their markup.
+  macros in `dashboard/templates/_fg.html` (`fg.toggle`, `fg.filter`, `fg.card`, `fg.chip`, …); never copy their markup.
 - A new component goes into Field Guide first: CSS in `components.css`, a macro in `_fg.html`
   if its markup is more than one class on a native element, and a spec row with every state
   in `dashboard/templates/field_guide.html`. `quality_check.py` fails if a `.fg-` class is
@@ -21,9 +21,8 @@ Rules:
 - Every template includes `{% include "_field_guide_head.html" %}` and uses `<body class="fg-page">`.
 - To change a token: edit `field-guide/tokens/*.json`, run `python field-guide/build.py`,
   commit the JSON and `field-guide/dist/tokens.css` together. Never edit `dist/` by hand.
-- Fonts are Fraunces (display) and Avenir Next (UI) only, with Roboto as the UI fallback on
-  non-Apple devices (Avenir Next isn't web-licensed), self-hosted one weight lighter. Never add another typeface.
-  Avenir Next (UI) text is never lighter than Medium (500); Regular is for Fraunces only.
+- Fonts are Fraunces (display) and Albert Sans (UI) only. Never add another typeface.
+  Albert Sans (UI) text is never lighter than Medium (500); Regular is for Fraunces only.
 - Goldenrod, Clay and Sage are never text colors on Parchment, and never the only signal of
   meaning. Pair them with Ink text or an icon.
 - Free text (messages, descriptions, body copy) is always left-aligned, even inside a centered
