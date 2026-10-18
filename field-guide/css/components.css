@@ -7,7 +7,7 @@
    checkbox/radio labels, menu rows, filter labels - are demibold.
    Values, messages and status labels - input values, filter values, message
    copy, the toggle's "Applied" - are medium.
-   Minimum weight for Avenir Next (UI) text is medium; regular is Fraunces only. */
+   Minimum weight for Albert Sans (UI) text is medium; regular is Fraunces only. */
 :root { color-scheme: light; }
 
 .fg-page {
@@ -16,7 +16,7 @@
   color: var(--fg-color-text-primary);
   font-family: var(--fg-font-family-ui);
   font-size: var(--fg-font-size-md);
-  font-weight: var(--fg-font-weight-medium); /* Avenir Next never lighter than Medium */
+  font-weight: var(--fg-font-weight-medium); /* Albert Sans never lighter than Medium */
   line-height: var(--fg-font-line-height-body);
 }
 

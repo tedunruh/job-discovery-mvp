@@ -189,17 +189,17 @@ def check_filter_states(page, base):
     page.goto(f"{base}/?work_set=1&range=24h", wait_until="load")  # leave the session at defaults
 
 
-def check_fallback_font(page, w):
-    """The UI fallback face is self-hosted under its own family name. A bad path or
+def check_ui_font(page, w):
+    """The UI face (Albert Sans) is self-hosted. A bad path or
     route 404s silently and the UI drops to the browser's generic sans-serif, so
     confirm every weight the UI uses actually loads."""
     loaded = page.evaluate(
         """
         async () => {
           const out = {};
-          for (const wt of [400, 500, 600]) {
+          for (const wt of [500, 600]) {
             try {  // a 404'd file rejects here rather than returning an error status
-              const faces = await document.fonts.load(`${wt} 16px "Field Guide UI"`);
+              const faces = await document.fonts.load(`${wt} 16px "Albert Sans"`);
               out[wt] = faces.length > 0 && faces.every(f => f.status === "loaded");
             } catch (e) { out[wt] = false; }
           }
@@ -208,7 +208,7 @@ def check_fallback_font(page, w):
         """
     )
     bad = [k for k, ok in loaded.items() if not ok]
-    check(not bad, f"UI fallback font loads  [@{w}]", "failed weights: " + ", ".join(bad))
+    check(not bad, f"UI font (Albert Sans) loads  [@{w}]", "failed weights: " + ", ".join(bad))
 
 
 def check_applied_alignment(page, w):
@@ -229,13 +229,12 @@ def check_applied_alignment(page, w):
           f"worst offset {max(off):.2f}px" if rows else "no rows")
 
 
-ALLOWED_FONTS = {"fraunces", "avenir next", "field guide ui"}
+ALLOWED_FONTS = {"fraunces", "albert sans"}
 
 
 def check_typefaces(page, path):
-    """Field Guide allows two typefaces (Fraunces, Avenir Next) plus the self-hosted
-    UI fallback face. Every rendered text element's first-choice family must be one
-    of them - catches a stray monospace, a browser default on a <code>/<button>,
+    """Field Guide allows two typefaces: Fraunces and Albert Sans. Every rendered
+    text element's first-choice family must be one of them - catches a stray monospace, a browser default on a <code>/<button>,
     or a new font slipped into one template."""
     bad = page.evaluate(
         """
@@ -246,7 +245,7 @@ def check_typefaces(page, path):
             const cs = getComputedStyle(el);
             const first = cs.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '').toLowerCase();
             if (!allowed.includes(first)) out.add(`${el.tagName.toLowerCase()}.${el.className || ''} -> ${first}`);
-            // UI face (Avenir Next / its fallback) is never lighter than Medium
+            // UI face (Albert Sans) is never lighter than Medium
             else if (first !== 'fraunces' && parseInt(cs.fontWeight, 10) < 500) out.add(`${el.tagName.toLowerCase()}.${el.className || ''} -> ${first} weight ${cs.fontWeight}`);
           }
           return [...out].slice(0, 8);
@@ -370,7 +369,7 @@ def main():
                     if path == "/":
                         check_toolbar(page, w)
                         check_filter_menus(page, w)
-                        check_fallback_font(page, w)
+                        check_ui_font(page, w)
                         if w <= 680:
                             check_applied_alignment(page, w)
                         snapshots[str(w)] = snapshot_styles(page)
