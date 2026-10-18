@@ -431,3 +431,18 @@ components it is meant to show faithfully.*
       (buttons back to 36px → fails, naming each short button).
 - [ ] Manual: gallery page styles target gallery classes or direct children only,
       never bare elements a component also uses (h2, p, ul).
+
+### 2026-10-18 — Albert Sans replaces Avenir Next; SC-46 components in Figma
+**Shipped:** Albert Sans (Ted) is the UI typeface: self-hosted 500/600, the old fallback face
+removed, token/rules/checks updated. Figma: every Avenir/Roboto layer on Components (36
+ranges) and the gallery page (180) moved to Albert Sans (Demi Bold→SemiBold, else Medium);
+`font/family/ui` = Albert Sans. Existing Button and Text field reconciled with code (44px,
+readable disabled), Checkbox/Radio rows 44px. 21 new Figma components for SC-46, bound to
+Semantic variables. Foundations page left alone (Ted's exploration page; mixed fonts).
+**Rework count:** 1. `resize()` after setting auto-layout sizing reset heights to FIXED, so
+the Card set and fixed-width components collapsed (48px card set). Fixed by re-applying hug.
+**Root cause:** the standing check from 2026-10-15 ("after any resize(), re-set sizing")
+existed but the build script set sizing modes *before* resize. Order matters: resize first.
+**Standing checks:**
+- [ ] Figma builds: call `resize()` first, then set `primaryAxisSizingMode` /
+      `counterAxisSizingMode`; check returned heights are not the resize placeholder (10px).

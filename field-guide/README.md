@@ -51,7 +51,11 @@ mirrors it so designs can be made by hand with the same tokens.
 - **Components page:** real Figma components with variants for every state,
   fills/strokes/padding/radius bound to the Semantic variables: Button
   (Style × State), Link, Icon button, Checkbox, Radio, Toggle, Text field,
-  Filter pill, Filter menu (built from Checkbox/Radio instances), Message.
+  Filter pill, Filter menu (built from Checkbox/Radio instances), Message; and from
+  SC-46: Chip, Add chip, Select, Segment, Segmented control, Checkbox group, Add row,
+  Group label, Page header, Page intro, Card (Style × Header, Content is an instance
+  swap of "Card content"), Suggestion, Status strip, Action bar, File row, Dropzone,
+  List row, List empty, Stat, Before and after. Controls have a 44px minimum height.
   Each description names its code class or macro. Text is Albert Sans.
 - **Field Guide gallery page:** the `/field-guide` page laid out in Figma from
   instances of those components, same sections and "use this when" notes.
