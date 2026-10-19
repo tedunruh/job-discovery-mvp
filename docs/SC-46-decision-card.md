@@ -87,8 +87,10 @@ SC-52 (bring your own key, spiked in SC-42) moves out until coach Q&A or on-dema
 stands for (from `ROLE_CATEGORIES`), and each keyword becomes a title. The old tables stay and are
 read-only until the cutover, so nothing a person sees changes until they save.
 
-**Level:** classify a posting's level from title words (Senior, Staff, Principal, Lead, Manager; no
-marker means Mid) in `role_categories.py`. The canvas order is Mid, Senior, Staff, Principal, Lead or
+**Level:** classify a posting's level from title words (Senior, Staff, Principal, Lead, Manager) in
+`role_categories.py`. **Built that way, with one change from the first draft:** a title that states no level
+("Product Designer") passes every level, because Scout can't tell and treating it as Mid would hide most
+roles from everyone above Mid. Titles that state a different level are filtered. The canvas order is Mid, Senior, Staff, Principal, Lead or
 manager. "One level up" from Lead or manager is undefined; recommend the checkbox is simply not offered
 for the top level. An empty level matches any level (decision 8).
 
@@ -136,7 +138,9 @@ joins the union only on save.
   set when the person presses "start watching" and reset on resume.
 - In `fan_out`, skip paused users before building their bucket. Roles posted while paused are not alerted
   on resume, so there is no flood.
-- Existing users get `alerts_started_at = onboarded_at`.
+- Existing users get `alerts_started_at` = when their account was created, **not** `onboarded_at`. Two of
+  the 5 never finished the old onboarding and still receive alerts today (alerts go to everyone), so keying
+  it to onboarding would have silenced them.
 
 ## 7. Suggestions
 

@@ -263,6 +263,66 @@ def get_all_user_keywords(conn):
         return result
 
 
+PROFILE_COLUMNS = "user_id, level, one_level_up, country, city, alerts_started_at, alerts_paused_at, version"
+
+
+def _attach_items(profiles, items):
+    for p in profiles.values():
+        p["titles"], p["skills"] = [], []
+    for user_id, kind, value in items:
+        if user_id in profiles:
+            profiles[user_id]["titles" if kind == "title" else "skills"].append(value)
+    return profiles
+
+
+def get_all_user_profiles(conn):
+    """{user_id: profile} for everyone who has a profile row (SC-46) - loaded once per scheduler
+    run. A profile is a dict: level, one_level_up, country, city, alerts_started_at,
+    alerts_paused_at, version, titles, skills. People without one still use their old role
+    categories and keywords."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(f"SELECT {PROFILE_COLUMNS} FROM user_profiles")
+        profiles = {row["user_id"]: dict(row) for row in cur.fetchall()}
+    if not profiles:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id, kind, value FROM user_profile_items ORDER BY value")
+        return _attach_items(profiles, cur.fetchall())
+
+
+def get_user_profile(conn, user_id):
+    """This person's profile (see get_all_user_profiles), or None if they don't have one yet."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(f"SELECT {PROFILE_COLUMNS} FROM user_profiles WHERE user_id = %s", (user_id,))
+        row = cur.fetchone()
+    if row is None:
+        return None
+    profiles = {user_id: dict(row)}
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id, kind, value FROM user_profile_items WHERE user_id = %s ORDER BY value", (user_id,))
+        return _attach_items(profiles, cur.fetchall())[user_id]
+
+
+def create_profile_from_legacy(conn, user_id, titles, alerts_started_at):
+    """Create a profile for someone who has none, from titles made out of their old role
+    categories and keywords (role_categories.profile_from_legacy). Idempotent: returns False and
+    changes nothing if they already have one. The old tables are left exactly as they were."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO user_profiles (user_id, alerts_started_at) VALUES (%s, %s) ON CONFLICT (user_id) DO NOTHING",
+            (user_id, alerts_started_at),
+        )
+        if cur.rowcount == 0:
+            return False
+        if titles:
+            psycopg2.extras.execute_values(
+                cur,
+                "INSERT INTO user_profile_items (user_id, kind, value, source) VALUES %s ON CONFLICT DO NOTHING",
+                [(user_id, "title", t, "converted") for t in titles],
+            )
+        return True
+
+
 def mark_full_ingest_done(conn, company_id):
     with conn.cursor() as cur:
         cur.execute("UPDATE companies SET full_ingest_at = now() WHERE id = %s", (company_id,))
