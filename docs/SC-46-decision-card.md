@@ -1,0 +1,145 @@
+# SC-46 — Decision card: resume and profile screens
+
+Drafted 2026-10-19 from the "SC-46 engineering handoff" doc (screens 1, 2a, 2b, 3), checked against
+`main` at `4350594`, `docs/SC-51-matching-descriptions.md` and `docs/SC-42-byo-ai-key-spike.md`.
+Each decision has a **recommended answer** for you to accept or change. Nothing here is built.
+
+Current state, measured: 5 users, 3 onboarded. Profiles today are role categories
+(`user_role_interests`), keywords (`user_role_keywords`) and `users.work_types`, set at `/onboarding`.
+Alerts fan out per new posting in `scheduler/run_collectors.py` (`fan_out`: `matches_profile`, then
+`matches_work_type`).
+
+## At a glance
+
+| # | Decision | Recommended answer |
+|---|---|---|
+| 1 | How a resume is read | The user's own Anthropic key (SC-52, spiked in SC-42), once per resume. Keep the PDF (2 MB cap) so View and Replace work. Ship 2b and 3 first; the resume path waits for SC-52. |
+| 2 | Profile data model | New `user_profiles` plus item and work-history tables. Titles replace categories and keywords. Existing profiles convert on first visit. |
+| 3 | What matching uses | Gate fields (titles, level, where) filter now. Skills and deal-breakers are saved but not applied until SC-51 ships. **Hide City radius and non-US country in v1** (see findings). |
+| 4 | Routes and flow | `/start` (1), `/profile` (2a, 2b and 3, one template). Everyone already onboarded lands on 3. |
+| 5 | "If you'd started last week" | Count on a short debounce, not per keystroke, using the same matcher. Say "so far" when the profile has non-design titles. |
+| 6 | Pause alerts | Stops ntfy pushes only. The dashboard keeps listing. No catch-up flood on resume. |
+| 7 | Suggestions | Hide the card in v1. |
+| 8 | Save rules | One title, one level and one work type, on 2a and 2b alike. "Save and finish later" saves a draft, keeps alerts off, and returns to the dashboard with a "Finish your profile" banner. |
+
+## Two findings the handoff doesn't mention
+
+1. **City radius and non-US country have no engine behind them.** Nothing in the repo geocodes
+   locations. `work_type()` and `is_us_location()` in `dashboard/filters.py` match US words and state
+   abbreviations in the location text, and a remote role outside the US lands in no work-type bucket.
+   The canvas's "Within 10, 25, 50 or 100 miles" would need a city-to-coordinates table, and a
+   country other than the United States would need `work_type()` generalised. Recommended: v1 matches on
+   the country and on the city name appearing in the posting's location; hide the radius control and offer
+   only United States as a country. That is a small canvas change. Geocoding is its own follow-up.
+2. **Screen 1 has no state for "no key connected".** Reading a resume uses the user's own key (decision 1),
+   and the SC-42 spike's biggest unknown is whether testers can get an API key at all. Until a key is
+   connected the dropzone should say so and point to "Tell me about yourself instead". This is a design
+   addition, not a rebuild.
+
+## 1. How a resume is read
+
+**Recommend:** the user's own Anthropic key, on a fast-tier model, once per upload, extracting titles,
+level, skills and work history. This is the SC-42 design: the key is encrypted per user, used only in the
+dashboard process and never in the scheduler.
+
+- **File:** keep the PDF in a `user_resumes` row (bytea, 2 MB cap, hard-deleted from Settings and when a
+  user is removed). The canvas promises View, Replace and "delete it any time", so a stored file is what
+  the copy already says. The cheaper alternative, discarding the file after extraction, means changing the
+  privacy note on screen 1 and the "Your resume" card on 2a.
+- **Replace** re-runs extraction and offers to update fields. Fields the person edited stay unless they say so.
+- **Sequence:** do not block 2b and 3 on this. 2b is the no-resume path by design.
+- **Cost:** SC-42 estimated 7–9 days for the key work. The extraction step and the screen 1 and 2a states
+  are on top of that.
+
+## 2. Profile data model
+
+**Recommend:** additive tables, applied to Neon before the code ships.
+
+- `user_profiles(user_id PK, level, one_level_up, country, city, resume_id, alerts_started_at,
+  alerts_paused_at, version, updated_at)`. `version` increments on save and drives the SC-51 rematch.
+- `user_profile_items(user_id, kind, value, source)` with kind `title`, `skill` or `deal_breaker`, and source
+  `resume`, `typed` or `suggested`.
+- `user_work_history(user_id, title, company, start_year, end_year)`.
+- `users.work_types` stays as it is.
+
+**Migration for the existing profiles:** each saved category becomes the title keywords it already
+stands for (from `ROLE_CATEGORIES`), and each keyword becomes a title. The old tables stay and are
+read-only until the cutover, so nothing a person sees changes until they save.
+
+**Level:** classify a posting's level from title words (Senior, Staff, Principal, Lead, Manager; no
+marker means Mid) in `role_categories.py`. The canvas order is Mid, Senior, Staff, Principal, Lead or
+manager. "One level up" from Lead or manager is undefined; recommend the checkbox is simply not offered
+for the top level.
+
+## 3. What matching uses
+
+**Recommend:** adopt the SC-51 split exactly.
+
+- **Gate** ("What I'll match on"): target titles, level, work type, country and city. These filter the
+  dashboard and the alerts, and they are the union gate that decides what discovered boards store.
+- **Read for** ("What I'll read for"): skills and deal-breakers. Saved from day one, applied once SC-51's
+  description storage exists (estimated 8–9 days). Until then, either hide the group or add one line of
+  copy saying these are saved and not yet used. The canvas copy is final, so this is your call.
+
+## 4. Routes and flow
+
+**Recommend:** the handoff's proposal, with one template.
+
+- `/start` is screen 1, for people with no `onboarded_at`.
+- `/profile` is 2a, 2b and 3: the same cards, with setup or settings mode and an empty or filled profile.
+- `/onboarding` redirects to `/start` for new people and to `/profile` for everyone else.
+- People already onboarded go straight to 3 with their converted values. They are not asked to start over.
+
+## 5. "If you'd started last week"
+
+**Recommend:** a server-side count of postings from the last 7 days that match the draft profile, using
+the same matcher as alerts and the same posted-date basis as the dashboard's "posted within" filter.
+Recompute after a short pause in editing, not per keystroke.
+
+**Conflict with SC-51, accepted:** discovered-board roles that pass no one's gate are not stored, so a
+brand-new profile's count undercounts them until the catch-up rescan runs. It is accurate for design
+titles (always stored) and for any role at the core boards. When the profile has a non-design title,
+show "N so far" and a help line that the count grows as Scout scans more boards. The draft profile's gate
+joins the union only on save.
+
+## 6. Pause alerts
+
+**Recommend:** pause stops ntfy pushes only. The dashboard is a pull surface, so it keeps listing roles.
+
+- State is `alerts_paused_at` (null means on). "Alerts have been on since [date]" is `alerts_started_at`,
+  set when the person presses "start watching" and reset on resume.
+- In `fan_out`, skip paused users before building their bucket. Roles posted while paused are not alerted
+  on resume, so there is no flood.
+- Existing users get `alerts_started_at = onboarded_at`.
+
+## 7. Suggestions
+
+**Recommend:** hide the "Something I noticed" card until its signals are defined. With 5 users there is
+too little open and apply data to suggest anything meaningful, and `fg.suggestion` stays in the gallery.
+
+## 8. Save rules
+
+**Recommend:**
+- **Required:** at least one title, a level and at least one work type, enforced the same on 2a and 2b.
+  A resume may not fill the level, so 2a can also be blocked.
+- **"Save and finish later":** saves the draft, leaves alerts off and `onboarded_at` unset, and returns to
+  the dashboard with a "Finish your profile" banner linking to `/profile`.
+- **"Looks right, start watching":** saves, sets `alerts_started_at` and `onboarded_at`, and lands on the
+  dashboard.
+- **Screen 3, nothing unsaved:** note "All changes saved." with the primary button disabled. Warn before
+  leaving with unsaved changes.
+
+## Suggested build order
+
+1. Schema, conversion of existing profiles, and the title and level gate in `role_categories.py` and `fan_out`.
+2. `/profile` for 2b and 3 (no AI), plus pause alerts and the preview.
+3. Resume path (screen 1, 2a), after SC-52.
+4. Skills and deal-breakers applied to descriptions, after SC-51.
+
+## Open or unverified
+
+- Whether testers can get an Anthropic key (SC-42's top risk). Ask them before building step 3.
+- The level classifier and the preview count have not been run against real titles. Measure the
+  classifier's agreement on a sample of stored titles before relying on it.
+- Effort figures for steps 1, 2 and the extraction step are not estimated here; size them once you have
+  accepted or changed the answers above.
