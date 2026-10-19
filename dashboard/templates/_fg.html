@@ -126,10 +126,12 @@
 
 {#- Chip: one saved value. variant "" (default) or "avoid" (deal-breaker);
     new=True rings it and adds a "New" tag (Scout added it since last visit).
+    name="titles" makes it a form value (a hidden input), so a list of chips posts with the form.
     Constraint: the words always say what it is; color only supports. -#}
-{% macro chip(label, variant="", new=False, removable=True) -%}
+{% macro chip(label, variant="", new=False, removable=True, name="") -%}
 <li class="fg-chip{% if variant %} fg-chip--{{ variant }}{% endif %}{% if new %} fg-chip--new{% endif %}">
   {{ label }}
+  {%- if name %}<input type="hidden" name="{{ name }}" value="{{ label }}">{% endif %}
   {%- if new %}<span class="fg-chip-tag">New</span>{% endif %}
   {%- if removable %}
   <button class="fg-chip-remove" type="button" aria-label="Remove {{ label }}">{{ icon_close() }}</button>
@@ -184,9 +186,11 @@
 </fieldset>
 {%- endmacro %}
 
-{#- Text field plus its own Add button, for adding one value to a list. -#}
-{% macro add_row(id, label, placeholder="", button="Add") -%}
-<div class="fg-add-row">
+{#- Text field plus its own Add button, for adding one value to a list. list="id" wires it
+    (field-guide/js/profile.js) to the <ul id="id"> of chips above it: Add, or Enter, turns
+    the typed text into a chip cloned from <template id="id-template">. -#}
+{% macro add_row(id, label, placeholder="", button="Add", list="") -%}
+<div class="fg-add-row"{% if list %} data-chip-list="{{ list }}"{% endif %}>
   <div class="fg-field">
     <label class="fg-label" for="{{ id }}">{{ label }}</label>
     <input class="fg-input" type="text" id="{{ id }}" name="{{ id }}"{% if placeholder %} placeholder="{{ placeholder }}"{% endif %}>

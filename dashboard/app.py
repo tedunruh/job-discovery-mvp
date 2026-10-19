@@ -31,14 +31,11 @@ from db.db import (
     log_event,
     log_visit,
     set_applied,
-    set_user_keywords,
-    set_user_role_categories,
     set_user_work_types,
 )
+from dashboard.profile import register as register_profile_screens
 from role_categories import (
-    ROLE_CATEGORIES,
-    MAX_KEYWORDS,
-    clean_keywords,
+    matches_city,
     matches_profile,
     matches_profile_titles,
 )
@@ -145,6 +142,9 @@ def require_login(view):
         return view(*args, **kwargs)
 
     return wrapped
+
+
+register_profile_screens(app, require_login)
 
 
 def humanize_posted_at(dt):
@@ -286,7 +286,7 @@ def index():
     conn = get_conn()
     try:
         if not is_onboarded(conn, user_id):
-            return redirect(url_for("onboarding"))
+            return redirect(url_for("profile"))
         log_visit(conn, user_id)
         conn.commit()
         role_categories = get_user_role_categories(conn, user_id)
@@ -311,6 +311,7 @@ def index():
         postings = [
             p for p in postings
             if matches_profile_titles(p["title"], profile["titles"], profile["level"], profile["one_level_up"])
+            and matches_city(work_type(p["location"], p["remote_type"]), p["location"], profile["city"])
         ]
     else:
         postings = [
@@ -365,33 +366,11 @@ def field_guide_gallery():
     return render_template("field_guide.html", tokens=_field_guide_tokens())
 
 
-@app.route("/onboarding", methods=["GET", "POST"])
+@app.route("/onboarding")
 @require_login
 def onboarding():
-    user_id = g.user_id
-    conn = get_conn()
-    try:
-        if request.method == "POST":
-            selected = [c for c in request.form.getlist("categories") if c in ROLE_CATEGORIES]
-            set_user_role_categories(conn, user_id, selected)
-            set_user_keywords(conn, user_id, clean_keywords(request.form.get("keywords", "")))
-            conn.commit()
-            return redirect(url_for("index"))
-        selected = get_user_role_categories(conn, user_id)
-        keywords = get_user_keywords(conn, user_id)
-        first_time = not is_onboarded(conn, user_id)
-    finally:
-        conn.close()
-    if first_time and not selected:
-        selected = set(DEFAULT_ONBOARDING_CATEGORIES)
-    return render_template(
-        "onboarding.html",
-        first_time=first_time,
-        categories=ROLE_CATEGORIES,
-        selected=selected,
-        keywords=", ".join(keywords),
-        max_keywords=MAX_KEYWORDS,
-    )
+    """Role picking moved to the profile screen (SC-46); old links and bookmarks still land there."""
+    return redirect(url_for("profile"))
 
 
 @app.route("/toggle_remote_us", methods=["POST"])

@@ -323,6 +323,80 @@ def create_profile_from_legacy(conn, user_id, titles, alerts_started_at):
         return True
 
 
+def legacy_alerts_start(conn, user_id):
+    """When alerts count as started for someone getting a profile for the first time: when they
+    onboarded (they have been getting alerts since), or now if they never finished onboarding."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT COALESCE(onboarded_at, now()) FROM users WHERE id = %s", (user_id,))
+        return cur.fetchone()[0]
+
+
+def save_profile(conn, user_id, *, titles, skills, level, one_level_up, city, work_types):
+    """Save the whole profile from the profile screen (the form posts everything, not a diff) and
+    mark the person onboarded. Creates the profile if they have none; alerts start now for someone
+    who never onboarded, and are left as they were for everyone else. Values that were already
+    there keep their source (resume, converted); new ones are 'typed'. work_types None = never chose
+    (the default, Remote, applies). Caller commits."""
+    started = legacy_alerts_start(conn, user_id)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO user_profiles (user_id, level, one_level_up, city, alerts_started_at)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET
+                level = EXCLUDED.level, one_level_up = EXCLUDED.one_level_up, city = EXCLUDED.city,
+                alerts_started_at = COALESCE(user_profiles.alerts_started_at, EXCLUDED.alerts_started_at),
+                version = user_profiles.version + 1, updated_at = now()
+            """,
+            (user_id, level, one_level_up, city, started),
+        )
+        wanted = {("title", t) for t in titles} | {("skill", s) for s in skills}
+        cur.execute("SELECT kind, value FROM user_profile_items WHERE user_id = %s", (user_id,))
+        have = set(cur.fetchall())
+        for kind, value in have - wanted:
+            cur.execute("DELETE FROM user_profile_items WHERE user_id = %s AND kind = %s AND value = %s",
+                        (user_id, kind, value))
+        if wanted - have:
+            psycopg2.extras.execute_values(
+                cur,
+                "INSERT INTO user_profile_items (user_id, kind, value, source) VALUES %s ON CONFLICT DO NOTHING",
+                [(user_id, kind, value, "typed") for kind, value in sorted(wanted - have)],
+            )
+        cur.execute("UPDATE users SET work_types = %s, onboarded_at = COALESCE(onboarded_at, now()) WHERE id = %s",
+                    (list(work_types) if work_types is not None else None, user_id))
+
+
+def set_alerts_paused(conn, user_id, paused):
+    """Pause or resume this person's alerts. They need a profile row for it to live on; callers
+    create one first (ensure_profile in dashboard/profile.py). Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE user_profiles SET alerts_paused_at = CASE WHEN %s THEN COALESCE(alerts_paused_at, now()) ELSE NULL END "
+            "WHERE user_id = %s",
+            (bool(paused), user_id),
+        )
+
+
+def get_week_stats(conn, user_id):
+    """The last 7 days for one person: roles that reached them, that they opened, that they applied to."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT count(*) FROM user_postings WHERE user_id = %s AND notified_at > now() - interval '7 days'",
+            (user_id,),
+        )
+        reached = cur.fetchone()[0]
+        cur.execute(
+            """
+            SELECT count(DISTINCT posting_id) FILTER (WHERE event_type = 'opened'),
+                   count(DISTINCT posting_id) FILTER (WHERE event_type = 'applied')
+            FROM user_events WHERE user_id = %s AND created_at > now() - interval '7 days'
+            """,
+            (user_id,),
+        )
+        opened, applied = cur.fetchone()
+    return {"reached": reached, "opened": opened, "applied": applied}
+
+
 def mark_full_ingest_done(conn, company_id):
     with conn.cursor() as cur:
         cur.execute("UPDATE companies SET full_ingest_at = now() WHERE id = %s", (company_id,))
