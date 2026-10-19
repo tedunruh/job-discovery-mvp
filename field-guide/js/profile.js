@@ -116,6 +116,14 @@
   }
 
   var initial = snapshot();
+  /* Opened already holding an unsaved draft (fields read from a resume, or a refused save)? The page says
+     what the saved profile is, so the draft counts as changes. */
+  if (mode === "settings") {
+    try {
+      var savedState = JSON.parse(form.getAttribute("data-saved") || "null");
+      if (savedState) initial = savedState;
+    } catch (e) { /* keep the snapshot taken from the page */ }
+  }
 
   function changeCount() {
     var now = snapshot();

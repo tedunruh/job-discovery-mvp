@@ -34,6 +34,7 @@ from db.db import (
     set_user_work_types,
 )
 from dashboard.profile import register as register_profile_screens
+from dashboard.resume import register as register_resume
 from role_categories import (
     matches_city,
     matches_profile,
@@ -145,6 +146,7 @@ def require_login(view):
 
 
 register_profile_screens(app, require_login)
+register_resume(app, require_login)
 
 
 def humanize_posted_at(dt):
@@ -286,7 +288,7 @@ def index():
     conn = get_conn()
     try:
         if not is_onboarded(conn, user_id):
-            return redirect(url_for("profile"))
+            return redirect(url_for("start"))
         log_visit(conn, user_id)
         conn.commit()
         role_categories = get_user_role_categories(conn, user_id)
