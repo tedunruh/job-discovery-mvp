@@ -1,0 +1,113 @@
+{% import "_fg.html" as fg %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ "Your profile" if mode == "setup" else "Settings" }} — Scout</title>
+  {% include "_field_guide_head.html" %}
+  <script src="/field-guide/js/profile.js" defer></script>
+  <style>
+    body.fg-page { display: flex; flex-direction: column; min-height: 100vh; }
+    .profile-main { flex: 1; padding-bottom: var(--fg-space-8); }
+    .profile-main > .fg-intro,
+    .profile-main > .fg-status,
+    .profile-main > .fg-message { margin-bottom: var(--fg-space-6); }
+  </style>
+</head>
+<body class="fg-page">
+  <main class="fg-shell profile-main">
+    {{ fg.header("Getting started" if mode == "setup" else "Settings") }}
+
+    {%- if mode == "setup" %}
+    {{ fg.intro("Tell me what to watch for.", "Add the job titles you're after, and I'll let you know when a new role fits. You can change any of this later in Settings.") }}
+    {%- else %}
+    {{ fg.intro("Here's what I'm watching for.", "Change anything below, then save. Nothing takes effect until you do.") }}
+    {%- endif %}
+
+    {%- if error %}
+    <p class="fg-message fg-message--attention" role="alert">{{ error }}</p>
+    {%- elif saved_notice %}
+    <p class="fg-message fg-message--success" role="status">Saved. Your alerts follow this from the next scan.</p>
+    {%- endif %}
+
+    {%- if mode == "settings" %}
+    {%- if model.alerts_paused_at %}
+    {%- call fg.status("Alerts are paused.", "Nothing will reach you until you turn them back on.", paused=True) %}
+    <form method="post" action="/profile/alerts"><input type="hidden" name="action" value="resume"><button class="fg-button fg-button--primary" type="submit">Resume alerts</button></form>
+    {%- endcall %}
+    {%- else %}
+    {%- call fg.status("I'm watching.", ("Alerts have been on since " ~ started_label ~ ".") if started_label else "") %}
+    <form method="post" action="/profile/alerts"><input type="hidden" name="action" value="pause"><button class="fg-button fg-button--secondary" type="submit">Pause alerts</button></form>
+    {%- endcall %}
+    {%- endif %}
+    {%- endif %}
+
+    <form id="profile-form" method="post" action="/profile" novalidate
+          data-mode="{{ mode }}" data-preview-url="/profile/preview"
+          data-any-level="Any level" data-top-level="Lead or manager"
+          {%- if mode == "setup" %}
+          data-ready="You can change any of this later in Settings."
+          data-blocked="Add a title to continue."
+          {%- else %}
+          data-clean="All changes saved." data-one="{n} change not saved." data-many="{n} changes not saved."
+          {%- endif %}>
+      <div class="fg-split">
+        <div class="fg-split-main">
+          {{ fg.group_label("What I'll match on", "These decide which postings reach you at all.") }}
+
+          {%- call(part) fg.card("titles", "Roles I'll watch for", "The job titles I'll match postings against.") %}
+          <ul class="fg-chips" id="titles-list">
+            {%- for t in model.titles %}
+            {{ fg.chip(t, name="titles") }}
+            {%- endfor %}
+          </ul>
+          <template id="titles-list-template">{{ fg.chip("__label__", name="titles") }}</template>
+          {{ fg.add_row("titles_new", "Add a title", placeholder="For example, Product Manager", list="titles-list") }}
+          {%- endcall %}
+
+          {%- call(part) fg.card("level", "Your level", "Leave this on Any level to see every level. A title that doesn't state its level always shows.") %}
+          {{ fg.segmented("level", "Level", level_options, selected=level_label, hide_legend=True) }}
+          <label class="fg-check" data-needs-level{% if not model.level or model.level == "lead_manager" %} hidden{% endif %}><input class="fg-checkbox" type="checkbox" name="one_level_up" value="1"{% if model.one_level_up %} checked{% endif %}> Also show me roles one level up</label>
+          {%- endcall %}
+
+          {%- call(part) fg.card("where", "Where you'll work", "If you don't choose a work type, I'll show remote roles.") %}
+          {{ fg.checkbox_group("work", "Work type", work_options, checked=work_checked) }}
+          <div class="fg-field">
+            <label class="fg-label" for="city">City</label>
+            <input class="fg-input" type="text" id="city" name="city" value="{{ model.city or '' }}" placeholder="For example, Chicago" autocomplete="off">
+            <p class="fg-card-help">Only used for hybrid and on-site roles. Leave it empty to see every city.</p>
+          </div>
+          {%- endcall %}
+
+          {{ fg.group_label("What I'll read for in each posting", "These help me judge how well a role fits.") }}
+
+          {%- call(part) fg.card("skills", "Skills and strengths", "Saved. I'll start using this soon.") %}
+          <ul class="fg-chips" id="skills-list">
+            {%- for s in model.skills %}
+            {{ fg.chip(s, name="skills") }}
+            {%- endfor %}
+          </ul>
+          <template id="skills-list-template">{{ fg.chip("__label__", name="skills") }}</template>
+          {{ fg.add_row("skills_new", "Add a skill", placeholder="For example, Prototyping", list="skills-list") }}
+          {%- endcall %}
+        </div>
+
+        <aside class="fg-side-panel" id="profile-preview" aria-label="Preview" aria-live="polite">
+          {%- include "_profile_preview.html" %}
+        </aside>
+      </div>
+    </form>
+  </main>
+
+  {%- if mode == "setup" %}
+  {%- call fg.action_bar("You can change any of this later in Settings." if model.titles else "Add a title to continue.") %}
+  <button class="fg-button fg-button--primary" type="submit" form="profile-form" id="save-button"{% if not model.titles %} disabled{% endif %}>Looks right, start watching</button>
+  {%- endcall %}
+  {%- else %}
+  {%- call fg.action_bar(((changes ~ (" change not saved." if changes == 1 else " changes not saved.")) if changes else "All changes saved.")) %}
+  <button class="fg-button fg-button--secondary" type="button" id="discard-button"{% if not changes %} disabled{% endif %}>Discard</button>
+  <button class="fg-button fg-button--primary" type="submit" form="profile-form" id="save-button"{% if not changes %} disabled{% endif %}>Save changes</button>
+  {%- endcall %}
+  {%- endif %}
+</body>
+</html>

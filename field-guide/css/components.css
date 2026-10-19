@@ -10,6 +10,9 @@
    Minimum weight for Albert Sans (UI) text is medium; regular is Fraunces only. */
 :root { color-scheme: light; }
 
+/* The hidden attribute wins over component display rules (a hidden .fg-check stays hidden). */
+.fg-page [hidden] { display: none !important; }
+
 .fg-page {
   margin: 0;
   background: var(--fg-color-surface-page);

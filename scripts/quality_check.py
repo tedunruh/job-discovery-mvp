@@ -5,7 +5,7 @@
 
 Run before calling any UI change done. Exits non-zero on any failure.
 
-What it checks, at phone / tablet / desktop sizes, on /login, /onboarding and /:
+What it checks, at phone / tablet / desktop sizes, on /login, /profile (set up and settings views) and /:
   1. viewport meta present, and a mobile-emulated page reports its true width
   2. no horizontal page overflow
   3. login route artwork (pins, dots) stays inside the viewport once animations end
@@ -42,6 +42,7 @@ from db.db import create_session, get_conn  # noqa: E402
 
 BASELINE_PATH = os.path.join(ROOT, "scripts", "quality_baseline.json")
 TEST_EMAIL = "quality-check@example.invalid"
+TEST_EMAIL_SETUP = "quality-check-setup@example.invalid"  # never onboarded: sees the profile setup view
 # Narrowest supported phone is 360 (small Android). 320 (iPhone SE 1st gen) was dropped
 # deliberately: the three toolbar items can't fit one line in its 288px of content.
 VIEWPORTS = [(360, 740), (390, 844), (768, 1024), (800, 600), (1280, 800), (1440, 900)]
@@ -64,14 +65,14 @@ def check(ok, label, detail=""):
 # ---- setup -----------------------------------------------------------------
 
 
-def provision_user():
-    """Throwaway onboarded user (every user sees every company)."""
+def provision_user(email=TEST_EMAIL, onboarded=True):
+    """Throwaway user (every user sees every company); onboarded unless told otherwise."""
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("DELETE FROM users WHERE email = %s", (TEST_EMAIL,))
+    cur.execute("DELETE FROM users WHERE email = %s", (email,))
     cur.execute(
-        "INSERT INTO users (email, ntfy_topic, onboarded_at) VALUES (%s, 'quality-check', now()) RETURNING id",
-        (TEST_EMAIL,),
+        "INSERT INTO users (email, ntfy_topic, onboarded_at) VALUES (%s, %s, CASE WHEN %s THEN now() END) RETURNING id",
+        (email, "quality-check-" + ("on" if onboarded else "setup"), onboarded),
     )
     user_id = cur.fetchone()[0]
     token = create_session(conn, user_id)
@@ -83,7 +84,7 @@ def provision_user():
 def remove_user():
     conn = get_conn()
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM users WHERE email = %s", (TEST_EMAIL,))  # cascades sessions/events
+        cur.execute("DELETE FROM users WHERE email = ANY(%s)", ([TEST_EMAIL, TEST_EMAIL_SETUP],))  # cascades sessions/events
     conn.commit()
     conn.close()
 
@@ -334,6 +335,7 @@ def snapshot_styles(page):
 def main():
     update_baseline = "--update-baseline" in sys.argv
     user_id, token = provision_user()
+    _, setup_token = provision_user(TEST_EMAIL_SETUP, onboarded=False)
     server = make_server("127.0.0.1", 0, app)
     base = f"http://127.0.0.1:{server.server_port}"
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -352,7 +354,7 @@ def main():
                 ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=mobile, has_touch=mobile)
                 ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
                 page = ctx.new_page()
-                for path in ("/login", "/onboarding", "/", "/field-guide"):
+                for path in ("/login", "/profile", "/", "/field-guide"):
                     # /login redirects nowhere for anonymous *and* signed-in users; the rest need the cookie.
                     page.goto(base + path, wait_until="load")
                     check_page_basics(page, path, w)
@@ -363,6 +365,8 @@ def main():
                         check_typefaces(page, path)
                     if path == "/field-guide" and w == VIEWPORTS[-1][0]:
                         check_gallery_complete(page)
+                        check_control_heights(page)
+                    if path == "/profile" and w == VIEWPORTS[-1][0]:
                         check_control_heights(page)
                     if path == "/login":
                         check_login_artwork(page, w, h)
@@ -378,6 +382,16 @@ def main():
                     if os.environ.get("QC_SHOTS"):
                         name = (path.strip("/") or "dashboard").replace("/", "_")
                         page.screenshot(path=os.path.join(os.environ["QC_SHOTS"], f"{name}@{w}.png"))
+                ctx.close()
+                # The profile screen for someone who hasn't onboarded (setup view, other action bar).
+                ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=mobile, has_touch=mobile)
+                ctx.add_cookies([{"name": "scout_session", "value": setup_token, "url": base}])
+                page = ctx.new_page()
+                page.goto(base + "/profile", wait_until="load")
+                check_page_basics(page, "/profile (setup)", w)
+                if w == VIEWPORTS[-1][0]:
+                    check_typefaces(page, "/profile (setup)")
+                    check_control_heights(page)
                 ctx.close()
             browser.close()
     finally:
