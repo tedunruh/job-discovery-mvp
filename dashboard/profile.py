@@ -12,6 +12,8 @@ from db.db import (
     create_profile_from_legacy,
     get_conn,
     get_open_postings,
+    get_resume,
+    get_resume_parse_result,
     get_user_keywords,
     get_user_profile,
     get_user_role_categories,
@@ -66,10 +68,12 @@ def parse_profile_form(form):
     counts too. No level means every level; no work type means the default (Remote), kept as None."""
     level = _LEVEL_BY_LABEL.get(form.get("level", ""))
     chosen = {_WORK_KEY_BY_LABEL[w] for w in form.getlist("work") if w in _WORK_KEY_BY_LABEL}
+    note = " ".join((form.get("level_note") or "").split())[:200] or None
     return {
         "titles": clean_values(form.getlist("titles") + [form.get("titles_new", "")], MAX_TITLES),
         "skills": clean_values(form.getlist("skills") + [form.get("skills_new", "")], MAX_SKILLS),
         "level": level,
+        "level_note": note if level and form.get("level_note_level") == level else None,
         "one_level_up": bool(level) and level != LEVELS[-1] and "one_level_up" in form,
         "city": " ".join((form.get("city") or "").split())[:MAX_CITY_LENGTH] or None,
         "work_types": [key for key in WORK_TYPES if key in chosen] or None,
@@ -102,6 +106,19 @@ def changed_count(saved, draft):
         (effective_work_types(saved["work_types"]), effective_work_types(draft["work_types"])),
     ]
     return sum(1 for a, b in pairs if a != b)
+
+
+def snapshot_of(model):
+    """The profile as profile.js reads the form (same normalisation), so the page can tell what has changed
+    from the saved profile even when it is opened already holding an unsaved draft."""
+    return {
+        "titles": "|".join(sorted(t.lower() for t in model["titles"])),
+        "skills": "|".join(sorted(s.lower() for s in model["skills"])),
+        "level": LEVEL_LABELS.get(model["level"], ANY_LEVEL),
+        "up": "1" if model["one_level_up"] else "",
+        "city": (model["city"] or "").lower(),
+        "work": "|".join(sorted(WORK_TYPES[k] for k in effective_work_types(model["work_types"]))),
+    }
 
 
 def preview_rows(rows, draft):
@@ -137,12 +154,14 @@ def saved_profile(conn, user_id, onboarded):
     work_types = get_user_work_types(conn, user_id)
     if profile is not None:
         model = {"titles": profile["titles"], "skills": profile["skills"], "level": profile["level"],
-                 "one_level_up": profile["one_level_up"], "city": profile["city"]}
+                 "level_note": profile.get("level_note"), "one_level_up": profile["one_level_up"],
+                 "city": profile["city"]}
         started, paused = profile["alerts_started_at"], profile["alerts_paused_at"]
     else:
         has_old_picks = bool(get_user_role_categories(conn, user_id) or get_user_keywords(conn, user_id))
         titles = _legacy_titles(conn, user_id) if (onboarded or has_old_picks) else []
-        model = {"titles": titles, "skills": [], "level": None, "one_level_up": False, "city": None}
+        model = {"titles": titles, "skills": [], "level": None, "level_note": None, "one_level_up": False,
+                 "city": None}
         started, paused = (legacy_alerts_start(conn, user_id) if onboarded else None), None
     model["work_types"] = work_types
     model["alerts_started_at"], model["alerts_paused_at"] = started, paused
@@ -162,6 +181,8 @@ def date_label(dt):
 def view_context(conn, user_id, mode, model, saved=None, **extra):
     """Everything profile.html and _profile_preview.html need. `saved` is the saved profile when
     `model` is an unsaved draft of it (the settings preview then also shows the change)."""
+    from dashboard import resume as resume_mod  # imported here: resume.py imports this module
+
     rows = preview_for(conn, user_id, model)
     ctx = {
         "mode": mode,
@@ -178,6 +199,11 @@ def view_context(conn, user_id, mode, model, saved=None, **extra):
         "started_label": date_label(model.get("alerts_started_at")),
         "paused_label": date_label(model.get("alerts_paused_at")),
         "changes": 0,
+        "saved_snapshot": snapshot_of(saved if saved is not None else model),
+        "resume": get_resume(conn, user_id),
+        "reading": resume_mod.reading_state(conn, user_id),
+        "notice": None,
+        "resume_added": False,
     }
     if saved is not None and differs(saved, model):
         ctx["compare"] = (len(preview_for(conn, user_id, saved)), len(rows))
@@ -205,9 +231,17 @@ def register(app, require_login):
                 save_profile(conn, user_id, **draft)
                 conn.commit()
                 return redirect(url_for("profile", saved=1) if onboarded else url_for("index"))
-            model = saved_profile(conn, user_id, onboarded)
-            return render_template("profile.html", **view_context(conn, user_id, mode, model,
-                                                                  saved_notice=bool(request.args.get("saved"))))
+            from dashboard import resume as resume_mod
+
+            saved = saved_profile(conn, user_id, onboarded)
+            model, added = saved, False
+            parse_id = request.args.get("from_resume", type=int)
+            fields = get_resume_parse_result(conn, user_id, parse_id) if parse_id else None
+            if fields:
+                model, added = resume_mod.merge_fields(saved, fields), True
+            return render_template("profile.html", **view_context(
+                conn, user_id, mode, model, saved=saved if onboarded else None,
+                saved_notice=bool(request.args.get("saved")), notice=resume_mod.pop_notice(), resume_added=added))
         finally:
             conn.close()
 

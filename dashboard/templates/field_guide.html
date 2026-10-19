@@ -583,7 +583,7 @@
       </div>
       <div class="state state--wide" style="max-width: none; width: 100%">
         <span class="state-label">Not ready yet</span>
-        {% call fg.action_bar("Add a title, a level and a work type to continue.") %}<button class="fg-button fg-button--secondary" type="button">Save and finish later</button><button class="fg-button fg-button--primary" type="button" disabled>Looks right, start watching</button>{% endcall %}
+        {% call fg.action_bar("Add a title to continue.") %}<button class="fg-button fg-button--primary" type="button" disabled>Looks right, start watching</button>{% endcall %}
       </div>
     </div>
   </section>
@@ -607,10 +607,10 @@
     <div>
       <h3>File row</h3>
       <p class="spec-use">Use to show a file the person has added, with what they can do to it.</p>
-      <code class="spec-code">{% raw %}{% call fg.file_row(name, meta) %}buttons{% endcall %}{% endraw %} · .fg-file-row</code>
+      <code class="spec-code">{% raw %}{% call fg.file_row(name, meta) %}buttons{% endcall %} · {{ fg.file_picker(id, label, form) }}{% endraw %} · .fg-file-row</code>
     </div>
     <div class="states">
-      <div class="state state--wide" style="max-width: none; width: 100%">{% call fg.file_row("Alex-Rivera-Resume.pdf", "Added today") %}<button class="fg-button fg-button--secondary" type="button">View</button><button class="fg-button fg-button--secondary" type="button">Replace</button>{% endcall %}</div>
+      <div class="state state--wide" style="max-width: none; width: 100%">{% call fg.file_row("Alex-Rivera-Resume.pdf", "Added today") %}<a class="fg-button fg-button--secondary" href="#file-row">View</a>{{ fg.file_picker("g-replace", "Replace") }}<button class="fg-button fg-button--secondary" type="button">Delete</button>{% endcall %}</div>
     </div>
   </section>
 

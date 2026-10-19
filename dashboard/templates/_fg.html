@@ -240,8 +240,9 @@
 {%- endmacro %}
 
 {#- Dropzone: where a file goes. The button is a label for a hidden file input.
-    inline=True is the compact row used inside a card. -#}
-{% macro dropzone(id, title, hint="", button="Choose a file", inline=False, accept=".pdf") -%}
+    inline=True is the compact row used inside a card. form="id" attaches the file to a form
+    elsewhere on the page (a dropzone inside another form). -#}
+{% macro dropzone(id, title, hint="", button="Choose a file", inline=False, accept=".pdf", form="") -%}
 <div class="fg-dropzone{% if inline %} fg-dropzone--inline{% endif %}">
   {%- if inline %}
   <div class="fg-file">
@@ -258,8 +259,14 @@
     {%- if hint %}<p class="fg-dropzone-hint">{{ hint }}</p>{% endif %}
   </div>
   {%- endif %}
-  <label class="fg-button fg-button--primary"><input class="fg-visually-hidden" type="file" id="{{ id }}" name="{{ id }}" accept="{{ accept }}">{{ button }}</label>
+  <label class="fg-button fg-button--primary"><input class="fg-visually-hidden" type="file" id="{{ id }}" name="{{ id }}"{% if form %} form="{{ form }}"{% endif %} accept="{{ accept }}">{{ button }}</label>
 </div>
+{%- endmacro %}
+
+{#- A button that opens the file picker (Replace, beside View). form="id" attaches the file to a form
+    elsewhere on the page, so the picker can sit inside another form. -#}
+{% macro file_picker(id, label, form="", variant="secondary", accept=".pdf") -%}
+<label class="fg-button fg-button--{{ variant }}"><input class="fg-visually-hidden" type="file" id="{{ id }}" name="{{ id }}"{% if form %} form="{{ form }}"{% endif %} accept="{{ accept }}">{{ label }}</label>
 {%- endmacro %}
 
 {#- List row: title and meta on the left, a detail (dates) on the right. -#}

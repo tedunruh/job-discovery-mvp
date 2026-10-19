@@ -256,3 +256,40 @@ CREATE TABLE IF NOT EXISTS user_profile_items (
     source TEXT NOT NULL DEFAULT 'typed' CHECK (source IN ('resume', 'typed', 'suggested', 'converted')),
     PRIMARY KEY (user_id, kind, value)
 );
+
+-- ---------------------------------------------------------------------------
+-- SC-46 step 3: resume upload and reading. Additive migrations (safe to re-run).
+-- ---------------------------------------------------------------------------
+
+-- The one-line reason Scout gave for the level it read from a resume (shown under the level card).
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS level_note TEXT;
+
+-- The resume file, one per person. Deleting it (from the profile screen) removes the row;
+-- the person's saved profile fields stay. Neon keeps a few hours of history (restore window).
+CREATE TABLE IF NOT EXISTS user_resumes (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    content BYTEA NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- One row per call to the model that reads a resume, including failed ones: who, which model, tokens,
+-- and what it cost. cost_usd is computed from price_version's rates when the call is made, so a later
+-- price change doesn't rewrite history. result holds the fields it read until the person saves or
+-- deletes their resume; deleting the resume nulls it. No resume text is kept here.
+CREATE TABLE IF NOT EXISTS resume_parses (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    model TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd NUMERIC(10, 6) NOT NULL DEFAULT 0,
+    price_version TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('ok', 'error')),
+    error_kind TEXT,
+    request_id TEXT,
+    result JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_resume_parses_user_month ON resume_parses (user_id, created_at DESC);
