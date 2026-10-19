@@ -225,3 +225,34 @@ ALTER TABLE companies ADD CONSTRAINT companies_ats_type_check
 -- by relevance, not date). The scanner stores a cheap fingerprint of a board here and only does
 -- a full paged scan when it changes (plus a periodic forced one). NULL = never scanned.
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS scan_marker TEXT;
+
+-- ---------------------------------------------------------------------------
+-- SC-46: profiles (target titles, level, skills). Additive migrations (safe to re-run).
+-- ---------------------------------------------------------------------------
+
+-- One row per person once they have a profile. Until then the old role categories and keywords
+-- (user_role_interests / user_role_keywords) still decide what they see and are alerted about;
+-- scripts/convert_profiles.py creates the row from them. NULL level = every level.
+-- alerts_started_at: NULL = alerts off (the person hasn't pressed "start watching").
+-- alerts_paused_at: NULL = not paused. version goes up on every save.
+CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    level TEXT CHECK (level IN ('mid', 'senior', 'staff', 'principal', 'lead_manager')),
+    one_level_up BOOLEAN NOT NULL DEFAULT false,
+    country TEXT NOT NULL DEFAULT 'US',
+    city TEXT,
+    alerts_started_at TIMESTAMPTZ,
+    alerts_paused_at TIMESTAMPTZ,
+    version INTEGER NOT NULL DEFAULT 1,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Target titles and skills. source says where the value came from; 'converted' = made from the
+-- person's old role categories and keywords.
+CREATE TABLE IF NOT EXISTS user_profile_items (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('title', 'skill')),
+    value TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'typed' CHECK (source IN ('resume', 'typed', 'suggested', 'converted')),
+    PRIMARY KEY (user_id, kind, value)
+);

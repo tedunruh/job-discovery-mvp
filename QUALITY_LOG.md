@@ -446,3 +446,27 @@ existed but the build script set sizing modes *before* resize. Order matters: re
 **Standing checks:**
 - [ ] Figma builds: call `resize()` first, then set `primaryAxisSizingMode` /
       `counterAxisSizingMode`; check returned heights are not the resize placeholder (10px).
+
+### 2026-10-19 — SC-46 step 1: profiles, title and level matching, dual-read
+**Shipped:** `user_profiles` and `user_profile_items` tables (additive); target-title and level matching
+in `role_categories.py`; alerts (`_wants_posting` in `scheduler/run_collectors.py`) and the dashboard read a
+person's profile when they have one and fall back to their role categories and keywords when they don't.
+`scripts/convert_profiles.py` (dry run by default, idempotent) and `scripts/compare_matchers.py` (read-only).
+Nothing converts anyone yet: profiles are created when the new screens ship, because the old onboarding form
+writes the old tables. Rehearsed on a Neon branch of production: old and new matchers identical for all 5
+people across 29,086 open postings; dashboard shows the same roles before and after conversion; alert
+matching identical; conversion is idempotent; `quality_check.py` 142/142.
+**Rework count:** 2. (1) The run-isolation test's fake DB didn't know the new `get_all_user_profiles`, so 3
+tests errored; caught by the suite. (2) Undoing a mutation test with `git checkout <file>` also threw away my
+uncommitted real edits to that file; caught when a grep for them came back empty, and re-applied.
+**Root causes:** *A new DB read added to the scheduler without updating the test's fakes.* *Reverted a test
+mutation with git instead of restoring a copy, which discards uncommitted work in the same file.*
+**Decisions made while building (each recorded in `docs/SC-46-decision-card.md`):** a title that states no
+level passes every level (hiding it would hide most roles); existing people get `alerts_started_at` = account
+creation, not onboarding, so the 2 who never finished onboarding keep their alerts.
+**Standing checks added:**
+- [x] Automated: `tests/test_profiles.py` (22 tests). Mutation-tested: breaking a level pattern, dropping the
+      keywords from conversion, and ignoring `alerts_started_at` each fail it.
+- [ ] Manual: mutation-test against a copy of the file (`cp` before, `cp` back after), never `git checkout`.
+- [ ] Manual: `quality_check.py` boots the app against the database in `.env.local`. A change that reads a new
+      table must run it on a Neon branch with the schema applied, and the schema goes to production before the code.
