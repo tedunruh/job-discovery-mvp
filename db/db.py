@@ -263,7 +263,7 @@ def get_all_user_keywords(conn):
         return result
 
 
-PROFILE_COLUMNS = "user_id, level, one_level_up, country, city, alerts_started_at, alerts_paused_at, version"
+PROFILE_COLUMNS = "user_id, level, level_note, one_level_up, country, city, alerts_started_at, alerts_paused_at, version"
 
 
 def _attach_items(profiles, items):
@@ -331,7 +331,7 @@ def legacy_alerts_start(conn, user_id):
         return cur.fetchone()[0]
 
 
-def save_profile(conn, user_id, *, titles, skills, level, one_level_up, city, work_types):
+def save_profile(conn, user_id, *, titles, skills, level, one_level_up, city, work_types, level_note=None):
     """Save the whole profile from the profile screen (the form posts everything, not a diff) and
     mark the person onboarded. Creates the profile if they have none; alerts start now for someone
     who never onboarded, and are left as they were for everyone else. Values that were already
@@ -341,14 +341,15 @@ def save_profile(conn, user_id, *, titles, skills, level, one_level_up, city, wo
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO user_profiles (user_id, level, one_level_up, city, alerts_started_at)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO user_profiles (user_id, level, level_note, one_level_up, city, alerts_started_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (user_id) DO UPDATE SET
-                level = EXCLUDED.level, one_level_up = EXCLUDED.one_level_up, city = EXCLUDED.city,
+                level = EXCLUDED.level, level_note = EXCLUDED.level_note,
+                one_level_up = EXCLUDED.one_level_up, city = EXCLUDED.city,
                 alerts_started_at = COALESCE(user_profiles.alerts_started_at, EXCLUDED.alerts_started_at),
                 version = user_profiles.version + 1, updated_at = now()
             """,
-            (user_id, level, one_level_up, city, started),
+            (user_id, level, level_note if level else None, one_level_up, city, started),
         )
         wanted = {("title", t) for t in titles} | {("skill", s) for s in skills}
         cur.execute("SELECT kind, value FROM user_profile_items WHERE user_id = %s", (user_id,))
@@ -395,6 +396,93 @@ def get_week_stats(conn, user_id):
         )
         opened, applied = cur.fetchone()
     return {"reached": reached, "opened": opened, "applied": applied}
+
+
+def save_resume(conn, user_id, filename, content):
+    """Store this person's resume PDF, replacing any earlier one. Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO user_resumes (user_id, filename, content, size_bytes)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET
+                filename = EXCLUDED.filename, content = EXCLUDED.content,
+                size_bytes = EXCLUDED.size_bytes, uploaded_at = now()
+            """,
+            (user_id, filename, psycopg2.Binary(content), len(content)),
+        )
+
+
+def get_resume(conn, user_id, with_content=False):
+    """This person's resume as a dict (filename, size_bytes, uploaded_at, and content if asked), or None."""
+    cols = "filename, size_bytes, uploaded_at" + (", content" if with_content else "")
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(f"SELECT {cols} FROM user_resumes WHERE user_id = %s", (user_id,))
+        row = cur.fetchone()
+    if row is None:
+        return None
+    row = dict(row)
+    if with_content:
+        row["content"] = bytes(row["content"])
+    return row
+
+
+def delete_resume(conn, user_id):
+    """Remove the resume file for good, and the fields read from it that haven't been saved (they
+    are in resume_parses.result). The cost rows stay, without any content. Returns whether a file
+    was removed. Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM user_resumes WHERE user_id = %s", (user_id,))
+        removed = cur.rowcount > 0
+        cur.execute("UPDATE resume_parses SET result = NULL WHERE user_id = %s AND result IS NOT NULL", (user_id,))
+    return removed
+
+
+def log_resume_parse(conn, user_id, *, model, input_tokens, output_tokens, cost_usd, price_version,
+                     status, error_kind=None, request_id=None, result=None):
+    """Record one call to the resume-reading model (every call, failed ones too). Returns its id.
+    Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO resume_parses (user_id, model, input_tokens, output_tokens, cost_usd, price_version,
+                                       status, error_kind, request_id, result)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+            """,
+            (user_id, model, input_tokens, output_tokens, cost_usd, price_version, status, error_kind,
+             request_id, psycopg2.extras.Json(result) if result is not None else None),
+        )
+        return cur.fetchone()[0]
+
+
+def get_resume_parse_result(conn, user_id, parse_id, max_age_hours=24):
+    """The fields a recent successful read produced for this person, or None (not theirs, too old,
+    failed, or wiped by deleting the resume)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT result FROM resume_parses
+            WHERE id = %s AND user_id = %s AND status = 'ok' AND result IS NOT NULL
+              AND created_at > now() - make_interval(hours => %s)
+            """,
+            (parse_id, user_id, max_age_hours),
+        )
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
+def resume_usage(conn, user_id):
+    """(this person's successful reads this month, everyone's spend this month in dollars), in UTC months."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT count(*) FILTER (WHERE user_id = %s AND status = 'ok'), COALESCE(sum(cost_usd), 0)
+            FROM resume_parses WHERE created_at >= date_trunc('month', now())
+            """,
+            (user_id,),
+        )
+        mine, spend = cur.fetchone()
+    return mine, float(spend)
 
 
 def mark_full_ingest_done(conn, company_id):

@@ -13,5 +13,7 @@ services:
         sync: false
       - key: RESEND_FROM
         sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
       - key: SECRET_KEY
         generateValue: true

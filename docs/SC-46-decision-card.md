@@ -238,3 +238,33 @@ and the work history card. Where the build differs from the canvas, or fills a g
 | Side panel, set up | "If you'd started last week": count and the 3 newest matches, or a prompt to add a title. |
 | Side panel, settings | "This week" with three counts (reached you, you opened, you applied to), and "With your unsaved change" showing roles a week before and after. The handoff's "change vs last week" figure is not built: nothing says how to show it. |
 | Copy I wrote | Header context ("Getting started", "Settings"), the two intros, the level and city helper lines, the save confirmation ("Saved. Your alerts follow this from the next scan."), the title error ("Add at least one job title to continue."), and the group helper under "What I'll read for". |
+
+## Built in step 3: resume reading
+
+Built on branch `sc-46-resume`. Decided with product: Scout pays during alpha on its own key; $5 a month for
+everyone and 3 reads a month per person (Replace counts); the work history card is cut from v1; `anthropic` is
+pinned to 0.125.0 (the newest this machine's Python 3.9 can install; Render may run a newer Python, so the pin keeps
+both on the same version).
+
+| Area | Built |
+|---|---|
+| Screen 1 (`/start`) | Dropzone ("A PDF works best. Up to 2 MB."), "Tell me about yourself instead", and a privacy note. New people land here; "Tell me about yourself instead" goes to `/profile`. |
+| Reading | One call to Claude Haiku 5.5 with the PDF. It returns up to 6 target titles, a level with a one-line reason, and up to 12 skills. The resume is treated as data, and the output is cleaned before use. |
+| Screen 2a | There is no separate page: `/profile` shows the same screen with the fields filled in as an **unsaved draft**, a message saying so, and the resume card. Nothing is saved or alerted on until "Looks right, start watching" (set up) or "Save changes" (settings). |
+| Replace | Only fills empty fields and adds new titles and skills. It never removes or overwrites, and a level already chosen stays. |
+| Resume card | File name and when it was added, with View (opens the PDF in a new tab, only for its owner), Replace, and Delete (asks first). With no file, an inline dropzone. |
+| Delete | Removes the file for good and wipes the fields read from it that weren't saved. Cost rows stay without any content. What was saved to the profile stays. Neon keeps about 6 hours of history, so the copy says the file is deleted from Scout rather than promising a deeper erase. |
+| Level reason | Shown under the level card ("I picked this from your resume: ..."). Kept only while the saved level is the one it was written for. |
+| Unavailable states | No key, or the $5 monthly cap reached: the start page shows a message and no dropzone, and the profile card says reading isn't available. Over 3 reads: the limit message; View and Delete still work, Replace is hidden. A non-PDF, an oversize file, an unreadable file and a failing model each get a plain message. |
+| Cost log | `resume_parses`: user, model, tokens, cost, price version, status, error kind and Anthropic's request id for every call, failed ones included. |
+
+Copy I wrote that the designer should check: the screen 1 intro and privacy note, the resume card help line, the
+"I read your resume" message, the "reading" message, the limit and unavailable messages, and the delete confirmation.
+The privacy note says only what Anthropic's own page states (API inputs and outputs deleted from its backend within
+30 days, with exceptions for policy enforcement and law). It makes **no claim about model training**, because that
+page doesn't address it; add one only after checking Anthropic's training policy yourself.
+
+**Before this ships:** create the three tables in production, add `ANTHROPIC_API_KEY` to Render (a dedicated key in
+its own Console workspace with a hard monthly limit set there; the $5 here is the app-side stop in front of it),
+then deploy. Run `python scripts/try_resume_read.py` once with the key in `.env.local`: it is the only part not yet
+exercised against the real API.

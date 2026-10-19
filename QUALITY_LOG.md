@@ -491,3 +491,30 @@ because a radio can't be unselected; "reached you / you opened / you applied to"
 - [ ] Manual: a field that looks like a setting must change what Scout does. City was added to the matcher in
       the same change as its field, not left for later (the deal-breakers card was cut for the same reason).
 - [ ] Manual: mutation-test against copies of files, and run each mutation against the *whole* suite.
+
+### 2026-10-19 — SC-46 step 3: resume reading
+**Shipped:** `/start` (screen 1), a "Your resume" card on `/profile` (View, Replace, Delete, or an inline dropzone),
+and `dashboard/resume.py`: one call per upload to Claude Haiku 5.5 on Scout's own key, returning target titles, a
+level with a one-line reason, and skills. What it reads arrives as an unsaved draft on `/profile`; nothing is saved
+or alerted on until the person presses save. Caps: 3 reads per person and $5 across everyone per month (UTC), both
+enforced on the server before the model is called. Every call, failed ones too, is logged in `resume_parses` with
+tokens, cost, price version, model and request id. The PDF (2 MB) is stored in Postgres; Delete removes the row and
+wipes the stored reads, and keeps the cost rows. New tables `user_resumes`, `resume_parses`, column
+`user_profiles.level_note`. `anthropic==0.125.0` pinned; `scripts/try_resume_read.py` for one real call.
+Rehearsed on a Neon branch in headless Chromium, model stubbed: 50 steps (non-PDF, read, draft, View, another
+person's file and read, save, the limit and a forced 4th upload, delete, model down, spend cap, oversize, an
+existing person's settings, phone); `quality_check.py` 171/171; 146 offline tests.
+**Not verified:** a real call to the API (no key was configured yet). Run `python scripts/try_resume_read.py`.
+**Rework count:** 2. (1) The first rehearsal expected a dropzone after deleting a resume, but that person had used
+all three reads, so the limit message is right; the check was wrong. (2) The upload held a database transaction open
+during the model call (up to 25s); it now commits first, with a test for the order.
+**Root causes:** *A test expectation written without the rule that applies to the person in that state.*
+*Held a transaction across a slow external call, which this log already warns about for production dry runs.*
+**Standing checks added:**
+- [x] Automated: `tests/test_resume.py` (30 tests) and the resume cases in `tests/test_profile_screen.py`.
+      Mutation-tested 13 ways (price, logging, storing, PDF check, level overwrite, off-by-one limit, unknown level,
+      temperature, caps, stale reason, delete form, saved-state hand-off, commit-before-call); none survived.
+- [x] Automated: `quality_check.py` covers `/start` and the setup view of `/profile` at every width.
+- [ ] Manual: no database transaction is open across a call to an outside service.
+- [ ] Manual: a rehearsal check asserts the rule for the state the person is in (a person at a limit is not a person
+      with a fresh allowance).

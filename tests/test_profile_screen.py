@@ -64,6 +64,14 @@ class ParseForm(unittest.TestCase):
         self.assertEqual(p["work_types"], ["remote"])
         self.assertIsNone(p["city"])
 
+    def test_the_level_reason_is_kept_only_for_the_level_it_was_written_for(self):
+        keep = pf.parse_profile_form(form(titles="x1", level="Senior", level_note="Led a team.", level_note_level="senior"))
+        self.assertEqual(keep["level_note"], "Led a team.")
+        changed = pf.parse_profile_form(form(titles="x1", level="Staff", level_note="Led a team.", level_note_level="senior"))
+        self.assertIsNone(changed["level_note"])
+        none = pf.parse_profile_form(form(titles="x1", level="Any level", level_note="Led a team.", level_note_level="senior"))
+        self.assertIsNone(none["level_note"])
+
     def test_no_title_means_an_empty_list(self):
         self.assertEqual(pf.parse_profile_form(form(level="Senior"))["titles"], [])
 
@@ -160,6 +168,8 @@ def render(mode, **over):
         "preview_items": [posting("Senior Product Designer")], "has_titles": True, "compare": None,
         "week": {"reached": 21, "opened": 9, "applied": 2}, "started_label": "Oct 6", "paused_label": "",
         "changes": 0, "error": None, "saved_notice": False,
+        "saved_snapshot": pf.snapshot_of(model), "resume": None, "reading": ("ok", None),
+        "notice": None, "resume_added": False,
     }
     ctx.update(over)
     with dapp.app.test_request_context("/profile"):
@@ -230,6 +240,61 @@ class Template(unittest.TestCase):
         html = render("setup", error=pf.NO_TITLE_ERROR)
         self.assertIn('role="alert"', html)
         self.assertIn(pf.NO_TITLE_ERROR, html)
+
+    def test_resume_card_without_a_resume_offers_the_dropzone(self):
+        html = render("settings")
+        self.assertIn("Your resume", html)
+        self.assertIn("No resume yet", html)
+        self.assertIn('form="resume-form"', html)
+        self.assertNotIn('href="/resume/file"', html)
+
+    def test_resume_card_with_a_resume_offers_view_replace_delete(self):
+        html = render("settings", resume={"filename": "cv.pdf", "size_bytes": 10,
+                                          "uploaded_at": datetime(2026, 10, 19, tzinfo=timezone.utc)})
+        self.assertIn("cv.pdf", html)
+        self.assertIn('href="/resume/file"', html)
+        self.assertIn("Replace", html)
+        self.assertIn('form="resume-delete-form"', html)
+        self.assertIn('action="/resume/delete"', html)
+        self.assertNotIn("No resume yet", html)
+
+    def test_resume_card_when_reading_is_unavailable(self):
+        html = render("settings", reading=("unavailable", "Reading resumes isn't available right now."))
+        self.assertIn("available right now", html)
+        self.assertNotIn("No resume yet", html)
+
+    def test_at_the_monthly_limit_a_file_can_be_viewed_and_deleted_but_not_replaced(self):
+        html = render("settings", reading=("limit", "You've used this month's resume reads."),
+                      resume={"filename": "cv.pdf", "size_bytes": 10, "uploaded_at": datetime(2026, 10, 19, tzinfo=timezone.utc)})
+        self.assertIn('href="/resume/file"', html)
+        self.assertIn('form="resume-delete-form"', html)
+        self.assertNotIn("Replace", html)
+        self.assertIn("used this month", html)
+
+    def test_the_level_reason_is_shown_and_posted_back(self):
+        model = draft(level="senior", level_note="Led design for 4 years.", alerts_started_at=None, alerts_paused_at=None)
+        html = render("settings", model=model, level_label="Senior")
+        self.assertIn("I picked this from your resume: Led design for 4 years.", html)
+        self.assertIn('name="level_note" value="Led design for 4 years."', html)
+        self.assertIn('name="level_note_level" value="senior"', html)
+
+    def test_the_saved_profile_is_handed_to_the_page_script(self):
+        model = draft(titles=["new one"], alerts_started_at=None, alerts_paused_at=None)
+        html = render("settings", model=model, saved_snapshot=pf.snapshot_of(draft(titles=["old one"])), changes=1)
+        self.assertIn('data-saved=\'{"city": "", "level": "Any level", "skills": "", "titles": "old one"', html)
+        self.assertIn("1 change not saved.", html)
+
+    def test_a_read_resume_message_and_notices(self):
+        self.assertIn("I read your resume and filled in what I could", render("settings", resume_added=True))
+        html = render("settings", notice={"text": "That doesn't look like a PDF.", "kind": "attention"})
+        self.assertIn("fg-message--attention", html)
+        self.assertIn('role="alert"', html)
+
+    def test_the_snapshot_matches_what_the_page_script_reads(self):
+        snap = pf.snapshot_of(draft(titles=["B title", "a title"], level="senior", one_level_up=True, city="Chicago",
+                                    work_types=["remote", "hybrid"]))
+        self.assertEqual(snap, {"titles": "a title|b title", "skills": "", "level": "Senior", "up": "1",
+                                "city": "chicago", "work": "Hybrid|Remote"})
 
     def test_no_deal_breakers_card(self):
         self.assertNotIn("rather not hear", render("settings"))

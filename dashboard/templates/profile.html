@@ -6,6 +6,7 @@
   <title>{{ "Your profile" if mode == "setup" else "Settings" }} — Scout</title>
   {% include "_field_guide_head.html" %}
   <script src="/field-guide/js/profile.js" defer></script>
+  <script src="/field-guide/js/resume.js" defer></script>
   <style>
     body.fg-page { display: flex; flex-direction: column; min-height: 100vh; }
     .profile-main { flex: 1; padding-bottom: var(--fg-space-8); }
@@ -26,6 +27,10 @@
 
     {%- if error %}
     <p class="fg-message fg-message--attention" role="alert">{{ error }}</p>
+    {%- elif notice %}
+    <p class="fg-message fg-message--{{ notice.kind }}" role="{{ 'alert' if notice.kind == 'attention' else 'status' }}">{{ notice.text }}</p>
+    {%- elif resume_added %}
+    <p class="fg-message fg-message--success" role="status">I read your resume and filled in what I could. Check it, fix anything that's off, then {{ "save" if mode == "settings" else "start watching" }}.</p>
     {%- elif saved_notice %}
     <p class="fg-message fg-message--success" role="status">Saved. Your alerts follow this from the next scan.</p>
     {%- endif %}
@@ -43,7 +48,7 @@
     {%- endif %}
 
     <form id="profile-form" method="post" action="/profile" novalidate
-          data-mode="{{ mode }}" data-preview-url="/profile/preview"
+          data-mode="{{ mode }}" data-preview-url="/profile/preview" data-saved='{{ saved_snapshot | tojson }}'
           data-any-level="Any level" data-top-level="Lead or manager"
           {%- if mode == "setup" %}
           data-ready="You can change any of this later in Settings."
@@ -53,6 +58,22 @@
           {%- endif %}>
       <div class="fg-split">
         <div class="fg-split-main">
+          {%- call(part) fg.card("resume", "Your resume", "I read it once to fill in what I can. It stays private to you, and you can delete it any time.") %}
+          {%- if resume %}
+          {%- call fg.file_row(resume.filename, "Added " ~ (resume.uploaded_at | humanize)) %}
+          <a class="fg-button fg-button--secondary" href="/resume/file" target="_blank" rel="noopener">View</a>
+          {%- if reading[0] == "ok" %}{{ fg.file_picker("resume", "Replace", form="resume-form") }}{% endif %}
+          <button class="fg-button fg-button--secondary" type="submit" form="resume-delete-form">Delete</button>
+          {%- endcall %}
+          {%- if reading[0] != "ok" %}<p class="fg-card-help">{{ reading[1] }}</p>{% endif %}
+          {%- elif reading[0] == "ok" %}
+          {{ fg.dropzone("resume", "No resume yet", "Add a PDF and I'll fill in what I can.", button="Add a resume", inline=True, form="resume-form") }}
+          {%- else %}
+          <p class="fg-message fg-message--attention" role="status">{{ reading[1] }}</p>
+          {%- endif %}
+          <p class="fg-message fg-message--discovery" id="resume-busy" role="status" hidden>Reading your resume. This takes a few seconds.</p>
+          {%- endcall %}
+
           {{ fg.group_label("What I'll match on", "These decide which postings reach you at all.") }}
 
           {%- call(part) fg.card("titles", "Roles I'll watch for", "The job titles I'll match postings against.") %}
@@ -68,6 +89,10 @@
           {%- call(part) fg.card("level", "Your level", "Leave this on Any level to see every level. A title that doesn't state its level always shows.") %}
           {{ fg.segmented("level", "Level", level_options, selected=level_label, hide_legend=True) }}
           <label class="fg-check" data-needs-level{% if not model.level or model.level == "lead_manager" %} hidden{% endif %}><input class="fg-checkbox" type="checkbox" name="one_level_up" value="1"{% if model.one_level_up %} checked{% endif %}> Also show me roles one level up</label>
+          <input type="hidden" name="level_note" value="{{ model.level_note or '' }}"><input type="hidden" name="level_note_level" value="{{ model.level or '' }}">
+          {%- if model.level and model.level_note %}
+          <p class="fg-card-help">I picked this from your resume: {{ model.level_note }}</p>
+          {%- endif %}
           {%- endcall %}
 
           {%- call(part) fg.card("where", "Where you'll work", "If you don't choose a work type, I'll show remote roles.") %}
@@ -98,6 +123,8 @@
       </div>
     </form>
   </main>
+  <form id="resume-form" method="post" action="/resume" enctype="multipart/form-data"></form>
+  <form id="resume-delete-form" method="post" action="/resume/delete" data-confirm="Delete your resume? This removes the file from Scout. What you've saved to your profile stays."></form>
 
   {%- if mode == "setup" %}
   {%- call fg.action_bar("You can change any of this later in Settings." if model.titles else "Add a title to continue.") %}
