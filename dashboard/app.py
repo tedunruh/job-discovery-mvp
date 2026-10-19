@@ -23,6 +23,7 @@ from db.db import (
     get_open_postings,
     get_posting_url,
     get_user_keywords,
+    get_user_profile,
     get_user_work_types,
     get_session_user,
     get_user_role_categories,
@@ -34,7 +35,13 @@ from db.db import (
     set_user_role_categories,
     set_user_work_types,
 )
-from role_categories import ROLE_CATEGORIES, MAX_KEYWORDS, clean_keywords, matches_profile
+from role_categories import (
+    ROLE_CATEGORIES,
+    MAX_KEYWORDS,
+    clean_keywords,
+    matches_profile,
+    matches_profile_titles,
+)
 
 app = Flask(__name__)
 # Falls back to a fixed dev value locally; set a real SECRET_KEY once this is
@@ -284,6 +291,9 @@ def index():
         conn.commit()
         role_categories = get_user_role_categories(conn, user_id)
         keywords = get_user_keywords(conn, user_id)
+        profile = get_user_profile(conn, user_id)  # SC-46; None = still on categories and keywords
+        if profile is not None:
+            keywords = profile["titles"]  # the SQL pre-filter admits non-design roles by these
         saved_work_types = get_user_work_types(conn, user_id)
         if saved_work_types is None and ("work_types" in session or "remote_us_only" in session):
             # A choice made before it was stored on the person: save it, so alerts match it too.
@@ -297,10 +307,16 @@ def index():
     work_types = selected_work_types(saved_work_types)
     if work_types and len(work_types) < len(WORK_TYPES):  # none or all checked = Any
         postings = [p for p in postings if work_type(p["location"], p["remote_type"]) in work_types]
-    postings = [
-        p for p in postings
-        if matches_profile(p["title"], p["is_design"], role_categories, keywords)
-    ]
+    if profile is not None:
+        postings = [
+            p for p in postings
+            if matches_profile_titles(p["title"], profile["titles"], profile["level"], profile["one_level_up"])
+        ]
+    else:
+        postings = [
+            p for p in postings
+            if matches_profile(p["title"], p["is_design"], role_categories, keywords)
+        ]
 
     total = len(postings)
     limit = min(max(request.args.get("n", PAGE_SIZE, type=int), PAGE_SIZE), MAX_SHOWN)

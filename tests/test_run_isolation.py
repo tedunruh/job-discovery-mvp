@@ -33,6 +33,7 @@ class RunIsolation(unittest.TestCase):
             "start_scheduler_run": lambda c: (1, None),
             "get_all_user_role_categories": lambda c: {},
             "get_all_user_keywords": lambda c: {},
+            "get_all_user_profiles": lambda c: {},
             "get_all_users": lambda c: [USER],
             "get_companies_to_scan": lambda c: [CORE, TAIL],
             "_fetch_company": lambda company: ([dict(posting)], None),
