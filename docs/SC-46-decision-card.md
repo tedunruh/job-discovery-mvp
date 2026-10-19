@@ -6,7 +6,9 @@ Each decision has a **recommended answer** for you to accept or change. Nothing 
 
 **Updated 2026-10-19 with product answers:** decision 1 changed (Scout pays for resume reading in
 alpha; the resume path ships this sprint and does not wait for SC-52), City radius and non-US country
-are hidden in v1, and the suggestion card and the deal-breakers card are cut. Decisions 2, 4, 5, 6 and 8 stand as drafted.
+are hidden in v1, and the suggestion card and the deal-breakers card are cut. Decision 8 changed: no
+dashboard banner, and the incomplete-profile dot and note are not in this sprint. Decisions 2, 4, 5 and 6
+stand as drafted.
 
 Current state, measured: 5 users, 3 onboarded. Profiles today are role categories
 (`user_role_interests`), keywords (`user_role_keywords`) and `users.work_types`, set at `/onboarding`.
@@ -24,7 +26,7 @@ Alerts fan out per new posting in `scheduler/run_collectors.py` (`fan_out`: `mat
 | 5 | "If you'd started last week" | Count on a short debounce, not per keystroke, using the same matcher. Say "so far" when the profile has non-design titles. |
 | 6 | Pause alerts | Stops ntfy pushes only. The dashboard keeps listing. No catch-up flood on resume. |
 | 7 | Suggestions | Hide the card in v1. |
-| 8 | Save rules | One title, one level and one work type, on 2a and 2b alike. "Save and finish later" saves a draft, keeps alerts off, and returns to the dashboard with a "Finish your profile" banner. |
+| 8 | Save rules | **Decided: no dashboard banner.** People must meet the required minimum before they can move on (**a job title only; empty level = any level, empty work type = Remote**; "Save and finish later" is removed), so there is no half-finished state to flag. A dot on "Role preferences" plus a one-line "complete your profile" note on the settings screen is wanted later, **not this sprint** (it blocks nothing). |
 
 ## Two findings the handoff doesn't mention
 
@@ -88,7 +90,7 @@ read-only until the cutover, so nothing a person sees changes until they save.
 **Level:** classify a posting's level from title words (Senior, Staff, Principal, Lead, Manager; no
 marker means Mid) in `role_categories.py`. The canvas order is Mid, Senior, Staff, Principal, Lead or
 manager. "One level up" from Lead or manager is undefined; recommend the checkbox is simply not offered
-for the top level.
+for the top level. An empty level matches any level (decision 8).
 
 ## 3. What matching uses
 
@@ -117,7 +119,8 @@ for the top level.
 
 **Recommend:** a server-side count of postings from the last 7 days that match the draft profile, using
 the same matcher as alerts and the same posted-date basis as the dashboard's "posted within" filter.
-Recompute after a short pause in editing, not per keystroke.
+Recompute after a short pause in editing, not per keystroke. With title-only setup (decision 8), 2b's
+side panel switches from the placeholder to the real preview as soon as a title exists, not a title and a level.
 
 **Conflict with SC-51, accepted:** discovered-board roles that pass no one's gate are not stored, so a
 brand-new profile's count undercounts them until the catch-up rescan runs. It is accurate for design
@@ -142,11 +145,25 @@ too little open and apply data to suggest anything meaningful, and `fg.suggestio
 
 ## 8. Save rules
 
-**Recommend:**
-- **Required:** at least one title, a level and at least one work type, enforced the same on 2a and 2b.
-  A resume may not fill the level, so 2a can also be blocked.
-- **"Save and finish later":** saves the draft, leaves alerts off and `onboarded_at` unset, and returns to
-  the dashboard with a "Finish your profile" banner linking to `/profile`.
+**Decided: no "Finish your profile" banner on the dashboard.** Setup can't be left half-done, so a banner
+would flag a state that doesn't exist. Instead:
+- **Setup:** the person can't move past 2a or 2b until the required minimum is filled. Everything else
+  can stay empty, and they can still act on the dashboard and edit later via "Role preferences".
+- **Incomplete profile, later, not this sprint:** a dot on the "Role preferences" button and a one-line
+  note at the top of the settings screen (along the lines of "Complete your profile"), both gone once
+  the profile is complete. It blocks nothing, so it is out of SC-46's build. When it is picked up: the dot
+  is a new Field Guide component (CSS, macro, gallery row) that needs a text equivalent for screen
+  readers and must not be the only signal (the note covers that), and "incomplete" needs a definition
+  of which optional fields count.
+- **Required minimum, decided: a job title only,** the same on 2a and 2b. The handoff said a title, a
+  level and a work type; that is relaxed.
+  - An empty level means **any level**. "Also show me roles one level up" is only offered once a level is set.
+  - An empty work type falls back to the existing default (**Remote**, `DEFAULT_WORK_TYPES`).
+  - This widens what a new person is alerted about (roles at every level), and it changes 2b's copy:
+    the action bar note "Add a title, a level and a work type to continue." and the disabled-until-three
+    rule on the primary button become title-only. Designer to update the copy.
+- **"Save and finish later": removed (decided).** With the minimum enforced there is no draft state for
+  it to save. The action bar on 2a and 2b has the primary button only.
 - **"Looks right, start watching":** saves, sets `alerts_started_at` and `onboarded_at`, and lands on the
   dashboard.
 - **Screen 3, nothing unsaved:** note "All changes saved." with the primary button disabled. Warn before
