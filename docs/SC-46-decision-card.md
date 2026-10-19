@@ -169,6 +169,36 @@ would flag a state that doesn't exist. Instead:
 - **Screen 3, nothing unsaved:** note "All changes saved." with the primary button disabled. Warn before
   leaving with unsaved changes.
 
+## Rollout and testing
+
+**Existing profiles: import, then ask for a review.** The 3 onboarded users are converted automatically so
+their alerts never stop. On their next sign-in they see the new profile screen pre-filled with the converted
+values, framed as "review your profile", which gets first-use feedback without an outage. The 2 users who never
+onboarded go through the new flow. Forcing onboarding without converting would mean either stopping their
+alerts until they finish or falling back to the old tables anyway.
+
+**Why testing is still needed.** The risk is not what testers see: it is the schema change, the new matcher in
+`fan_out` (it decides who is alerted, for everyone, every 15 minutes) and the deploy. A push to `main`
+auto-deploys the dashboard, and the collector runs whatever `main` is at its next dispatch, so the two can be on
+different versions for a while.
+
+**No separate test stack: a Neon branch of production is the stack.**
+1. Rehearse the schema and the conversion on a Neon branch, then run the same script on production.
+2. Run the old and the new matcher side by side on the last 7 days of stored postings for each converted user.
+   Results must match, or every difference must be explained. This is the main check: converting categories to
+   titles is lossy (a "Product design" chip would not word-match a posting titled "Product Designer").
+3. Run the dashboard locally against the branch, with the offline unit tests and `scripts/quality_check.py`.
+4. Check the resume path on the branch: the cost log rows are written, the per-person cap holds, and Settings
+   delete removes the file (View then returns not-found).
+5. Never dry-run the collector against production; use the branch.
+
+**Order that stays safe.**
+1. Apply the additive tables to Neon first (old code ignores them).
+2. Ship code that reads the new profile when one exists and falls back to the old tables, so a Render and
+   collector version mismatch can't break alerts.
+3. Leave the old tables read-only for a sprint, so rolling back is a revert.
+4. Drop the old tables in a later sprint.
+
 ## Suggested build order
 
 1. Schema, conversion of existing profiles, and the title and level gate in `role_categories.py` and `fan_out`.
