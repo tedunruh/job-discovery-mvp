@@ -470,3 +470,24 @@ creation, not onboarding, so the 2 who never finished onboarding keep their aler
 - [ ] Manual: mutation-test against a copy of the file (`cp` before, `cp` back after), never `git checkout`.
 - [ ] Manual: `quality_check.py` boots the app against the database in `.env.local`. A change that reads a new
       table must run it on a Neon branch with the schema applied, and the schema goes to production before the code.
+
+### 2026-10-19 — SC-46 step 2: the profile screen (/profile)
+**Shipped:** `/profile` for first-time setup and for settings (one template, two modes), a live side panel
+(`/profile/preview` returns the panel as HTML), pause and resume alerts, and the city rule in alerts and the
+dashboard. `/onboarding` and the "Role preferences" link now go to `/profile`. Field Guide: `fg.chip(name=)`
+and `fg.add_row(list=)`, `field-guide/js/profile.js`, a `[hidden]` rule. `quality_check.py` covers `/profile`
+at every width in both modes (a second throwaway user who never onboarded). Rehearsed on a Neon branch with
+headless Chromium: 44 steps (setup, error path, chips, level, unsaved count, discard, save, pause, resume,
+leave warning, phone width), each with a database check; `quality_check.py` 157/157; 107 offline tests.
+**Rework count:** 1. A mutation test showed no test changed the work type and expected it counted; added.
+**Root cause:** *A counting function tested only on the parts the first tests happened to change.*
+**Decisions made while building (recorded in `docs/SC-46-decision-card.md`):** an explicit "Any level" segment,
+because a radio can't be unselected; "reached you / you opened / you applied to" use the gallery wording; the
+"change vs last week" figure on This week was left out (no design for it).
+**Standing checks added:**
+- [x] Automated: `tests/test_profile_screen.py` (31 tests). Mutation-tested six ways; each failed it after the
+      work-type test was added.
+- [x] Automated: `quality_check.py` runs the profile screen's controls through the 44px check, both modes.
+- [ ] Manual: a field that looks like a setting must change what Scout does. City was added to the matcher in
+      the same change as its field, not left for later (the deal-breakers card was cut for the same reason).
+- [ ] Manual: mutation-test against copies of files, and run each mutation against the *whole* suite.

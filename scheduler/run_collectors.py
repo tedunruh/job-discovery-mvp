@@ -36,7 +36,7 @@ from db.db import (
     touch_source_health,
     upsert_postings,
 )
-from role_categories import alerts_active, matches_profile, matches_profile_titles, matches_work_type
+from role_categories import alerts_active, matches_city, matches_profile, matches_profile_titles, matches_work_type
 from scheduler.heartbeat import ping_failure, ping_success
 from scheduler.notify import notify_health_alerts, notify_new_postings
 
@@ -259,6 +259,9 @@ def _run(health_alerts):
                 if not _wants_posting(user["id"], posting, all_user_profiles, all_user_categories, all_user_keywords):
                     continue
                 if not matches_work_type(wtype, user["work_types"]):
+                    continue
+                profile = all_user_profiles.get(user["id"])
+                if profile is not None and not matches_city(wtype, posting.get("location"), profile["city"]):
                     continue
                 bucket = new_postings_by_user.setdefault(
                     user["id"], {"ntfy_topic": user["ntfy_topic"], "postings": []}

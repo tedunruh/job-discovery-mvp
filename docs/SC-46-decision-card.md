@@ -220,3 +220,21 @@ different versions for a while.
   classifier's agreement on a sample of stored titles before relying on it.
 - Effort figures for steps 1, 2 and the extraction step are not estimated here; size them once you have
   accepted or changed the answers above.
+
+## Built in step 2: what the designer should reflect in the canvas
+
+Built on branch `sc-46-profile-screens`: `/profile` for set up (2b) and settings (3), the live side panel,
+pause and resume alerts, and the city rule. Not built yet: screen 1, screen 2a and the resume path (step 3),
+and the work history card. Where the build differs from the canvas, or fills a gap:
+
+| Area | Built |
+|---|---|
+| Level | An **"Any level"** segment comes first. Radios can't be unselected, so without it a person could never return to every level. The "also show me roles one level up" box only appears for a level below the top. |
+| Where you'll work | Work type and **City** only. City narrows hybrid and on-site roles to postings that name it. No country select, no radius. If no work type is chosen the card says remote roles are shown. |
+| Skills | Saved, with the helper line "Saved. I'll start using this soon." No deal-breakers card, no suggestion card. |
+| Titles | Chips plus an "Add a title" field (Add button or Enter). Typed text that wasn't added is still saved. |
+| Action bar, set up | "Looks right, start watching", disabled until there is a title. Note: "Add a title to continue." then "You can change any of this later in Settings." No "Save and finish later". |
+| Action bar, settings | "Discard" and "Save changes". Note: "All changes saved." or "{n} change(s) not saved." The browser's own dialog warns before leaving with unsaved changes. |
+| Side panel, set up | "If you'd started last week": count and the 3 newest matches, or a prompt to add a title. |
+| Side panel, settings | "This week" with three counts (reached you, you opened, you applied to), and "With your unsaved change" showing roles a week before and after. The handoff's "change vs last week" figure is not built: nothing says how to show it. |
+| Copy I wrote | Header context ("Getting started", "Settings"), the two intros, the level and city helper lines, the save confirmation ("Saved. Your alerts follow this from the next scan."), the title error ("Add at least one job title to continue."), and the group helper under "What I'll read for". |

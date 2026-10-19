@@ -1,0 +1,41 @@
+{#- The profile screen's side panel. Rendered with the page, and again by /profile/preview as the form
+    changes (field-guide/js/profile.js swaps it in). Setup shows what the draft would have caught last
+    week; settings shows this week, and the effect of an unsaved change. -#}
+{% import "_fg.html" as fg %}
+{%- if mode == "settings" %}
+  {%- call(part) fg.card("week", eyebrow="This week") %}
+  <div class="fg-stats">
+    {{ fg.stat(week.reached, "reached you") }}
+    {{ fg.stat(week.opened, "you opened") }}
+    {{ fg.stat(week.applied, "you applied to") }}
+  </div>
+  {%- endcall %}
+  {%- if compare %}
+  {%- call(part) fg.card("compare", eyebrow="With your unsaved change", extra_class="fg-card--emphasis") %}
+  {{ fg.compare(compare[0], compare[1], "roles a week") }}
+  <p class="fg-card-help">Counted from roles first seen in the last 7 days.</p>
+  {%- endcall %}
+  {%- endif %}
+{%- else %}
+  {%- call(part) fg.card("preview", eyebrow="If you'd started last week") %}
+  {%- if has_titles %}
+  {{ fg.stat(preview_count, "roles would have reached you", inline=True) }}
+  {%- if preview_items %}
+  <ul class="fg-list">
+    {%- for p in preview_items %}
+    {{ fg.list_row(p.title, p.company_name, p.first_seen_at | humanize) }}
+    {%- endfor %}
+  </ul>
+  {%- else %}
+  <p class="fg-list-empty">Nothing matched in the last 7 days.</p>
+  {%- endif %}
+  <p class="fg-card-help">Too few? Add another title. Too many? Pick a level.</p>
+  {%- else %}
+  <p class="fg-voice">Add a title, and I'll show you what would have reached you.</p>
+  <ul class="fg-list">
+    {{ fg.list_placeholder() }}
+    {{ fg.list_placeholder("50%", "70%") }}
+  </ul>
+  {%- endif %}
+  {%- endcall %}
+{%- endif %}
