@@ -4,6 +4,10 @@ Drafted 2026-10-19 from the "SC-46 engineering handoff" doc (screens 1, 2a, 2b, 
 `main` at `4350594`, `docs/SC-51-matching-descriptions.md` and `docs/SC-42-byo-ai-key-spike.md`.
 Each decision has a **recommended answer** for you to accept or change. Nothing here is built.
 
+**Updated 2026-10-19 with product answers:** decision 1 changed (Scout pays for resume reading in
+alpha; the resume path ships this sprint and does not wait for SC-52), City radius and non-US country
+are hidden in v1, and the suggestion card and the deal-breakers card are cut. Decisions 2, 4, 5, 6 and 8 stand as drafted.
+
 Current state, measured: 5 users, 3 onboarded. Profiles today are role categories
 (`user_role_interests`), keywords (`user_role_keywords`) and `users.work_types`, set at `/onboarding`.
 Alerts fan out per new posting in `scheduler/run_collectors.py` (`fan_out`: `matches_profile`, then
@@ -13,9 +17,9 @@ Alerts fan out per new posting in `scheduler/run_collectors.py` (`fan_out`: `mat
 
 | # | Decision | Recommended answer |
 |---|---|---|
-| 1 | How a resume is read | The user's own Anthropic key (SC-52, spiked in SC-42), once per resume. Keep the PDF (2 MB cap) so View and Replace work. Ship 2b and 3 first; the resume path waits for SC-52. |
+| 1 | How a resume is read | **Decided:** Scout's own key, fast model, one call per upload, hard monthly spend limit, tokens and cost logged per user on every parse. Keep the PDF (2 MB cap); Settings delete must really remove it. Ships this sprint with 2b and 3. SC-52 moves out. |
 | 2 | Profile data model | New `user_profiles` plus item and work-history tables. Titles replace categories and keywords. Existing profiles convert on first visit. |
-| 3 | What matching uses | Gate fields (titles, level, where) filter now. Skills and deal-breakers are saved but not applied until SC-51 ships. **Hide City radius and non-US country in v1** (see findings). |
+| 3 | What matching uses | Gate fields (titles, level, where) filter now. Skills are saved and used once SC-51 ships. **Deal-breakers are removed from v1 (decided).** **City radius and non-US country are hidden in v1 (decided).** |
 | 4 | Routes and flow | `/start` (1), `/profile` (2a, 2b and 3, one template). Everyone already onboarded lands on 3. |
 | 5 | "If you'd started last week" | Count on a short debounce, not per keystroke, using the same matcher. Say "so far" when the profile has non-design titles. |
 | 6 | Pause alerts | Stops ntfy pushes only. The dashboard keeps listing. No catch-up flood on resume. |
@@ -28,28 +32,43 @@ Alerts fan out per new posting in `scheduler/run_collectors.py` (`fan_out`: `mat
    locations. `work_type()` and `is_us_location()` in `dashboard/filters.py` match US words and state
    abbreviations in the location text, and a remote role outside the US lands in no work-type bucket.
    The canvas's "Within 10, 25, 50 or 100 miles" would need a city-to-coordinates table, and a
-   country other than the United States would need `work_type()` generalised. Recommended: v1 matches on
-   the country and on the city name appearing in the posting's location; hide the radius control and offer
-   only United States as a country. That is a small canvas change. Geocoding is its own follow-up.
-2. **Screen 1 has no state for "no key connected".** Reading a resume uses the user's own key (decision 1),
-   and the SC-42 spike's biggest unknown is whether testers can get an API key at all. Until a key is
-   connected the dropzone should say so and point to "Tell me about yourself instead". This is a design
-   addition, not a rebuild.
+   country other than the United States would need `work_type()` generalised. **Decided:** v1 matches on
+   the country and on the city name appearing in the posting's location; the radius control and non-US
+   countries are hidden. Geocoding is its own follow-up.
+2. **Screen 1 has no state for "resume reading unavailable".** Scout pays for parsing under a hard monthly
+   limit, so the dropzone needs a state for when the limit is reached or the API is down, pointing to
+   "Tell me about yourself instead". A per-person upload cap is also needed, because Replace runs another
+   parse. This is a design addition, not a rebuild.
 
 ## 1. How a resume is read
 
-**Recommend:** the user's own Anthropic key, on a fast-tier model, once per upload, extracting titles,
-level, skills and work history. This is the SC-42 design: the key is encrypted per user, used only in the
-dashboard process and never in the scheduler.
+**Decided:** during alpha Scout pays. One call per upload, on the fast model, using Scout's own key,
+extracting titles, level, skills and work history. The resume path ships this sprint with 2b and 3.
+SC-52 (bring your own key, spiked in SC-42) moves out until coach Q&A or on-demand scoring need it.
 
-- **File:** keep the PDF in a `user_resumes` row (bytea, 2 MB cap, hard-deleted from Settings and when a
-  user is removed). The canvas promises View, Replace and "delete it any time", so a stored file is what
-  the copy already says. The cheaper alternative, discarding the file after extraction, means changing the
-  privacy note on screen 1 and the "Your resume" card on 2a.
+- **Key:** a Render environment variable, read only by the dashboard process. Never in the scheduler or
+  in GitHub Actions secrets.
+- **Spend limit:** a hard monthly limit set at the provider, plus an app-side check against the logged
+  cost so the dropzone can say "unavailable" before a call is refused. Confirm the provider offers a hard
+  cap before relying on it **[verify]**.
+- **Cost log from the first call:** a `resume_parses` row per call, including failed ones: user, model,
+  input and output tokens, status, time. Store tokens, and compute cost from a dated price table so a
+  price change doesn't rewrite history.
+- **Per-person cap:** Replace runs another parse, so cap parses per person per month (proposal: 3).
+- **File:** keep the PDF in a `user_resumes` row (bytea, 2 MB cap). The screen promises the resume is
+  private and can be deleted any time from Settings, so **delete must remove the file**: a hard
+  `DELETE` of the row, also run when a user is removed, with a test that View returns not-found
+  afterwards. Store no copy of the extracted text beyond the profile fields, and keep resume contents out
+  of logs and error reports.
+- **Backups:** Neon's history can retain deleted rows for its restore window **[check the plan's window]**.
+  Word the delete promise so it stays true ("removed from Scout") or shorten the window.
+- **Privacy note on screen 1:** it should say the resume is sent to Anthropic to be read. Check
+  Anthropic's current API data-retention terms before writing the final copy **[verify]**.
+- **Untrusted output:** the extracted fields pre-fill 2a for the person to check. Nothing acts on them
+  until "Looks right, start watching".
 - **Replace** re-runs extraction and offers to update fields. Fields the person edited stay unless they say so.
-- **Sequence:** do not block 2b and 3 on this. 2b is the no-resume path by design.
-- **Cost:** SC-42 estimated 7–9 days for the key work. The extraction step and the screen 1 and 2a states
-  are on top of that.
+- **Cost of the build:** well under SC-42's 7–9 days, because there is no per-user encryption, settings
+  page or retry queue. Not sized here.
 
 ## 2. Profile data model
 
@@ -57,7 +76,7 @@ dashboard process and never in the scheduler.
 
 - `user_profiles(user_id PK, level, one_level_up, country, city, resume_id, alerts_started_at,
   alerts_paused_at, version, updated_at)`. `version` increments on save and drives the SC-51 rematch.
-- `user_profile_items(user_id, kind, value, source)` with kind `title`, `skill` or `deal_breaker`, and source
+- `user_profile_items(user_id, kind, value, source)` with kind `title` or `skill`, and source
   `resume`, `typed` or `suggested`.
 - `user_work_history(user_id, title, company, start_year, end_year)`.
 - `users.work_types` stays as it is.
@@ -77,9 +96,13 @@ for the top level.
 
 - **Gate** ("What I'll match on"): target titles, level, work type, country and city. These filter the
   dashboard and the alerts, and they are the union gate that decides what discovered boards store.
-- **Read for** ("What I'll read for"): skills and deal-breakers. Saved from day one, applied once SC-51's
-  description storage exists (estimated 8–9 days). Until then, either hide the group or add one line of
-  copy saying these are saved and not yet used. The canvas copy is final, so this is your call.
+- **Read for** ("What I'll read for"): skills only. Saved from day one, used once SC-51's description
+  storage exists (estimated 8–9 days). Keep the field; helper copy "Saved. I'll start using this soon."
+  (product's proposal). It makes no promise about filtering, so it stays true.
+- **Deal-breakers: removed from v1 (decided).** The "Anything you'd rather not hear about?" card is
+  dropped from 2a, 2b and 3, and `deal_breaker` is not a profile item kind. Deal-breakers mostly live in
+  the description ("on-call"), which Scout can't read until SC-51, so a v1 card could not keep its
+  promise. Revisit when SC-51 ships. The "What I'll read for" group then holds one card.
 
 ## 4. Routes and flow
 
@@ -133,12 +156,15 @@ too little open and apply data to suggest anything meaningful, and `fg.suggestio
 
 1. Schema, conversion of existing profiles, and the title and level gate in `role_categories.py` and `fan_out`.
 2. `/profile` for 2b and 3 (no AI), plus pause alerts and the preview.
-3. Resume path (screen 1, 2a), after SC-52.
-4. Skills and deal-breakers applied to descriptions, after SC-51.
+3. Resume path (screen 1, 2a) on Scout's key, this sprint: parse call, cost log, per-person cap, stored
+   PDF with a real delete, and the unavailable state.
+4. Skills applied to descriptions, and deal-breakers reconsidered, after SC-51.
 
 ## Open or unverified
 
-- Whether testers can get an Anthropic key (SC-42's top risk). Ask them before building step 3.
+- Whether the provider offers a hard monthly spend cap, and Anthropic's current API retention terms
+  (both feed the screen 1 privacy copy).
+- Neon's restore window for deleted rows (the delete promise).
 - The level classifier and the preview count have not been run against real titles. Measure the
   classifier's agreement on a sample of stored titles before relying on it.
 - Effort figures for steps 1, 2 and the extraction step are not estimated here; size them once you have
