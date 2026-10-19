@@ -151,11 +151,11 @@ is for supporting text only (metadata, hints, counts, section notes).
 | `fg.suggestion(eyebrow, statement, help)` · `.fg-voice` | Scout suggests a change: Goldenrod tint, statement in Fraunces |
 | `fg.group_label(title, help)` · `.fg-eyebrow` | Sentence case, 14px demibold, secondary; never all caps |
 | `.fg-split` `.fg-split-main` `.fg-side-panel` | Main column plus sticky side panel; panel drops below on phones |
-| `fg.chip(label, variant, new)` `fg.chip_add(label)` · `.fg-chips` | Sage tint, Ink words. `avoid` = deal-breaker (Clay outline). `new` = Goldenrod ring + "New" tag |
+| `fg.chip(label, variant, new, name)` `fg.chip_add(label)` · `.fg-chips` | Sage tint, Ink words. `avoid` = deal-breaker (Clay outline). `new` = Goldenrod ring + "New" tag. `name="titles"` adds a hidden input so the chip posts with its form |
 | `fg.select(id, label, options)` · `.fg-select` | Same box as `.fg-input`, with a chevron |
 | `fg.checkbox_group(name, legend, options)` · `.fg-fieldset` `.fg-legend` | A set of checkboxes answering one question |
 | `fg.segmented(name, legend, options)` · `.fg-segmented` `.fg-segment` | One of a short ordered set; real radios (arrow keys work) |
-| `fg.add_row(id, label)` · `.fg-add-row` | Field plus its own Add button |
+| `fg.add_row(id, label, list=)` · `.fg-add-row` | Field plus its own Add button. `list="id"` wires it to a chip list with `js/profile.js` (Add or Enter clones `<template id="id-template">`) |
 | `fg.status(title, detail, paused)` · `.fg-status` | Is Scout watching; the words carry the state, not the dot |
 | `fg.action_bar(note)` · `.fg-action-bar` | Sticky bottom bar with a note and the save actions |
 | `fg.file_row(name, meta)` · `fg.dropzone(id, title, hint)` | A file the person added; where a file goes (`inline=True` inside a card) |

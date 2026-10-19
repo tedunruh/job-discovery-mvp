@@ -147,6 +147,16 @@ def matches_profile_titles(title: str, titles, level=None, one_level_up: bool = 
     return matches_keywords(title, titles) and matches_level(title, level, one_level_up)
 
 
+def matches_city(posting_work_type, location, city) -> bool:
+    """A city only narrows hybrid and on-site roles: the posting's location has to name it. Remote
+    roles pass, and so does everything when no city is set."""
+    if not city:
+        return True
+    if posting_work_type not in ("hybrid", "onsite"):
+        return True
+    return bool(location) and re.search(r"\b" + re.escape(city.strip()) + r"\b", location, re.IGNORECASE) is not None
+
+
 def alerts_active(profile) -> bool:
     """Alerts go out only after the person has started watching, and not while paused."""
     return bool(profile.get("alerts_started_at")) and not profile.get("alerts_paused_at")
