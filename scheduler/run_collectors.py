@@ -16,6 +16,7 @@ from db.db import (
     ensure_conn,
     finish_scheduler_run,
     get_all_user_keywords,
+    get_all_user_profiles,
     get_all_user_role_categories,
     get_all_users,
     get_companies_to_scan,
@@ -35,7 +36,7 @@ from db.db import (
     touch_source_health,
     upsert_postings,
 )
-from role_categories import matches_profile, matches_work_type
+from role_categories import alerts_active, matches_profile, matches_profile_titles, matches_work_type
 from scheduler.heartbeat import ping_failure, ping_success
 from scheduler.notify import notify_health_alerts, notify_new_postings
 
@@ -215,6 +216,18 @@ def order_for_fairness(boards):
     return sorted(boards, key=lambda c: c.get("last_checked_at") or oldest)
 
 
+def _wants_posting(user_id, posting, profiles, categories, keywords):
+    """Does this person's profile want this role (before their Work type is checked)? People with
+    a profile (SC-46) are matched on target titles and level, and only while their alerts are on;
+    everyone else on their old role categories and keywords, exactly as before."""
+    profile = profiles.get(user_id)
+    if profile is None:
+        return matches_profile(posting["title"], posting["is_design"],
+                               categories.get(user_id, set()), keywords.get(user_id, []))
+    return alerts_active(profile) and matches_profile_titles(
+        posting["title"], profile["titles"], profile["level"], profile["one_level_up"])
+
+
 def _run(health_alerts):
     conn = get_conn()
     new_postings_by_user = {}  # user_id -> {"ntfy_topic": str, "postings": [...]}
@@ -228,6 +241,7 @@ def _run(health_alerts):
             )
         all_user_categories = get_all_user_role_categories(conn)
         all_user_keywords = get_all_user_keywords(conn)
+        all_user_profiles = get_all_user_profiles(conn)
         all_users = get_all_users(conn)
         everything = get_companies_to_scan(conn)
         if not everything:
@@ -242,12 +256,7 @@ def _run(health_alerts):
             """Alert every user whose profile AND Work type fit this new role."""
             wtype = work_type(posting.get("location"), posting.get("remote_type"))
             for user in all_users:
-                if not matches_profile(
-                    posting["title"],
-                    posting["is_design"],
-                    all_user_categories.get(user["id"], set()),
-                    all_user_keywords.get(user["id"], []),
-                ):
+                if not _wants_posting(user["id"], posting, all_user_profiles, all_user_categories, all_user_keywords):
                     continue
                 if not matches_work_type(wtype, user["work_types"]):
                     continue
