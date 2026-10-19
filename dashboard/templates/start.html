@@ -1,0 +1,42 @@
+{% import "_fg.html" as fg %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Start with your resume — Scout</title>
+  {% include "_field_guide_head.html" %}
+  <script src="/field-guide/js/resume.js" defer></script>
+  <style>
+    body.fg-page { display: flex; flex-direction: column; min-height: 100vh; }
+    .start-main { flex: 1; padding-bottom: var(--fg-space-8); max-width: 760px; }
+    .start-main > * + * { margin-top: var(--fg-space-6); }
+    .start-or { display: flex; flex-wrap: wrap; align-items: center; gap: var(--fg-space-3) var(--fg-space-4); }
+    .start-or p { margin: 0; }
+  </style>
+</head>
+<body class="fg-page">
+  <main class="fg-shell start-main">
+    {{ fg.header("Getting started") }}
+    {{ fg.intro("Let's start with your resume.", "Add it and I'll fill in what I can. You'll check it before I start watching.") }}
+
+    {%- if notice %}
+    <p class="fg-message fg-message--{{ notice.kind }}" role="{{ 'alert' if notice.kind == 'attention' else 'status' }}">{{ notice.text }}</p>
+    {%- endif %}
+
+    {%- if unavailable %}
+    <p class="fg-message fg-message--attention" role="status">{{ unavailable }}</p>
+    {%- else %}
+    {{ fg.dropzone("resume", "Drop your resume here", "A PDF works best. Up to 2 MB.", button="Choose a PDF", form="resume-form") }}
+    <p class="fg-message fg-message--discovery" id="resume-busy" role="status" hidden>Reading your resume. This takes a few seconds.</p>
+    {%- endif %}
+
+    <div class="start-or">
+      <p class="fg-text-secondary">No resume handy?</p>
+      <a class="fg-button fg-button--secondary" href="/profile">Tell me about yourself instead</a>
+    </div>
+
+    <p class="fg-text-secondary">Your resume stays private to you. I send it to Anthropic once so it can be read, and Anthropic deletes what it received from its systems within 30 days. You can delete your copy from Settings any time.</p>
+  </main>
+  <form id="resume-form" method="post" action="/resume" enctype="multipart/form-data"></form>
+</body>
+</html>

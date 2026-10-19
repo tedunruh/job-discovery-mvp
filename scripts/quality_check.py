@@ -5,7 +5,7 @@
 
 Run before calling any UI change done. Exits non-zero on any failure.
 
-What it checks, at phone / tablet / desktop sizes, on /login, /profile (set up and settings views) and /:
+What it checks, at phone / tablet / desktop sizes, on /login, /profile (set up and settings views), /start and /:
   1. viewport meta present, and a mobile-emulated page reports its true width
   2. no horizontal page overflow
   3. login route artwork (pins, dots) stays inside the viewport once animations end
@@ -387,11 +387,12 @@ def main():
                 ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=mobile, has_touch=mobile)
                 ctx.add_cookies([{"name": "scout_session", "value": setup_token, "url": base}])
                 page = ctx.new_page()
-                page.goto(base + "/profile", wait_until="load")
-                check_page_basics(page, "/profile (setup)", w)
-                if w == VIEWPORTS[-1][0]:
-                    check_typefaces(page, "/profile (setup)")
-                    check_control_heights(page)
+                for path in ("/start", "/profile"):
+                    page.goto(base + path, wait_until="load")
+                    check_page_basics(page, f"{path} (setup)", w)
+                    if w == VIEWPORTS[-1][0]:
+                        check_typefaces(page, f"{path} (setup)")
+                        check_control_heights(page)
                 ctx.close()
             browser.close()
     finally:
