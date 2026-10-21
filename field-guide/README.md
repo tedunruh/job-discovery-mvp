@@ -146,7 +146,7 @@ is for supporting text only (metadata, hints, counts, section notes).
 | Macro / class | Notes |
 |---|---|
 | `fg.header(context)` · `.fg-shell` `.fg-header` `.fg-wordmark` | One header for onboarding and settings: wordmark left, context right |
-| `fg.intro(title, lede)` · `.fg-display--page` `.fg-lede` | Fraunces headline in Scout's voice, then what to do here |
+| `fg.intro(title, lede)` · `.fg-display--page` `.fg-lede` | Fraunces headline in Scout's voice, then what to do here. A call block puts something on the headline's right (`.fg-intro-aside`) |
 | `fg.card(id, title, help)` · `.fg-card` `--emphasis` `--discovery` | Flat card on `--fg-color-surface-card` (a step lighter than Parchment) with a hairline border. Emphasis = unsaved change (Forest outline) |
 | `fg.suggestion(eyebrow, statement, help)` · `.fg-voice` | Scout suggests a change: Goldenrod tint, statement in Fraunces |
 | `fg.group_label(title, help)` · `.fg-eyebrow` | Sentence case, 14px demibold, secondary; never all caps |
@@ -156,7 +156,8 @@ is for supporting text only (metadata, hints, counts, section notes).
 | `fg.checkbox_group(name, legend, options)` · `.fg-fieldset` `.fg-legend` | A set of checkboxes answering one question |
 | `fg.segmented(name, legend, options)` · `.fg-segmented` `.fg-segment` | One of a short ordered set; real radios (arrow keys work) |
 | `fg.add_row(id, label, list=)` · `.fg-add-row` | Field plus its own Add button. `list="id"` wires it to a chip list with `js/profile.js` (Add or Enter clones `<template id="id-template">`) |
-| `fg.status(title, detail, paused)` · `.fg-status` | Is Scout watching; the words carry the state, not the dot |
+| `fg.status(title, detail, paused, compact)` · `.fg-status` | Is Scout watching; the words carry the state, not the dot. `compact` drops the box for one line, beside a page title |
+| `fg.progress(id, steps)` · `.fg-progress` | Plain text that changes while something runs, over a bar that fills toward done; hidden until `js/resume.js` starts it |
 | `fg.action_bar(note)` · `.fg-action-bar` | Sticky bottom bar with a note and the save actions |
 | `fg.file_row(name, meta)` · `fg.dropzone(id, title, hint)` | A file the person added; where a file goes (`inline=True` inside a card) |
 | `fg.list_row(title, meta, detail)` · `fg.list_placeholder()` · `.fg-list-empty` | Short records, placeholder shape, empty line |

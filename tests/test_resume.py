@@ -278,27 +278,39 @@ class RequestShape(unittest.TestCase):
         self.assertEqual(self.kind(raises=down), "unavailable")
 
 
+class Wording(unittest.TestCase):
+    def test_the_reading_steps_are_plain_short_lines(self):
+        self.assertGreaterEqual(len(rs.READING_STEPS), 4)
+        for line in rs.READING_STEPS:
+            self.assertLessEqual(len(line), 40)
+            self.assertTrue(line.endswith("…"))
+        self.assertEqual(rs.READING_STEPS[-1], "Almost there…")
+
+
 class Pages(unittest.TestCase):
     def render(self, name, **ctx):
         with dapp.app.test_request_context("/"):
             return dapp.app.jinja_env.get_template(name).render(**ctx)
 
     def test_start_page(self):
-        html = self.render("start.html", unavailable=None, notice=None)
+        html = self.render("start.html", unavailable=None, notice=None, steps=rs.READING_STEPS)
         self.assertIn("Let&#39;s start with your resume.", html)
         self.assertIn('form="resume-form"', html)
         self.assertIn("Tell me about yourself instead", html)
         self.assertIn("within 30 days", html)
         self.assertIn('id="resume-form"', html)
+        self.assertIn('id="resume-progress"', html)
+        self.assertIn("Opening your resume…", html)
+        self.assertNotIn("resume-busy", html)
 
     def test_start_page_when_reading_is_unavailable_has_no_dropzone(self):
-        html = self.render("start.html", unavailable=rs.MESSAGES["unavailable"], notice=None)
+        html = self.render("start.html", unavailable=rs.MESSAGES["unavailable"], notice=None, steps=rs.READING_STEPS)
         self.assertNotIn("fg-dropzone", html)
         self.assertIn("isn&#39;t available right now", html)
         self.assertIn("Tell me about yourself instead", html)
 
     def test_start_page_shows_a_notice(self):
-        html = self.render("start.html", unavailable=None, notice={"text": rs.MESSAGES["not_pdf"], "kind": "attention"})
+        html = self.render("start.html", unavailable=None, notice={"text": rs.MESSAGES["not_pdf"], "kind": "attention"}, steps=rs.READING_STEPS)
         self.assertIn("fg-message--attention", html)
         self.assertIn("doesn&#39;t look like a PDF", html)
 

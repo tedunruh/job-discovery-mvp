@@ -534,3 +534,29 @@ key]`) was assumed, not tested.* The spike said so in writing; the build didn't 
       -> fails).
 - [ ] Manual: anything a spike or plan marks `[verify]` against a live service gets a real example before it ships,
       or a named test, or is removed from the plan. Don't let it fade into an assumption.
+
+### 2026-10-21 — Profile screen polish: no 'Leave site?' on our own actions, progress while reading, tidier layout
+**Shipped (Ted's review of the live screen):**
+- Replace resume, Delete and Pause/Resume alerts no longer raise the browser's "Leave site?" dialog when you have an
+  unsaved edit. Walking away from unsaved edits still asks first.
+- While a resume is read: plain text that changes ("Opening your resume…" to "Almost there…") over a progress bar that
+  eases toward full and never claims to finish early. The boxed "Reading your resume" message is gone. New Field Guide
+  component `fg.progress`.
+- The add-a-title and add-a-skill fields now sit above their chips.
+- The "I read your resume and filled in what I could" banner is removed.
+- The "I'm watching" strip is one compact line to the right of the page title (`fg.status(compact=True)`,
+  `fg.intro` takes an aside), with a quiet Pause button.
+**Found by:** the live screen, in review. The dialog reproduced exactly (edit, then upload, or edit, then Pause) on a
+Neon copy before fixing.
+**Rework count:** 1. At 360px the compact status beside the title made the page 3px too wide (`flex: none` on a block
+that needed to wrap); the existing "mobile page reports true width" check caught it.
+**Root causes:** *An unsaved-changes guard that didn't distinguish the page's own navigations from walking away.*
+*A flex child that cannot shrink, placed beside a headline.*
+**Standing checks added:**
+- [x] Automated: `quality_check.py` now fails if an unsaved edit plus pausing alerts raises a "Leave site?" dialog,
+      or if walking away from an unsaved edit stops asking. Mutation-tested (own-navigation exemption removed ->
+      both checks fail).
+- [x] Automated: tests that the add fields precede their chips, the banner is gone, the status is inside the title
+      row, and progress exists in place of a banner (`tests/test_profile_screen.py`, `tests/test_resume.py`).
+- [ ] Manual: any "unsaved changes" guard is tried both ways in a real browser: its own actions don't trip it,
+      and leaving does.

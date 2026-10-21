@@ -203,7 +203,7 @@ def view_context(conn, user_id, mode, model, saved=None, **extra):
         "resume": get_resume(conn, user_id),
         "reading": resume_mod.reading_state(conn, user_id),
         "notice": None,
-        "resume_added": False,
+        "reading_steps": resume_mod.READING_STEPS,
     }
     if saved is not None and differs(saved, model):
         ctx["compare"] = (len(preview_for(conn, user_id, saved)), len(rows))
@@ -234,14 +234,14 @@ def register(app, require_login):
             from dashboard import resume as resume_mod
 
             saved = saved_profile(conn, user_id, onboarded)
-            model, added = saved, False
+            model = saved
             parse_id = request.args.get("from_resume", type=int)
             fields = get_resume_parse_result(conn, user_id, parse_id) if parse_id else None
             if fields:
-                model, added = resume_mod.merge_fields(saved, fields), True
+                model = resume_mod.merge_fields(saved, fields)
             return render_template("profile.html", **view_context(
                 conn, user_id, mode, model, saved=saved if onboarded else None,
-                saved_notice=bool(request.args.get("saved")), notice=resume_mod.pop_notice(), resume_added=added))
+                saved_notice=bool(request.args.get("saved")), notice=resume_mod.pop_notice()))
         finally:
             conn.close()
 

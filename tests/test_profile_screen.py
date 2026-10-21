@@ -169,7 +169,7 @@ def render(mode, **over):
         "week": {"reached": 21, "opened": 9, "applied": 2}, "started_label": "Oct 6", "paused_label": "",
         "changes": 0, "error": None, "saved_notice": False,
         "saved_snapshot": pf.snapshot_of(model), "resume": None, "reading": ("ok", None),
-        "notice": None, "resume_added": False,
+        "notice": None, "reading_steps": ["Opening your resume…", "Reading your experience…"],
     }
     ctx.update(over)
     with dapp.app.test_request_context("/profile"):
@@ -203,12 +203,27 @@ class Template(unittest.TestCase):
     def test_settings_mode_has_status_pause_and_save_bar(self):
         html = render("settings")
         self.assertIn("I&#39;m watching.", html)
-        self.assertIn("Alerts have been on since Oct 6.", html)
+        self.assertIn("Since Oct 6.", html)
+        self.assertNotIn("Alerts have been on since", html)
         self.assertIn('value="pause"', html)
         self.assertIn("Save changes", html)
         self.assertIn("All changes saved.", html)
         self.assertNotIn("start watching", html)
         self.assertIn("This week", html)
+
+    def test_the_status_is_compact_and_sits_beside_the_page_title(self):
+        html = render("settings")
+        head, lede = html.index("fg-intro-head"), html.index('class="fg-lede"')
+        aside, watching = html.index("fg-intro-aside"), html.index("I&#39;m watching.")
+        self.assertTrue(head < aside < watching < lede, "the status belongs inside the headline row, before the lede")
+        self.assertIn("fg-status--compact", html)
+        self.assertIn("fg-button--ghost", html[watching:lede])  # Pause alerts is the quiet button
+        self.assertEqual(html.count("fg-status "), 1)
+
+    def test_setup_has_no_status_beside_the_title(self):
+        html = render("setup")
+        self.assertNotIn("fg-intro-aside", html)
+        self.assertNotIn("fg-status", html)
 
     def test_paused_shows_resume(self):
         model = draft(alerts_started_at=None, alerts_paused_at=datetime(2026, 10, 10))
@@ -284,8 +299,26 @@ class Template(unittest.TestCase):
         self.assertIn('data-saved=\'{"city": "", "level": "Any level", "skills": "", "titles": "old one"', html)
         self.assertIn("1 change not saved.", html)
 
-    def test_a_read_resume_message_and_notices(self):
-        self.assertIn("I read your resume and filled in what I could", render("settings", resume_added=True))
+    def test_there_is_no_i_read_your_resume_banner(self):
+        for mode in ("setup", "settings"):
+            self.assertNotIn("I read your resume", render(mode))
+            self.assertNotIn("filled in what I could", render(mode))
+
+    def test_inputs_come_above_the_chips(self):
+        html = render("settings")
+        for field, chips in (("titles_new", "titles-list"), ("skills_new", "skills-list")):
+            self.assertLess(html.index(f'id="{field}"'), html.index(f'id="{chips}"'), f"{field} should come before {chips}")
+
+    def test_reading_shows_progress_text_and_a_bar_not_a_banner(self):
+        html = render("settings")
+        self.assertIn('id="resume-progress"', html)
+        self.assertRegex(html, r'id="resume-progress"[^>]* hidden')
+        self.assertIn("Opening your resume…", html)
+        self.assertIn("fg-progress-bar", html)
+        self.assertNotIn("resume-busy", html)
+        self.assertNotIn("fg-message--discovery", html)
+
+    def test_a_notice_is_announced(self):
         html = render("settings", notice={"text": "That doesn't look like a PDF.", "kind": "attention"})
         self.assertIn("fg-message--attention", html)
         self.assertIn('role="alert"', html)

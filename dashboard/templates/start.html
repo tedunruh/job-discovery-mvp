@@ -27,7 +27,7 @@
     <p class="fg-message fg-message--attention" role="status">{{ unavailable }}</p>
     {%- else %}
     {{ fg.dropzone("resume", "Drop your resume here", "A PDF works best. Up to 2 MB.", button="Choose a PDF", form="resume-form") }}
-    <p class="fg-message fg-message--discovery" id="resume-busy" role="status" hidden>Reading your resume. This takes a few seconds.</p>
+    {{ fg.progress("resume-progress", steps) }}
     {%- endif %}
 
     <div class="start-or">
