@@ -167,7 +167,11 @@ def read_resume(pdf_bytes):
                 {"type": "text", "text": "Read this resume."},
             ]}],
         )
-    except anthropic.BadRequestError:
+    except anthropic.BadRequestError as e:
+        # An empty balance comes back as a 400 too (seen live: "Your credit balance is too low to access the
+        # Anthropic API"). That is Scout's problem, not the person's file.
+        if "credit balance" in str(e).lower():
+            raise ResumeError("unavailable")
         raise ResumeError("unreadable")  # an unreadable, encrypted or oversized PDF
     except (anthropic.APIStatusError, anthropic.APIConnectionError):
         raise ResumeError("unavailable")  # rate limit, auth, overload, server error, timeout, no network

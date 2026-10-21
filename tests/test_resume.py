@@ -268,7 +268,12 @@ class RequestShape(unittest.TestCase):
         bad = anthropic.BadRequestError("bad pdf", response=httpx.Response(400, request=req), body=None)
         busy = anthropic.RateLimitError("slow down", response=httpx.Response(429, request=req), body=None)
         down = anthropic.APIConnectionError(request=req)
+        out_of_credit = anthropic.BadRequestError(
+            "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': "
+            "'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to "
+            "upgrade or purchase credits.'}}", response=httpx.Response(400, request=req), body=None)
         self.assertEqual(self.kind(raises=bad), "unreadable")
+        self.assertEqual(self.kind(raises=out_of_credit), "unavailable")  # not the person's file
         self.assertEqual(self.kind(raises=busy), "unavailable")
         self.assertEqual(self.kind(raises=down), "unavailable")
 
