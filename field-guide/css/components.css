@@ -403,15 +403,24 @@ button.fg-link {
   font-size: var(--fg-font-size-md);
   color: var(--fg-color-text-secondary);
 }
-/* Page intro: Fraunces headline in Scout's voice, then a lede. */
+/* Page intro: Fraunces headline in Scout's voice, then a lede. The headline row can hold something
+   on its right (the status strip in settings); it wraps under the headline on narrow screens. */
 .fg-intro {
   display: flex;
   flex-direction: column;
   gap: var(--fg-space-3);
-  max-width: 680px;
 }
+.fg-intro-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fg-space-3) var(--fg-space-6);
+}
+.fg-intro-aside { min-width: 0; max-width: 100%; }  /* shrinks and wraps on a narrow phone */
 .fg-display--page { font-size: var(--fg-font-size-4xl); }
 .fg-lede {
+  max-width: 680px;
   margin: 0;
   font-size: var(--fg-font-size-xl);
   line-height: var(--fg-font-line-height-body);
@@ -720,6 +729,15 @@ button.fg-link {
   border-radius: var(--fg-radius-full);
   background: var(--fg-color-action-primary);
 }
+/* Compact: no box, one line. For beside a page title. */
+.fg-status--compact {
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  gap: var(--fg-space-3) var(--fg-space-4);
+}
+.fg-status--compact .fg-status-text { font-size: var(--fg-font-size-md); }
 .fg-status--paused .fg-status-dot {
   background: transparent;
   border: 2px solid var(--fg-color-text-secondary);
@@ -923,4 +941,36 @@ button.fg-link {
   .fg-card { padding: var(--fg-space-4); }
   .fg-dropzone { padding: var(--fg-space-6); }
   .fg-side-panel { position: static; max-width: none; }
+}
+
+/* ---------- Progress ---------- */
+/* Plain text that changes while something runs, over a bar that fills toward done. No box. The bar's
+   fill is set by script (field-guide/js/resume.js) or inline in a specimen. */
+.fg-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-2);
+}
+.fg-progress-text {
+  margin: 0;
+  font-size: var(--fg-font-size-md);
+  color: var(--fg-color-text-secondary);
+}
+.fg-progress-bar {
+  box-sizing: border-box;
+  height: var(--fg-space-2);
+  overflow: hidden;
+  border-radius: var(--fg-radius-full);
+  background: var(--fg-color-signal-progress-subtle);
+}
+.fg-progress-bar > span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--fg-color-action-primary);
+  transition: width 0.4s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fg-progress-bar > span { transition: none; }
 }
