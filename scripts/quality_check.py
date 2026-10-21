@@ -269,6 +269,29 @@ def check_gallery_complete(page):
     check(not missing, "gallery shows every Field Guide class", "missing: " + ", ".join(missing))
 
 
+def check_leave_warning(ctx, base):
+    """The profile screen warns before you walk away from unsaved edits, but never when the page itself
+    navigates (pause, resume, save, upload, delete). Browsers show a native "Leave site?" dialog for the
+    first and it reads as a bug for the second (SC-46: Replace resume asked "Leave site?")."""
+    page = ctx.new_page()
+    dialogs, stay = [], {"on": False}
+    # Record every dialog. Accept it (so the page moves on) unless we are testing that walking away asks first.
+    page.on("dialog", lambda d: (dialogs.append(d.type), d.dismiss() if stay["on"] and d.type == "beforeunload" else d.accept()))
+    page.goto(base + "/profile", wait_until="load")
+    page.fill("#city", "Chicago")  # an unsaved edit
+    with page.expect_navigation():
+        page.click("button:has-text('Pause alerts')")  # the page's own navigation
+    check(dialogs == [], "pausing alerts with an unsaved edit raises no 'Leave site?' dialog", str(dialogs))
+    page.wait_for_load_state("load")
+    page.fill("#city", "Chicago")
+    stay["on"] = True
+    page.click("a.fg-wordmark")  # walking away
+    page.wait_for_timeout(300)
+    check(dialogs == ["beforeunload"] and page.url.endswith("/profile"),
+          "walking away from an unsaved edit still asks first", f"{dialogs} {page.url}")
+    page.close()
+
+
 # Every control a finger has to hit is at least this tall (Ted, SC-46). Filter
 # pills follow the dashboard Figma (36px) and a chip's remove button sits inside
 # its 44px chip, so they're not listed here.
@@ -348,6 +371,7 @@ def main():
             ctx = browser.new_context()
             ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
             check_filter_states(ctx.new_page(), base)
+            check_leave_warning(ctx, base)
             ctx.close()
             for (w, h) in VIEWPORTS:
                 mobile = w < MOBILE_MAX_WIDTH

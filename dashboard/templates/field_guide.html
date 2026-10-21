@@ -488,10 +488,11 @@
     <div>
       <h3>Page intro</h3>
       <p class="spec-use">Use once per page: a headline in Scout's voice (Fraunces), then a lede saying what to do here.</p>
-      <code class="spec-code">{% raw %}{{ fg.intro(title, lede) }}{% endraw %} · .fg-display--page .fg-lede</code>
+      <code class="spec-code">{% raw %}{{ fg.intro(title, lede) }} · {% call fg.intro(title, lede) %}aside{% endcall %}{% endraw %} · .fg-display--page .fg-lede .fg-intro-head .fg-intro-aside</code>
     </div>
     <div class="states">
       <div class="state state--wide" style="max-width: none">{{ fg.intro("Here's what I'll watch for.", "Check that this sounds like you, and fix anything that's off.") }}</div>
+      <div class="state state--wide" style="max-width: none; width: 100%"><span class="state-label">With something beside the headline</span>{% call fg.intro("Here's what I'm watching for.", "Change anything below, then save.") %}{% call fg.status("I'm watching.", "Since Oct 6.", compact=True) %}<button class="fg-button fg-button--ghost" type="button">Pause</button>{% endcall %}{% endcall %}</div>
     </div>
   </section>
 
@@ -556,7 +557,7 @@
     <div>
       <h3>Status strip</h3>
       <p class="spec-use">Use at the top of settings to say whether Scout is watching. The dot never carries the state alone; the words do.</p>
-      <code class="spec-code">{% raw %}{% call fg.status(title, detail, paused) %}button{% endcall %}{% endraw %} · .fg-status</code>
+      <code class="spec-code">{% raw %}{% call fg.status(title, detail, paused, compact) %}button{% endcall %}{% endraw %} · .fg-status --paused --compact</code>
     </div>
     <div class="states">
       <div class="state state--wide" style="max-width: none; width: 100%">
@@ -566,6 +567,14 @@
       <div class="state state--wide" style="max-width: none; width: 100%">
         <span class="state-label">Paused</span>
         {% call fg.status("Alerts are paused.", "Nothing will reach you until you turn them back on.", paused=True) %}<button class="fg-button fg-button--primary" type="button">Resume alerts</button>{% endcall %}
+      </div>
+      <div class="state state--wide" style="max-width: none; width: 100%">
+        <span class="state-label">Compact, watching</span>
+        {% call fg.status("I'm watching.", "Since Oct 6.", compact=True) %}<button class="fg-button fg-button--ghost" type="button">Pause</button>{% endcall %}
+      </div>
+      <div class="state state--wide" style="max-width: none; width: 100%">
+        <span class="state-label">Compact, paused</span>
+        {% call fg.status("Alerts are paused.", "Since Oct 10.", paused=True, compact=True) %}<button class="fg-button fg-button--primary" type="button">Resume alerts</button>{% endcall %}
       </div>
     </div>
   </section>
@@ -600,6 +609,18 @@
       <div class="state state--wide"><span class="state-label">Default</span>{{ fg.dropzone("g-drop", "Drop your resume here", "A PDF works best.") }}</div>
       <div class="state state--wide"><span class="state-label">File dragged over</span><div class="fg-dropzone is-dragover"><p class="fg-dropzone-title">Drop it to add it</p></div></div>
       <div class="state state--wide"><span class="state-label">Inline, in a card</span>{{ fg.dropzone("g-drop-inline", "No resume yet", "Add a PDF and I'll fill in what I can.", button="Add a resume", inline=True) }}</div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="progress">
+    <div>
+      <h3>Progress</h3>
+      <p class="spec-use">Use while something takes a few seconds and the person is waiting. Plain text that changes, over a bar that fills toward done. No box around it. It is hidden until the action starts.</p>
+      <code class="spec-code">{% raw %}{{ fg.progress(id, steps) }}{% endraw %} · .fg-progress</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide" style="max-width: none; width: 100%"><span class="state-label">Started</span>{{ fg.progress("g-progress", ["Opening your resume…", "Reading your experience…"], shown=True, percent=35) }}</div>
+      <div class="state state--wide" style="max-width: none; width: 100%"><span class="state-label">Nearly done</span>{{ fg.progress("g-progress-2", ["Almost there…"], shown=True, percent=88) }}</div>
     </div>
   </section>
 

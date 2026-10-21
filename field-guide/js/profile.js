@@ -13,7 +13,12 @@
   var save = document.getElementById("save-button");
   var discard = document.getElementById("discard-button");
   var note = document.querySelector(".fg-action-bar-note");
-  var submitting = false;
+  /* Saving, uploading a resume, deleting it and pausing alerts all leave this page on purpose: only walking
+     away from unsaved edits should ask first. Any form that goes ahead (a cancelled delete does not) counts. */
+  var leaving = false;
+  document.addEventListener("submit", function (event) {
+    if (!event.defaultPrevented) leaving = true;
+  });
 
   function keyOf(text) { return text.trim().replace(/\s+/g, " ").toLowerCase(); }
 
@@ -81,7 +86,6 @@
         if (addChip(row.getAttribute("data-chip-list"), input.value)) input.value = "";
       }
     });
-    submitting = true;
   });
 
   /* ---------- level: "one level up" only makes sense once a level below the top is chosen ---------- */
@@ -172,10 +176,10 @@
   form.addEventListener("input", changed);
   form.addEventListener("change", changed);
 
-  if (discard) discard.addEventListener("click", function () { submitting = true; window.location.href = window.location.pathname; });
+  if (discard) discard.addEventListener("click", function () { leaving = true; window.location.href = window.location.pathname; });
 
   window.addEventListener("beforeunload", function (event) {
-    if (mode === "settings" && !submitting && changeCount() > 0) {
+    if (mode === "settings" && !leaving && changeCount() > 0) {
       event.preventDefault();
       event.returnValue = "";
     }
