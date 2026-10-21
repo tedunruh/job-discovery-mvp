@@ -106,7 +106,7 @@ for the top level. An empty level matches any level (decision 8).
 - **Deal-breakers: removed from v1 (decided).** The "Anything you'd rather not hear about?" card is
   dropped from 2a, 2b and 3, and `deal_breaker` is not a profile item kind. Deal-breakers mostly live in
   the description ("on-call"), which Scout can't read until SC-51, so a v1 card could not keep its
-  promise. Revisit when SC-51 ships. The "What I'll read for" group then holds one card.
+  promise. Revisit when SC-51 ships. The skills card is then the only card in that group.
 
 ## 4. Routes and flow
 
@@ -170,7 +170,7 @@ would flag a state that doesn't exist. Instead:
   it to save. The action bar on 2a and 2b has the primary button only.
 - **"Looks right, start watching":** saves, sets `alerts_started_at` and `onboarded_at`, and lands on the
   dashboard.
-- **Screen 3, nothing unsaved:** note "All changes saved." with the primary button disabled. Warn before
+- **Screen 3, nothing unsaved:** no note, with the primary button disabled. Warn before
   leaving with unsaved changes.
 
 ## Rollout and testing
@@ -234,10 +234,10 @@ and the work history card. Where the build differs from the canvas, or fills a g
 | Skills | Saved, with the helper line "Saved. I'll start using this soon." No deal-breakers card, no suggestion card. |
 | Titles | Chips plus an "Add a title" field (Add button or Enter). Typed text that wasn't added is still saved. |
 | Action bar, set up | "Looks right, start watching", disabled until there is a title. Note: "Add a title to continue." then "You can change any of this later in Settings." No "Save and finish later". |
-| Action bar, settings | "Discard" and "Save changes". Note: "All changes saved." or "{n} change(s) not saved." The browser's own dialog warns before leaving with unsaved changes. |
+| Action bar, settings | "Discard" and "Save changes". Note: only "{n} change(s) not saved." when there are unsaved changes; nothing when there aren't. The browser's own dialog warns before leaving with unsaved changes. |
 | Side panel, set up | "If you'd started last week": count and the 3 newest matches, or a prompt to add a title. |
 | Side panel, settings | "This week" with three counts (reached you, you opened, you applied to), and "With your unsaved change" showing roles a week before and after. The handoff's "change vs last week" figure is not built: nothing says how to show it. |
-| Copy I wrote | Header context ("Getting started", "Settings"), the two intros, the level and city helper lines, the save confirmation ("Saved. Your alerts follow this from the next scan."), the title error ("Add at least one job title to continue."), and the group helper under "What I'll read for". |
+| Copy I wrote | Header context ("Getting started", "Settings"), the two intros, the level and city helper lines, and the title error ("Add at least one job title to continue."). |
 
 ## Built in step 3: resume reading
 
@@ -284,3 +284,10 @@ For the designer: the canvas should show the compact status in the title row, th
 Not done, offered: marking chips that came from the resume with the existing "New" tag, as a quieter signal that replaces the removed banner. Prompt tuning so a read doesn't suggest titles below the person's current level.
 
 **Also (2026-10-21):** on settings the top-right "Settings" label is now a "Back to dashboard" link (the setup view keeps "Getting started"). Designer: show it in the canvas.
+
+**Trimmed after review (2026-10-21):** four items were redundant and are gone from the page: the "Saved. Your alerts
+follow this from the next scan." banner after saving, the "What I'll match on" and "What I'll read for in each
+posting" group headings with their sub-lines, and the "All changes saved." note. After a save the only signals are that
+Save and Discard are disabled again and the "{n} changes not saved." note and the "With your unsaved change" card
+disappear. The cards now simply stack: resume, roles, level, where you'll work, skills. Designer: drop those from the
+canvas. (`fg.group_label` stays in Field Guide as a component; no page uses it now.)

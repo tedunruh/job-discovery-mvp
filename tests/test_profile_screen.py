@@ -167,7 +167,7 @@ def render(mode, **over):
         "work_options": pf.WORK_OPTIONS, "work_checked": ["Remote", "Hybrid"], "preview_count": 2,
         "preview_items": [posting("Senior Product Designer")], "has_titles": True, "compare": None,
         "week": {"reached": 21, "opened": 9, "applied": 2}, "started_label": "Oct 6", "paused_label": "",
-        "changes": 0, "error": None, "saved_notice": False,
+        "changes": 0, "error": None,
         "saved_snapshot": pf.snapshot_of(model), "resume": None, "reading": ("ok", None),
         "notice": None, "reading_steps": ["Opening your resume…", "Reading your experience…"],
     }
@@ -207,7 +207,7 @@ class Template(unittest.TestCase):
         self.assertNotIn("Alerts have been on since", html)
         self.assertIn('value="pause"', html)
         self.assertIn("Save changes", html)
-        self.assertIn("All changes saved.", html)
+        self.assertNotIn("All changes saved", html)  # nothing to say when nothing is unsaved
         self.assertNotIn("start watching", html)
         self.assertIn("This week", html)
 
@@ -306,6 +306,20 @@ class Template(unittest.TestCase):
         setup = render("setup")
         self.assertNotIn("Back to dashboard", setup)  # they can't use the dashboard until they have started
         self.assertIn("Getting started", setup)
+
+    def test_the_page_has_no_save_banner_no_group_headings_and_no_all_saved_note(self):
+        for mode in ("setup", "settings"):
+            html = render(mode)
+            for gone in ("Saved. Your alerts follow", "All changes saved", "What I&#39;ll match on",
+                         "What I&#39;ll read for", "These decide which postings", "These help me judge"):
+                self.assertNotIn(gone, html, f"{gone!r} should be gone from {mode}")
+        self.assertIn('data-clean=""', render("settings"))  # the page script shows nothing when clean
+        # even if something still handed the page the old "just saved" flag, it must not draw a banner
+        self.assertNotIn("Saved. Your alerts follow", render("settings", saved_notice=True))
+
+    def test_the_unsaved_count_still_shows_and_the_clean_bar_is_empty(self):
+        self.assertIn("2 changes not saved.", render("settings", changes=2))
+        self.assertRegex(render("settings"), r'fg-action-bar-note"></p>')
 
     def test_there_is_no_i_read_your_resume_banner(self):
         for mode in ("setup", "settings"):
