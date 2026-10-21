@@ -51,12 +51,15 @@
 
 {#- ===================== Profile components (SC-46) ===================== -#}
 
-{#- Shared page header: wordmark plus context ("Step 2 of 2", "Settings").
-    One pattern for onboarding and settings. -#}
-{% macro header(context="", href="/") -%}
+{#- Shared page header: wordmark plus context ("Step 2 of 2"). One pattern for onboarding and settings.
+    back="Back to dashboard" turns the context into a link back (back_href, default "/"): use it on pages
+    a person can leave, such as settings, so the way out reads as a way out. -#}
+{% macro header(context="", href="/", back="", back_href="/") -%}
 <header class="fg-header">
   <a class="fg-wordmark" href="{{ href }}">Scout</a>
-  {%- if context %}
+  {%- if back %}
+  <a class="fg-link fg-header-link" href="{{ back_href }}">{{ back }}</a>
+  {%- elif context %}
   <span class="fg-header-context">{{ context }}</span>
   {%- endif %}
 </header>

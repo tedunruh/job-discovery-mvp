@@ -292,6 +292,19 @@ def check_leave_warning(ctx, base):
     page.close()
 
 
+def check_back_link(ctx, base):
+    """Settings has a visible way back to the dashboard, and it works (SC-46: "how do I go to the dashboard?")."""
+    page = ctx.new_page()
+    page.goto(base + "/profile", wait_until="load")
+    link = page.get_by_role("link", name="Back to dashboard")
+    check(link.count() == 1 and link.is_visible(), "settings shows a 'Back to dashboard' link")
+    if link.count() == 1:
+        link.click()
+        page.wait_for_load_state("load")
+        check(page.url.rstrip("/") == base, "...and it goes to the dashboard", page.url)
+    page.close()
+
+
 # Every control a finger has to hit is at least this tall (Ted, SC-46). Filter
 # pills follow the dashboard Figma (36px) and a chip's remove button sits inside
 # its 44px chip, so they're not listed here.
@@ -372,6 +385,7 @@ def main():
             ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
             check_filter_states(ctx.new_page(), base)
             check_leave_warning(ctx, base)
+            check_back_link(ctx, base)
             ctx.close()
             for (w, h) in VIEWPORTS:
                 mobile = w < MOBILE_MAX_WIDTH
