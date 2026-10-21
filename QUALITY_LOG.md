@@ -560,3 +560,15 @@ that needed to wrap); the existing "mobile page reports true width" check caught
       row, and progress exists in place of a banner (`tests/test_profile_screen.py`, `tests/test_resume.py`).
 - [ ] Manual: any "unsaved changes" guard is tried both ways in a real browser: its own actions don't trip it,
       and leaving does.
+
+### 2026-10-21 — Settings had no obvious way back to the dashboard
+**Shipped:** the "Settings" label at the top right of the profile screen is now a "Back to dashboard" link
+(`fg.header(back=...)`). The setup view keeps its "Getting started" label, since a new person can't use the
+dashboard until they have started. The wordmark still links home.
+**Found by:** Ted: "how do I go to the dashboard from this page?"
+**Rework count:** 0.
+**Root cause:** *The only way out was the wordmark, which doesn't read as a link.* A page a person can leave needs
+a visible way out.
+**Standing checks added:**
+- [x] Automated: `quality_check.py` fails if settings shows no "Back to dashboard" link or it doesn't reach the
+      dashboard; a test covers settings vs. setup. Mutation-tested (link removed -> both fail).

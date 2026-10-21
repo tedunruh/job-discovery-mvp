@@ -282,3 +282,5 @@ exercised against the real API.
 For the designer: the canvas should show the compact status in the title row, the progress text and bar, the add fields above the chips, and no banner after a read. The status wording is now short ("I'm watching. Since Oct 1."); the longer line ("Alerts have been on since Oct 6.") survives only in the non-compact specimen.
 
 Not done, offered: marking chips that came from the resume with the existing "New" tag, as a quieter signal that replaces the removed banner. Prompt tuning so a read doesn't suggest titles below the person's current level.
+
+**Also (2026-10-21):** on settings the top-right "Settings" label is now a "Back to dashboard" link (the setup view keeps "Getting started"). Designer: show it in the canvas.

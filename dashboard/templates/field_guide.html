@@ -476,11 +476,12 @@
     <div>
       <h3>Page header</h3>
       <p class="spec-use">Use at the top of onboarding and settings pages. Wordmark left; context right (where you are, or a step).</p>
-      <code class="spec-code">{% raw %}{{ fg.header(context) }}{% endraw %} · .fg-shell &gt; .fg-header</code>
+      <code class="spec-code">{% raw %}{{ fg.header(context) }} · {{ fg.header(back="Back to dashboard") }}{% endraw %} · .fg-shell &gt; .fg-header .fg-header-link</code>
     </div>
     <div class="states">
       <div class="state state--wide"><span class="state-label">Onboarding</span><div class="fg-shell" style="padding: 0">{{ fg.header("Step 2 of 2", href="#layout") }}</div></div>
       <div class="state state--wide"><span class="state-label">Settings</span><div class="fg-shell" style="padding: 0">{{ fg.header("Settings", href="#layout") }}</div></div>
+      <div class="state state--wide"><span class="state-label">With a way back</span><div class="fg-shell" style="padding: 0">{{ fg.header(back="Back to dashboard", back_href="#layout", href="#layout") }}</div></div>
     </div>
   </section>
 

@@ -299,6 +299,14 @@ class Template(unittest.TestCase):
         self.assertIn('data-saved=\'{"city": "", "level": "Any level", "skills": "", "titles": "old one"', html)
         self.assertIn("1 change not saved.", html)
 
+    def test_settings_has_a_link_back_to_the_dashboard_and_setup_does_not(self):
+        settings = render("settings")
+        self.assertRegex(settings, r'<a class="fg-link fg-header-link" href="/">Back to dashboard</a>')
+        self.assertNotIn("fg-header-context", settings)
+        setup = render("setup")
+        self.assertNotIn("Back to dashboard", setup)  # they can't use the dashboard until they have started
+        self.assertIn("Getting started", setup)
+
     def test_there_is_no_i_read_your_resume_banner(self):
         for mode in ("setup", "settings"):
             self.assertNotIn("I read your resume", render(mode))
