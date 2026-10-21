@@ -66,7 +66,12 @@ def main():
         content = fake_resume_pdf()
         print("Reading the built-in fake resume. Nothing is saved.")
     rs.check_file(content)
-    result = rs.read_resume(content)
+    try:
+        result = rs.read_resume(content)
+    except rs.ResumeError as e:
+        # The app turns every API failure into a short message for the person; here we want the real cause.
+        cause = e.__context__
+        sys.exit(f"The read failed ({e.kind}).\nWhat the API said: {cause if cause else 'nothing: the call was not made'}")
     fields = rs.normalize_fields(result.fields)
     print(f"\nmodel          {result.model}")
     print(f"tokens         {result.input_tokens:,} in, {result.output_tokens:,} out")

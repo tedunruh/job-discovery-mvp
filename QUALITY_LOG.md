@@ -518,3 +518,19 @@ during the model call (up to 25s); it now commits first, with a test for the ord
 - [ ] Manual: no database transaction is open across a call to an outside service.
 - [ ] Manual: a rehearsal check asserts the rule for the state the person is in (a person at a limit is not a person
       with a fresh allowance).
+
+### 2026-10-20 — Out-of-credit API error was reported as a bad file
+**Shipped:** the resume reader now treats the API's "credit balance is too low" error as "unavailable" (Scout's
+problem) instead of "unreadable" (the person's file). `scripts/try_resume_read.py` now prints the API's own words
+when a read fails, since the app deliberately turns every failure into a short message for the person.
+**Found by:** the first real call, with the Console balance still at $0.00. The API answers an empty balance with an
+HTTP 400 (`invalid_request_error`), the same status as a bad PDF, and the app mapped every 400 to "I couldn't read
+that file", so a good resume would have been blamed.
+**Rework count:** 1 (found live before anyone used it; nothing shipped wrong to a person).
+**Root cause:** *A provider error shape the SC-42 spike marked as unverified (`[verify against a live zero-credit
+key]`) was assumed, not tested.* The spike said so in writing; the build didn't carry it forward as a test.
+**Standing checks added:**
+- [x] Automated: a test with the real out-of-credit message maps to "unavailable"; mutation-tested (mapping removed
+      -> fails).
+- [ ] Manual: anything a spike or plan marks `[verify]` against a live service gets a real example before it ships,
+      or a named test, or is removed from the plan. Don't let it fade into an assumption.
