@@ -230,7 +230,7 @@ def register(app, require_login):
                         conn, user_id, mode, draft, saved=saved if onboarded else None, error=NO_TITLE_ERROR)), 400
                 save_profile(conn, user_id, **draft)
                 conn.commit()
-                return redirect(url_for("profile", saved=1) if onboarded else url_for("index"))
+                return redirect(url_for("profile") if onboarded else url_for("index"))
             from dashboard import resume as resume_mod
 
             saved = saved_profile(conn, user_id, onboarded)
@@ -241,7 +241,7 @@ def register(app, require_login):
                 model = resume_mod.merge_fields(saved, fields)
             return render_template("profile.html", **view_context(
                 conn, user_id, mode, model, saved=saved if onboarded else None,
-                saved_notice=bool(request.args.get("saved")), notice=resume_mod.pop_notice()))
+                notice=resume_mod.pop_notice()))
         finally:
             conn.close()
 
