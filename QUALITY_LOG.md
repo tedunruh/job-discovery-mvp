@@ -572,3 +572,20 @@ a visible way out.
 **Standing checks added:**
 - [x] Automated: `quality_check.py` fails if settings shows no "Back to dashboard" link or it doesn't reach the
       dashboard; a test covers settings vs. setup. Mutation-tested (link removed -> both fail).
+
+### 2026-10-21 — Trimmed four redundant items from the profile screen
+**Shipped (Ted's review):** removed the "Saved. Your alerts follow this from the next scan." banner after saving, the
+"What I'll match on" and "What I'll read for in each posting" group headings with their sub-lines, and the "All
+changes saved." note. The save redirect no longer adds `?saved=1`. With nothing unsaved the action bar shows no note,
+only the two disabled buttons; "{n} changes not saved." still shows while editing. `fg.group_label` stays in Field
+Guide as a component. Browser rehearsals on a Neon copy: 46 steps (setup, settings, pause, resume, discard, leave
+warning) and 61 (resume flows); `quality_check.py` 173/173; 154 offline tests.
+**Rework count:** 1 (a mutation test showed the banner test never exercised the banner, since the route stopped
+passing its flag; the test now passes the flag and asserts nothing renders).
+**Root cause:** *Copy added in the first build to explain what the screen did, which the layout and the buttons'
+state already said.* Each of the four said something already visible: the cards say what they are, the disabled Save
+says nothing is unsaved, and a refreshed page says it saved.
+**Standing checks added:**
+- [x] Automated: tests that none of the four strings render in setup or settings (including when handed the old flag).
+      Mutation-tested (each put back -> fails).
+- [ ] Manual: before adding a confirmation or a heading, ask what the screen already shows. Say it once.

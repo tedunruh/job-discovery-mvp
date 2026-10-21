@@ -42,8 +42,6 @@
     <p class="fg-message fg-message--attention" role="alert">{{ error }}</p>
     {%- elif notice %}
     <p class="fg-message fg-message--{{ notice.kind }}" role="{{ 'alert' if notice.kind == 'attention' else 'status' }}">{{ notice.text }}</p>
-    {%- elif saved_notice %}
-    <p class="fg-message fg-message--success" role="status">Saved. Your alerts follow this from the next scan.</p>
     {%- endif %}
 
     <form id="profile-form" method="post" action="/profile" novalidate
@@ -53,7 +51,7 @@
           data-ready="You can change any of this later in Settings."
           data-blocked="Add a title to continue."
           {%- else %}
-          data-clean="All changes saved." data-one="{n} change not saved." data-many="{n} changes not saved."
+          data-clean="" data-one="{n} change not saved." data-many="{n} changes not saved."
           {%- endif %}>
       <div class="fg-split">
         <div class="fg-split-main">
@@ -72,8 +70,6 @@
           {%- endif %}
           {{ fg.progress("resume-progress", reading_steps) }}
           {%- endcall %}
-
-          {{ fg.group_label("What I'll match on", "These decide which postings reach you at all.") }}
 
           {%- call(part) fg.card("titles", "Roles I'll watch for", "The job titles I'll match postings against.") %}
           {{ fg.add_row("titles_new", "Add a title", placeholder="For example, Product Manager", list="titles-list") }}
@@ -103,8 +99,6 @@
           </div>
           {%- endcall %}
 
-          {{ fg.group_label("What I'll read for in each posting", "These help me judge how well a role fits.") }}
-
           {%- call(part) fg.card("skills", "Skills and strengths", "Saved. I'll start using this soon.") %}
           {{ fg.add_row("skills_new", "Add a skill", placeholder="For example, Prototyping", list="skills-list") }}
           <ul class="fg-chips" id="skills-list">
@@ -130,7 +124,7 @@
   <button class="fg-button fg-button--primary" type="submit" form="profile-form" id="save-button"{% if not model.titles %} disabled{% endif %}>Looks right, start watching</button>
   {%- endcall %}
   {%- else %}
-  {%- call fg.action_bar(((changes ~ (" change not saved." if changes == 1 else " changes not saved.")) if changes else "All changes saved.")) %}
+  {%- call fg.action_bar(((changes ~ (" change not saved." if changes == 1 else " changes not saved.")) if changes else "")) %}
   <button class="fg-button fg-button--secondary" type="button" id="discard-button"{% if not changes %} disabled{% endif %}>Discard</button>
   <button class="fg-button fg-button--primary" type="submit" form="profile-form" id="save-button"{% if not changes %} disabled{% endif %}>Save changes</button>
   {%- endcall %}
