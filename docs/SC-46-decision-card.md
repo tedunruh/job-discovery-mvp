@@ -283,6 +283,8 @@ For the designer: the canvas should show the compact status in the title row, th
 
 Not done, offered: marking chips that came from the resume with the existing "New" tag, as a quieter signal that replaces the removed banner. Prompt tuning so a read doesn't suggest titles below the person's current level.
 
+**Also (2026-10-21):** on settings the top-right "Settings" label is now a "Back to dashboard" link (the setup view keeps "Getting started"). Designer: show it in the canvas.
+
 **Trimmed after review (2026-10-21):** four items were redundant and are gone from the page: the "Saved. Your alerts
 follow this from the next scan." banner after saving, the "What I'll match on" and "What I'll read for in each
 posting" group headings with their sub-lines, and the "All changes saved." note. After a save the only signals are that

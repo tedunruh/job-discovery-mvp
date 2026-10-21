@@ -16,7 +16,11 @@
 </head>
 <body class="fg-page">
   <main class="fg-shell profile-main">
-    {{ fg.header("Getting started" if mode == "setup" else "Settings") }}
+    {%- if mode == "setup" %}
+    {{ fg.header("Getting started") }}
+    {%- else %}
+    {{ fg.header(back="Back to dashboard") }}
+    {%- endif %}
 
     {%- if mode == "setup" %}
     {{ fg.intro("Tell me what to watch for.", "Add the job titles you're after, and I'll let you know when a new role fits. You can change any of this later in Settings.") }}
