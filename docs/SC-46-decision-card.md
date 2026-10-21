@@ -268,3 +268,17 @@ page doesn't address it; add one only after checking Anthropic's training policy
 its own Console workspace with a hard monthly limit set there; the $5 here is the app-side stop in front of it),
 then deploy. Run `python scripts/try_resume_read.py` once with the key in `.env.local`: it is the only part not yet
 exercised against the real API.
+
+## Changed after Ted reviewed the live screen (2026-10-21)
+
+| Area | Before | Now |
+|---|---|---|
+| Replace, Delete, Pause alerts with an unsaved edit | The browser's own "Leave site?" dialog appeared | No dialog for the page's own actions. Walking away from unsaved edits still asks first (an automated check covers both). |
+| While a resume is read | A boxed message, "Reading your resume. This takes a few seconds." | Plain text that changes every few seconds ("Opening your resume…", "Reading your experience…", "Picking out your skills…", "Working out your level…", "Pulling together job titles…", "Almost there…") over a progress bar that fills toward done but never claims to finish early. New Field Guide component `fg.progress`. |
+| Add fields | Below the chips | Above the chips, for titles and skills |
+| "I read your resume and filled in what I could…" banner | Shown after a read | Removed. The unsaved-changes count and the "With your unsaved change" card remain the signal in settings. |
+| "I'm watching" strip | Full-width bordered strip under the title | One compact line to the right of the page title, with space between and a quiet "Pause alerts" button. Paused shows "Alerts are paused. Since [date]." with "Resume alerts". Compact variant of `fg.status`; `fg.intro` can hold something beside the headline. |
+
+For the designer: the canvas should show the compact status in the title row, the progress text and bar, the add fields above the chips, and no banner after a read. The status wording is now short ("I'm watching. Since Oct 1."); the longer line ("Alerts have been on since Oct 6.") survives only in the non-compact specimen.
+
+Not done, offered: marking chips that came from the resume with the existing "New" tag, as a quieter signal that replaces the removed banner. Prompt tuning so a read doesn't suggest titles below the person's current level.

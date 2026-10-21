@@ -1,15 +1,43 @@
 /* Behavior for adding and deleting a resume (SC-46). The file inputs sit outside any other form and point at
-   #resume-form with their form attribute; choosing or dropping a PDF sends it straight away. Wording comes from
-   the page (the "reading" message and the delete confirmation are in the HTML). */
+   #resume-form with their form attribute; choosing or dropping a PDF sends it straight away, and a progress bar
+   with changing text shows while it is read. All wording comes from the page: the steps are in the progress
+   element's data-steps, the delete confirmation in the delete form's data-confirm. */
 (function () {
   "use strict";
 
   var form = document.getElementById("resume-form");
-  var busy = document.getElementById("resume-busy");
+  var progress = document.getElementById("resume-progress");
+  var STEP_SECONDS = 2.6;   // how long each line stays up
+  var SETTLE_SECONDS = 7;   // the bar eases toward full over about this long, and never finishes early
+  var CEILING = 92;         // percent: it only reaches the end when the next page loads
+
+  function startProgress() {
+    if (!progress) return;
+    var steps = [];
+    try { steps = JSON.parse(progress.getAttribute("data-steps") || "[]"); } catch (e) { /* no wording: bar only */ }
+    var text = progress.querySelector(".fg-progress-text");
+    var fill = progress.querySelector(".fg-progress-bar span");
+    var started = Date.now();
+    var shown = 0;
+
+    function tick() {
+      var seconds = (Date.now() - started) / 1000;
+      if (fill) fill.style.width = (CEILING * (1 - Math.exp(-seconds / SETTLE_SECONDS))).toFixed(1) + "%";
+      if (text && steps.length) {
+        var next = Math.min(steps.length - 1, Math.floor(seconds / STEP_SECONDS));
+        if (next !== shown) { shown = next; text.textContent = steps[next]; }
+      }
+    }
+    progress.hidden = false;
+    tick();
+    window.setInterval(tick, 250);
+  }
 
   function send() {
-    if (busy) busy.hidden = false;
-    form.submit();
+    startProgress();
+    /* requestSubmit fires the submit event, which is how the profile page knows this navigation is on purpose. */
+    if (form.requestSubmit) form.requestSubmit();
+    else if (form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))) form.submit();
   }
 
   if (form) {

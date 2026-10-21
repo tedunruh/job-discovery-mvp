@@ -62,10 +62,17 @@
 </header>
 {%- endmacro %}
 
-{#- Page intro: Fraunces headline in Scout's voice and a lede. -#}
+{#- Page intro: Fraunces headline in Scout's voice and a lede. A call block puts something on the
+    right of the headline (settings puts the compact status there):
+        {% call fg.intro("Here's what I'm watching for.", lede) %}{% call fg.status(…, compact=True) %}…{% endcall %}{% endcall %} -#}
 {% macro intro(title, lede="") -%}
 <div class="fg-intro">
-  <h1 class="fg-display fg-display--page">{{ title }}</h1>
+  <div class="fg-intro-head">
+    <h1 class="fg-display fg-display--page">{{ title }}</h1>
+    {%- if caller %}
+    <div class="fg-intro-aside">{{ caller() }}</div>
+    {%- endif %}
+  </div>
   {%- if lede %}
   <p class="fg-lede">{{ lede }}</p>
   {%- endif %}
@@ -199,9 +206,10 @@
 </div>
 {%- endmacro %}
 
-{#- Status strip: is Scout watching? The call block holds the action button. -#}
-{% macro status(title, detail="", paused=False) -%}
-<div class="fg-status{% if paused %} fg-status--paused{% endif %}" role="status">
+{#- Status strip: is Scout watching? The call block holds the action button. compact=True drops the
+    box for one tight line (beside a page title). -#}
+{% macro status(title, detail="", paused=False, compact=False) -%}
+<div class="fg-status{% if paused %} fg-status--paused{% endif %}{% if compact %} fg-status--compact{% endif %}" role="status">
   <p class="fg-status-text">
     <span class="fg-status-dot" aria-hidden="true"></span>
     <span class="fg-status-title">{{ title }}</span>
@@ -317,4 +325,14 @@
   {%- endif %}
   <div class="fg-row">{{ caller() }}</div>
 </section>
+{%- endmacro %}
+
+{#- Progress: plain text that changes while something runs, over a bar that fills toward done. Hidden until
+    started; field-guide/js/resume.js shows it, steps through `steps` (the wording, in order, kept in
+    data-steps) and eases the bar toward full. shown/percent are for a specimen. -#}
+{% macro progress(id, steps, shown=False, percent=0) -%}
+<div class="fg-progress" id="{{ id }}" role="status" aria-live="polite" data-steps='{{ steps | tojson }}'{% if not shown %} hidden{% endif %}>
+  <p class="fg-progress-text">{{ steps[0] }}</p>
+  <div class="fg-progress-bar" aria-hidden="true"><span{% if percent %} style="width: {{ percent }}%"{% endif %}></span></div>
+</div>
 {%- endmacro %}

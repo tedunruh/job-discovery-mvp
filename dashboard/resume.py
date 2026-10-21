@@ -47,6 +47,16 @@ MESSAGES = {
     "unreadable": "I couldn't read that file. You can try another PDF, or tell me about yourself instead.",
 }
 
+# What the page says, one line at a time, while a resume is being read (see fg.progress).
+READING_STEPS = [
+    "Opening your resume…",
+    "Reading your experience…",
+    "Picking out your skills…",
+    "Working out your level…",
+    "Pulling together job titles…",
+    "Almost there…",
+]
+
 SCHEMA = {
     "type": "object",
     "properties": {
@@ -255,7 +265,7 @@ def register(app, require_login):
         finally:
             conn.close()
         return render_template("start.html", unavailable=message if state != "ok" else None,
-                               notice=pop_notice())
+                               notice=pop_notice(), steps=READING_STEPS)
 
     @app.route("/resume", methods=["POST"])
     @require_login

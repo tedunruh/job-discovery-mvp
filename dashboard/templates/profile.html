@@ -11,7 +11,6 @@
     body.fg-page { display: flex; flex-direction: column; min-height: 100vh; }
     .profile-main { flex: 1; padding-bottom: var(--fg-space-8); }
     .profile-main > .fg-intro,
-    .profile-main > .fg-status,
     .profile-main > .fg-message { margin-bottom: var(--fg-space-6); }
   </style>
 </head>
@@ -22,29 +21,25 @@
     {%- if mode == "setup" %}
     {{ fg.intro("Tell me what to watch for.", "Add the job titles you're after, and I'll let you know when a new role fits. You can change any of this later in Settings.") }}
     {%- else %}
-    {{ fg.intro("Here's what I'm watching for.", "Change anything below, then save. Nothing takes effect until you do.") }}
+    {%- call fg.intro("Here's what I'm watching for.", "Change anything below, then save. Nothing takes effect until you do.") %}
+    {%- if model.alerts_paused_at %}
+    {%- call fg.status("Alerts are paused.", ("Since " ~ paused_label ~ ".") if paused_label else "", paused=True, compact=True) %}
+    <form method="post" action="/profile/alerts"><input type="hidden" name="action" value="resume"><button class="fg-button fg-button--primary" type="submit">Resume alerts</button></form>
+    {%- endcall %}
+    {%- else %}
+    {%- call fg.status("I'm watching.", ("Since " ~ started_label ~ ".") if started_label else "", compact=True) %}
+    <form method="post" action="/profile/alerts"><input type="hidden" name="action" value="pause"><button class="fg-button fg-button--ghost" type="submit">Pause alerts</button></form>
+    {%- endcall %}
+    {%- endif %}
+    {%- endcall %}
     {%- endif %}
 
     {%- if error %}
     <p class="fg-message fg-message--attention" role="alert">{{ error }}</p>
     {%- elif notice %}
     <p class="fg-message fg-message--{{ notice.kind }}" role="{{ 'alert' if notice.kind == 'attention' else 'status' }}">{{ notice.text }}</p>
-    {%- elif resume_added %}
-    <p class="fg-message fg-message--success" role="status">I read your resume and filled in what I could. Check it, fix anything that's off, then {{ "save" if mode == "settings" else "start watching" }}.</p>
     {%- elif saved_notice %}
     <p class="fg-message fg-message--success" role="status">Saved. Your alerts follow this from the next scan.</p>
-    {%- endif %}
-
-    {%- if mode == "settings" %}
-    {%- if model.alerts_paused_at %}
-    {%- call fg.status("Alerts are paused.", "Nothing will reach you until you turn them back on.", paused=True) %}
-    <form method="post" action="/profile/alerts"><input type="hidden" name="action" value="resume"><button class="fg-button fg-button--primary" type="submit">Resume alerts</button></form>
-    {%- endcall %}
-    {%- else %}
-    {%- call fg.status("I'm watching.", ("Alerts have been on since " ~ started_label ~ ".") if started_label else "") %}
-    <form method="post" action="/profile/alerts"><input type="hidden" name="action" value="pause"><button class="fg-button fg-button--secondary" type="submit">Pause alerts</button></form>
-    {%- endcall %}
-    {%- endif %}
     {%- endif %}
 
     <form id="profile-form" method="post" action="/profile" novalidate
@@ -71,19 +66,19 @@
           {%- else %}
           <p class="fg-message fg-message--attention" role="status">{{ reading[1] }}</p>
           {%- endif %}
-          <p class="fg-message fg-message--discovery" id="resume-busy" role="status" hidden>Reading your resume. This takes a few seconds.</p>
+          {{ fg.progress("resume-progress", reading_steps) }}
           {%- endcall %}
 
           {{ fg.group_label("What I'll match on", "These decide which postings reach you at all.") }}
 
           {%- call(part) fg.card("titles", "Roles I'll watch for", "The job titles I'll match postings against.") %}
+          {{ fg.add_row("titles_new", "Add a title", placeholder="For example, Product Manager", list="titles-list") }}
           <ul class="fg-chips" id="titles-list">
             {%- for t in model.titles %}
             {{ fg.chip(t, name="titles") }}
             {%- endfor %}
           </ul>
           <template id="titles-list-template">{{ fg.chip("__label__", name="titles") }}</template>
-          {{ fg.add_row("titles_new", "Add a title", placeholder="For example, Product Manager", list="titles-list") }}
           {%- endcall %}
 
           {%- call(part) fg.card("level", "Your level", "Leave this on Any level to see every level. A title that doesn't state its level always shows.") %}
@@ -107,13 +102,13 @@
           {{ fg.group_label("What I'll read for in each posting", "These help me judge how well a role fits.") }}
 
           {%- call(part) fg.card("skills", "Skills and strengths", "Saved. I'll start using this soon.") %}
+          {{ fg.add_row("skills_new", "Add a skill", placeholder="For example, Prototyping", list="skills-list") }}
           <ul class="fg-chips" id="skills-list">
             {%- for s in model.skills %}
             {{ fg.chip(s, name="skills") }}
             {%- endfor %}
           </ul>
           <template id="skills-list-template">{{ fg.chip("__label__", name="skills") }}</template>
-          {{ fg.add_row("skills_new", "Add a skill", placeholder="For example, Prototyping", list="skills-list") }}
           {%- endcall %}
         </div>
 
