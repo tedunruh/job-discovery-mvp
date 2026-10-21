@@ -399,6 +399,11 @@ button.fg-link {
   color: var(--fg-color-text-primary);
   text-decoration: none;
 }
+.fg-header-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--fg-size-touch-target);
+}
 .fg-header-context {
   font-size: var(--fg-font-size-md);
   color: var(--fg-color-text-secondary);
