@@ -610,3 +610,16 @@ rotating cold ones) was close to its limit, and nothing stopped the collector fr
       stop another, blocked boards aren't recorded as failed, alert names the ATS, Workable cadence covers every board).
 - [ ] Manual: when adding an ATS to the discovered-board scan, check its published or observed rate limit first and
       set TAIL_PER_ATS and the cadence to stay well under it.
+
+### 2026-10-21 — Parchment cleaned up to linen
+**Shipped:** `palette.parchment` #f6f2e9 → #faf9f7 and `palette.parchment-light` #fbf7ee → #fefdfd
+(Ted: page and card read too yellow and dingy; keep the ethereal feel, cleaner and a little
+brighter). Chosen from four rendered options of the settings screen, then brightened. Every
+surface, tint and on-action color follows through the semantic layer. Contrast re-measured and
+the README updated (Ink 14.0:1, Ink 70% 5.4:1, Forest 7.9:1, disabled button 5.1:1). Figma
+`_Primitives` variables updated to match; the SC-46 canvas re-linked to the new CSS.
+**Rework count:** 0
+**Note:** the local quality check first crashed because the local DB lacked tables added on
+`main` (`user_profiles`); applying `db/schema.sql` to the local DB fixed it.
+**Standing checks:**
+- [ ] Before running the quality check on a fresh `main`, apply `db/schema.sql` to the local DB.
