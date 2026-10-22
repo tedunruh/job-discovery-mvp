@@ -22,8 +22,8 @@
       "lg":       { "$value": "16px", "$description": "Item titles, form input text" },
       "xl":       { "$value": "20px", "$description": "Section titles" },
       "2xl":      { "$value": "24px", "$description": "Fraunces discovery headline" },
-      "3xl":      { "$value": "28px", "$description": "Page titles" },
-      "4xl":      { "$value": "36px", "$description": "Fraunces page headline / header wordmark" },
+      "3xl":      { "$value": "28px", "$description": "Page titles: the Fraunces page headline (h1) under the header" },
+      "4xl":      { "$value": "36px", "$description": "Header wordmark" },
       "wordmark": { "$value": "96px", "$description": "Sign-in wordmark" }
     },
     "line-height": {

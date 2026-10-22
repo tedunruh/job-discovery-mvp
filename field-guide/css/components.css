@@ -428,7 +428,8 @@ button.fg-link {
   gap: var(--fg-space-3) var(--fg-space-6);
 }
 .fg-intro-aside { min-width: 0; max-width: 100%; }  /* shrinks and wraps on a narrow phone */
-.fg-display--page { font-size: var(--fg-font-size-4xl); }
+/* The page headline (h1) is 28px, a step under the 36px wordmark above it. */
+.fg-display--page { font-size: var(--fg-font-size-3xl); }
 .fg-lede {
   max-width: 680px;
   margin: 0;
