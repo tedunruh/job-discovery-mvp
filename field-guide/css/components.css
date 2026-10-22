@@ -99,7 +99,7 @@ button.fg-link {
 }
 .fg-button--ghost:hover { background: var(--fg-color-signal-progress-subtle); }
 .fg-button--block { width: 100%; }
-/* Disabled buttons stay readable (secondary text on the secondary fill, 5.0:1)
+/* Disabled buttons stay readable (secondary text on the secondary fill, 5.1:1)
    instead of fading the whole button; the flat fill says "not yet". */
 .fg-button:disabled,
 .fg-button:disabled:hover {
