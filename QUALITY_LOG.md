@@ -589,3 +589,24 @@ says nothing is unsaved, and a refreshed page says it saved.
 - [x] Automated: tests that none of the four strings render in setup or settings (including when handed the old flag).
       Mutation-tested (each put back -> fails).
 - [ ] Manual: before adding a confirmation or a heading, ask what the screen already shows. Say it once.
+
+### 2026-10-21 — SC-61: 430 of 3,271 discovered boards failed in one run
+**What happened:** The 9:26 PM (Central) run raised the health alert "13% of discovered boards failed". The database
+shows 425 of the 430 were Workable (369 hot, 56 cold), all on their first failure in a row; Greenhouse and Ashby had
+about 10 between them, normal noise. Workable boards had been checked without trouble in the hours before, then
+nearly every request in that run was refused. Run length (6-11 min) and database connections were fine, so this was
+Workable limiting us, not our run. Core-board alerts go out before the discovered-board scan, so they were not delayed.
+**Fix:** once an ATS answers 5 requests in a run with 429/403, the rest of that ATS's boards are left unrequested
+for that run (not counted as failures, health and queue position untouched), and the log and an hourly health alert
+name the ATS. Hot Workable boards are now checked every other run instead of every run, which halves the load
+(they rarely post). The 10% alert still fires for any other kind of mass failure.
+**Not changed:** the 10% threshold is right; it caught this. The failure record keeps no error class per board, so the
+exact status (429 vs 403) isn't visible in the database; the first lines of the next run's log will show it.
+**Rework count:** 0.
+**Root cause:** *Workable rate-limits per source, our request rate to it (about 380 boards every 15 min plus
+rotating cold ones) was close to its limit, and nothing stopped the collector from pushing on once it was refused.*
+**Standing checks added:**
+- [x] Automated: tests/test_rate_limit.py (stops after the trip count, 404s don't trip it, one ATS blocked doesn't
+      stop another, blocked boards aren't recorded as failed, alert names the ATS, Workable cadence covers every board).
+- [ ] Manual: when adding an ATS to the discovered-board scan, check its published or observed rate limit first and
+      set TAIL_PER_ATS and the cadence to stay well under it.

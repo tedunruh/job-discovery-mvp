@@ -65,6 +65,12 @@ TAIL_CHUNK = 48  # boards fetched per batch: the time budget is only checked bet
 # Per-ATS cap on simultaneous requests, so a few thousand boards don't hammer one host.
 TAIL_PER_ATS = {"greenhouse": 8, "ashby": 5, "lever": 4, "workable": 4, "rippling": 4, "workday": 6}
 TAIL_COMMIT_EVERY = 100
+# An ATS that answers this many requests in one run with 429/403 is rate-limiting or blocking
+# us. Stop asking it for the rest of the run (the boards stay first in line for the next
+# run) instead of failing hundreds of boards and prolonging the block - Workable once held
+# one for ~23 hours.
+RATE_LIMIT_TRIP = 5
+WORKABLE_EVERY = 2  # hot Workable boards are checked every Nth run (they rarely post)
 # Past this, don't start more tail work this run (the next run picks it up); keeps a run
 # well inside the 15 min cadence even if an ATS is slow.
 TAIL_TIME_BUDGET_SECONDS = 600
@@ -84,6 +90,19 @@ COLLECTORS = {
 # Same, but cheaper where the ATS allows it (Greenhouse without full job descriptions).
 TAIL_COLLECTORS = dict(COLLECTORS, greenhouse=lambda ident: greenhouse.fetch(ident, light=True))
 _ats_slots = {ats: threading.Semaphore(n) for ats, n in TAIL_PER_ATS.items()}
+_rate_limited = {}  # ats -> rate-limit answers so far this run
+_rate_lock = threading.Lock()
+
+
+class AtsBlocked(Exception):
+    """This ATS is rate-limiting us this run: the board was not requested."""
+
+
+def _note_rate_limit(ats, error):
+    status = getattr(getattr(error, "response", None), "status_code", None)
+    if status in (429, 403):
+        with _rate_lock:
+            _rate_limited[ats] = _rate_limited.get(ats, 0) + 1
 
 
 def run():
@@ -130,6 +149,8 @@ def _fetch_tail(company):
     ats = company["ats_type"]
     marker = None
     with _ats_slots.get(ats, threading.Semaphore(2)):
+        if _rate_limited.get(ats, 0) >= RATE_LIMIT_TRIP:
+            return None, AtsBlocked(ats)
         try:
             if ats == "workday":
                 # Workday's search is ordered by relevance, not date, so there's no "newest
@@ -144,6 +165,7 @@ def _fetch_tail(company):
             else:
                 postings = TAIL_COLLECTORS[ats](company["ats_identifier"])
         except Exception as e:
+            _note_rate_limit(ats, e)
             return None, e
     storable = [p for p in postings if _is_storable(p)]
     design = []
@@ -181,6 +203,8 @@ def select_tail(companies, now=None):
                 every = WORKDAY_BIG_EVERY if _marker_total(c) >= WORKDAY_BIG_TOTAL else WORKDAY_EVERY
                 if c["id"] % every != slot % every:
                     continue
+            elif c["ats_type"] == "workable" and c["id"] % WORKABLE_EVERY != slot % WORKABLE_EVERY:
+                continue
             picked.append(c)
         elif c["tier"] == "cold" and c["id"] % COLD_SLICES == slot:
             picked.append(c)
@@ -379,6 +403,8 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
     if the server dropped it, write, then save progress - so a long run never holds a long idle
     connection or loses what it already did. Returns the connection to use afterwards."""
     t0 = time.time()
+    _rate_limited.clear()
+    blocked = {}  # ats -> boards left unrequested because it was rate-limiting us
     stored = get_open_posting_hashes(conn, [c["id"] for c in tail])
     stats = {"scanned": 0, "design_boards": 0, "writes": 0, "unchanged": 0, "empty": 0, "skipped_budget": 0,
              "ok": 0, "failed": 0, "first_scans": 0}
@@ -404,6 +430,11 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
             conn = ensure_conn(conn)
             for company, (result, error) in zip(chunk, results):
                 cid = company["id"]
+                if isinstance(error, AtsBlocked):
+                    # Not requested, so neither a success nor a failure: leave its health alone
+                    # and its place at the front of the queue.
+                    blocked[company["ats_type"]] = blocked.get(company["ats_type"], 0) + 1
+                    continue
                 stats["scanned"] += 1
                 if error is not None:
                     acc["failed"].append(cid)
@@ -447,6 +478,11 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
         f"{stats['first_scans']} first scans | {promoted} promoted to hot"
         + (f" | {stats['skipped_budget']} skipped (time budget)" if stats["skipped_budget"] else "")
     )
+    for ats, n in blocked.items():
+        print(f"{ats} is rate-limiting us: {n} board(s) not requested this run")
+        if _tail_slot() % 4 == 0:  # remind hourly, not every run, while a block lasts
+            health_alerts.append(f"{ats.capitalize()} is rate-limiting us - {n} board(s) skipped this run. "
+                                 f"Retrying every run; no action needed unless this lasts a day.")
     if stats["failed"] >= TAIL_FAILURE_ALERT_MIN and stats["failed"] > TAIL_FAILURE_ALERT_RATIO * max(stats["scanned"], 1):
         health_alerts.append(
             f"{stats['failed']} of {stats['scanned']} discovered job boards failed this run "
