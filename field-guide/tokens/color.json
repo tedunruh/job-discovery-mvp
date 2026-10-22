@@ -3,13 +3,13 @@
   "color": {
     "palette": {
       "$type": "color",
-      "parchment": { "$value": "#f6f2e9", "$description": "Scout's canvas. The dominant color across the experience." },
+      "parchment": { "$value": "#faf9f7", "$description": "Scout's canvas. The dominant color across the experience." },
       "ink":       { "$value": "#292824", "$description": "Scout's voice. Text, icons, high-emphasis content." },
       "forest":    { "$value": "#355447", "$description": "Scout's direction. Primary actions, links, active and selected states, progress." },
       "goldenrod": { "$value": "#d6a84f", "$description": "Scout's discovery. 'Hey, I found something.' Never the only thing carrying meaning." },
       "clay":      { "$value": "#c9785b", "$description": "Scout's attention. Warnings, time-sensitive info. Use sparingly." },
       "sage":      { "$value": "#a8b39c", "$description": "Scout's support. Tags, secondary statuses, subtle backgrounds." },
-      "parchment-light": { "$value": "#fbf7ee", "$description": "Card surface: a step lighter than Parchment so cards lift without a shadow (Ted, SC-46)." },
+      "parchment-light": { "$value": "#fefdfd", "$description": "Card surface: a step lighter than Parchment so cards lift without a shadow (Ted, SC-46)." },
       "white":     { "$value": "#ffffff", "$description": "Input field fill only." }
     },
     "surface": {

@@ -2,13 +2,13 @@
 :root {
 
   /* color.palette */
-  --fg-color-palette-parchment: #f6f2e9;
+  --fg-color-palette-parchment: #faf9f7;
   --fg-color-palette-ink: #292824;
   --fg-color-palette-forest: #355447;
   --fg-color-palette-goldenrod: #d6a84f;
   --fg-color-palette-clay: #c9785b;
   --fg-color-palette-sage: #a8b39c;
-  --fg-color-palette-parchment-light: #fbf7ee;
+  --fg-color-palette-parchment-light: #fefdfd;
   --fg-color-palette-white: #ffffff;
 
   /* color.surface */

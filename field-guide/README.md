@@ -91,16 +91,16 @@ exist, add a semantic token rather than reaching for a palette value.
 
 | Color | Hex | Role | Use for |
 |---|---|---|---|
-| Parchment | `#f6f2e9` | Canvas | Page backgrounds, large surfaces, empty states. Dominant everywhere. |
-| Parchment light | `#fbf7ee` | Card | Card fill on settings-style pages, a step lighter than the page. Text on it passes AA. |
+| Parchment | `#faf9f7` | Canvas | Page backgrounds, large surfaces, empty states. Dominant everywhere. A clean, nearly neutral linen (Ted, 2026-10-21; was `#f6f2e9`). |
+| Parchment light | `#fefdfd` | Card | Card fill on settings-style pages, a step lighter than the page. Text on it passes AA. |
 | Ink | `#292824` | Voice | Text, icons, high emphasis. Secondary and placeholder (tertiary) at 70%. |
 | Forest | `#355447` | Direction | Primary actions, links, active and selected states, progress |
 | Goldenrod | `#d6a84f` | Discovery | New matches, recommendations, "found for you" |
 | Clay | `#c9785b` | Attention | Warnings, time-sensitive info, secondary destructive actions. Sparingly. |
 | Sage | `#a8b39c` | Support | Tags, secondary statuses, subtle backgrounds |
 
-Contrast on Parchment: Ink 13.2:1, Ink 70% 5.2:1, Forest 7.5:1,
-Clay 3.0:1, Goldenrod 2.0:1, Sage 2.0:1. Every text token passes AA (4.5:1) on Parchment.
+Contrast on Parchment: Ink 14.0:1, Ink 70% 5.4:1, Forest 7.9:1,
+Clay 3.2:1, Goldenrod 2.1:1, Sage 2.1:1. Every text token passes AA (4.5:1) on Parchment.
 Ink on Goldenrod 6.7:1, on Sage 6.7:1, on Clay 4.4:1 (large or bold text only).
 
 ## Typography
@@ -164,7 +164,7 @@ is for supporting text only (metadata, hints, counts, section notes).
 | `fg.stat(value, label)` · `.fg-stats` · `fg.compare(before, after, unit)` | Counts are Ink, not Forest: a stat reports, it doesn't ask you to act |
 | `.fg-row` · `.fg-visually-hidden` · `button.fg-link` | Wrapping action row; screen-reader-only text; link look for an on-page action |
 
-Disabled buttons use the secondary fill with secondary text (5.0:1) rather than fading.
+Disabled buttons use the secondary fill with secondary text (5.1:1) rather than fading.
 
 ## Principles that are build rules
 
