@@ -293,3 +293,13 @@ CREATE TABLE IF NOT EXISTS resume_parses (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_resume_parses_user_month ON resume_parses (user_id, created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- SC-51: job descriptions for gate-passers. Additive migrations (safe to re-run).
+-- ---------------------------------------------------------------------------
+
+-- Plain text (HTML stripped, capped at 20,000 characters), fetched once for a role that passes at least one
+-- person's gate (title, level, location, work type). NULL = not fetched. Text is cleared a while after a role
+-- closes (db.clear_closed_descriptions) so storage stays small. The raw payload is not kept for this.
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS description_fetched_at TIMESTAMPTZ;
