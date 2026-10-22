@@ -372,8 +372,7 @@ button.fg-link {
 }
 
 /* ---------- Page shell ---------- */
-/* Shared header: wordmark on the left, context (step, page name or actions)
-   on the right. The same pattern on onboarding and settings. */
+/* The centered column most pages sit in. */
 .fg-shell {
   box-sizing: border-box;
   width: 100%;
