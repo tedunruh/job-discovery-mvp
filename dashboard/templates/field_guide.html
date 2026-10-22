@@ -489,13 +489,13 @@
   <section class="spec" data-component="header">
     <div>
       <h3>Page header</h3>
-      <p class="spec-use">Use at the top of onboarding and settings pages. Wordmark left; context right (where you are, or a step).</p>
-      <code class="spec-code">{% raw %}{{ fg.header(context) }} · {{ fg.header(back="Back to dashboard") }}{% endraw %} · .fg-shell &gt; .fg-header .fg-header-link</code>
+      <p class="spec-use">On every page. The Scout wordmark first, then one or two actions at the end of the row: a ghost button to go somewhere, a secondary button for a second action. Onboarding has no way out yet, so it shows where you are instead.</p>
+      <code class="spec-code">{% raw %}{% call fg.header() %}…{% endcall %} · {{ fg.header(context) }}{% endraw %} · .fg-header .fg-wordmark .fg-header-actions</code>
     </div>
     <div class="states">
-      <div class="state state--wide"><span class="state-label">Onboarding</span><div class="fg-shell" style="padding: 0">{{ fg.header("Step 2 of 2", href="#layout") }}</div></div>
-      <div class="state state--wide"><span class="state-label">Settings</span><div class="fg-shell" style="padding: 0">{{ fg.header("Settings", href="#layout") }}</div></div>
-      <div class="state state--wide"><span class="state-label">With a way back</span><div class="fg-shell" style="padding: 0">{{ fg.header(back="Back to dashboard", back_href="#layout", href="#layout") }}</div></div>
+      <div class="state state--wide"><span class="state-label">Dashboard: two actions</span><div class="fg-shell" style="padding: 0">{% call fg.header(href="#layout", current=True) %}<a class="fg-button fg-button--ghost" href="#layout">Role preferences</a><form action="#layout" onsubmit="return false"><button class="fg-button fg-button--secondary" type="submit">Sign out</button></form>{% endcall %}</div></div>
+      <div class="state state--wide"><span class="state-label">Settings: one action</span><div class="fg-shell" style="padding: 0">{% call fg.header(href="#layout") %}<a class="fg-button fg-button--ghost" href="#layout">Back to dashboard</a>{% endcall %}</div></div>
+      <div class="state state--wide"><span class="state-label">Onboarding: context</span><div class="fg-shell" style="padding: 0">{{ fg.header("Getting started", href="#layout") }}</div></div>
     </div>
   </section>
 

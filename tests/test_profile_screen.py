@@ -303,7 +303,7 @@ class Template(unittest.TestCase):
 
     def test_settings_has_a_link_back_to_the_dashboard_and_setup_does_not(self):
         settings = render("settings")
-        self.assertRegex(settings, r'<a class="fg-link fg-header-link" href="/">Back to dashboard</a>')
+        self.assertRegex(settings, r'<div class="fg-header-actions"><a class="fg-button fg-button--ghost" href="/">Back to dashboard</a></div>')
         self.assertNotIn("fg-header-context", settings)
         setup = render("setup")
         self.assertNotIn("Back to dashboard", setup)  # they can't use the dashboard until they have started
