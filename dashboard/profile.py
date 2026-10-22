@@ -5,7 +5,7 @@ Form parsing and the preview rule are plain functions so they can be tested with
 routes at the bottom are registered by dashboard/app.py (register)."""
 from datetime import datetime, timedelta, timezone
 
-from flask import g, redirect, render_template, request, url_for
+from flask import g, jsonify, redirect, render_template, request, url_for
 
 from dashboard.filters import WORK_TYPES, work_type
 from db.db import (
@@ -178,6 +178,14 @@ def date_label(dt):
     return f"{dt:%b} {dt.day}" if dt else ""
 
 
+def alerts_switch_state(model):
+    """(on, detail line) for the alerts switch: "On since Oct 1" or "Paused since Oct 21"."""
+    paused, started = model.get("alerts_paused_at"), model.get("alerts_started_at")
+    if paused:
+        return False, f"Paused since {date_label(paused)}"
+    return True, (f"On since {date_label(started)}" if started else "On")
+
+
 def view_context(conn, user_id, mode, model, saved=None, **extra):
     """Everything profile.html and _profile_preview.html need. `saved` is the saved profile when
     `model` is an unsaved draft of it (the settings preview then also shows the change)."""
@@ -196,8 +204,8 @@ def view_context(conn, user_id, mode, model, saved=None, **extra):
         "has_titles": bool(model["titles"]),
         "compare": None,
         "week": get_week_stats(conn, user_id) if mode == "settings" else None,
-        "started_label": date_label(model.get("alerts_started_at")),
-        "paused_label": date_label(model.get("alerts_paused_at")),
+        "alerts_on": alerts_switch_state(model)[0],
+        "alerts_detail": alerts_switch_state(model)[1],
         "changes": 0,
         "saved_snapshot": snapshot_of(saved if saved is not None else model),
         "resume": get_resume(conn, user_id),
@@ -268,10 +276,18 @@ def register(app, require_login):
         user_id = g.user_id
         conn = get_conn()
         try:
+            pause = request.form.get("action") == "pause"
             if is_onboarded(conn, user_id):
                 ensure_profile(conn, user_id)
-                set_alerts_paused(conn, user_id, request.form.get("action") == "pause")
+                set_alerts_paused(conn, user_id, pause)
                 conn.commit()
+            on, detail = alerts_switch_state(saved_profile(conn, user_id, is_onboarded(conn, user_id)))
+            # The switch (field-guide/js/switch.js) asks for JSON and flips in place, so unsaved edits
+            # elsewhere on the page survive. A plain form post just reloads: the switch and its date
+            # line say what happened, so there is no notice banner.
+            if request.accept_mimetypes.best == "application/json":
+                message = "Alerts on." if on else "Alerts paused."  # read out by screen readers only
+                return jsonify(on=on, value="pause" if on else "resume", detail=detail, message=message)
             return redirect(url_for("profile"))
         finally:
             conn.close()

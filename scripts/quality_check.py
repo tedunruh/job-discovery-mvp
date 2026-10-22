@@ -279,17 +279,58 @@ def check_leave_warning(ctx, base):
     page.on("dialog", lambda d: (dialogs.append(d.type), d.dismiss() if stay["on"] and d.type == "beforeunload" else d.accept()))
     page.goto(base + "/profile", wait_until="load")
     page.fill("#city", "Chicago")  # an unsaved edit
-    with page.expect_navigation():
-        page.click("button:has-text('Pause alerts')")  # the page's own navigation
-    check(dialogs == [], "pausing alerts with an unsaved edit raises no 'Leave site?' dialog", str(dialogs))
+    # The alerts switch flips in place (switch.js): no navigation, no dialog, the edit survives.
+    sw = page.locator("#alerts")
+    before = sw.get_attribute("aria-checked")
+    url = page.url
+    page.evaluate("window.__qcNoReload = true")  # a redirect back to /profile keeps the URL, so mark the page itself
+    sw.click()
+    try:
+        page.wait_for_function("(b) => document.getElementById('alerts')?.getAttribute('aria-checked') !== b",
+                               arg=before, timeout=5000)
+    except Exception:
+        pass  # reported below: the switch didn't flip in place
     page.wait_for_load_state("load")
-    page.fill("#city", "Chicago")
+    reloaded = page.url != url or not page.evaluate("window.__qcNoReload === true")
+    check(dialogs == [] and not reloaded and page.locator("#alerts").get_attribute("aria-checked") != before, "flipping the alerts switch raises no 'Leave site?' dialog and stays put",
+          f"{dialogs} {page.url}")
+    if reloaded:  # the rest of this check can't run on a reloaded page
+        page.close()
+        return
+    check(page.input_value("#city") == "Chicago", "...and the unsaved edit survives it", page.input_value("#city"))
+    detail = page.text_content("#alerts-detail") or ""
+    check(detail.startswith("Paused since" if before == "true" else "On since"),
+          "...and the line under it says the new state in words", detail)
+    sw.click()  # put it back
+    page.wait_for_function("(b) => document.getElementById('alerts').getAttribute('aria-checked') === b",
+                           arg=before, timeout=5000)
     stay["on"] = True
     page.click("a.fg-wordmark")  # walking away
     page.wait_for_timeout(300)
     check(dialogs == ["beforeunload"] and page.url.endswith("/profile"),
           "walking away from an unsaved edit still asks first", f"{dialogs} {page.url}")
     page.close()
+
+
+def check_alerts_switch_no_js(browser, base, token):
+    """Without JavaScript the alerts switch is still a working form button: it posts and the page
+    reloads with the switch flipped and its date line updated (no notice banner)."""
+    ctx = browser.new_context(java_script_enabled=False)
+    ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+    page = ctx.new_page()
+    page.goto(base + "/profile", wait_until="load")
+    before = page.get_attribute("#alerts", "aria-checked")
+    with page.expect_navigation():
+        page.click("#alerts")
+    page.wait_for_load_state("load")
+    after = page.get_attribute("#alerts", "aria-checked", timeout=5000) if page.locator("#alerts").count() else None
+    detail = (page.text_content("#alerts-detail") or "") if page.locator("#alerts-detail").count() else ""
+    check(after is not None and after != before and detail.startswith("Paused since" if before == "true" else "On since"),
+          "alerts switch works without JavaScript (posts, flips, the line under it updates)", f"{before}->{after} '{detail}'")
+    if after is not None and after != before:
+        with page.expect_navigation():
+            page.click("#alerts")  # put it back
+    ctx.close()
 
 
 def check_back_link(ctx, base):
@@ -309,7 +350,7 @@ def check_back_link(ctx, base):
 # pills follow the dashboard Figma (36px) and a chip's remove button sits inside
 # its 44px chip, so they're not listed here.
 CONTROL_SELECTORS = (".fg-button, .fg-input, .fg-select select, .fg-check, .fg-segment, "
-                     ".fg-chip, .fg-chip-add, .fg-toggle, .fg-icon-button, .fg-menu-item, button.fg-link")
+                     ".fg-chip, .fg-chip-add, .fg-toggle, .fg-switch, .fg-icon-button, .fg-menu-item, button.fg-link")
 
 
 def check_control_heights(page):
@@ -387,6 +428,7 @@ def main():
             check_leave_warning(ctx, base)
             check_back_link(ctx, base)
             ctx.close()
+            check_alerts_switch_no_js(browser, base, token)
             for (w, h) in VIEWPORTS:
                 mobile = w < MOBILE_MAX_WIDTH
                 ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=mobile, has_touch=mobile)

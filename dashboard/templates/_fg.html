@@ -339,3 +339,22 @@
   <div class="fg-progress-bar" aria-hidden="true"><span{% if percent %} style="width: {{ percent }}%"{% endif %}></span></div>
 </div>
 {%- endmacro %}
+
+{#- Switch: turns a setting on or off, effective immediately (alerts). The label stays
+    fixed; `detail` says the state in words under it ("On since Oct 1").
+    Inside a form, give it name/value and type="submit": it posts without JavaScript.
+    async=True + /field-guide/js/switch.js flips it in place (no reload, so unsaved edits
+    on the page survive); the endpoint answers Accept: application/json with
+    {on, value, detail, message}. `live` = id of a role="status" element for the message.
+    Not the Toggle: a Toggle marks one item in a list; a Switch controls a setting. -#}
+{% macro switch(id, label, on=False, detail="", name="", value="", type="button", async=False, live="", disabled=False) -%}
+<button class="fg-switch" id="{{ id }}" type="{{ type }}" role="switch" aria-checked="{{ 'true' if on else 'false' }}" aria-labelledby="{{ id }}-label"{% if detail %} aria-describedby="{{ id }}-detail"{% endif %}{% if name %} name="{{ name }}" value="{{ value }}"{% endif %}{% if async %} data-fg-async{% endif %}{% if live %} data-fg-live="{{ live }}"{% endif %}{% if disabled %} disabled{% endif %}>
+  <span class="fg-switch-track" aria-hidden="true"><span class="fg-switch-thumb"></span></span>
+  <span class="fg-switch-text">
+    <span class="fg-switch-label" id="{{ id }}-label">{{ label }}</span>
+    {%- if detail %}
+    <span class="fg-switch-detail" id="{{ id }}-detail">{{ detail }}</span>
+    {%- endif %}
+  </span>
+</button>
+{%- endmacro %}

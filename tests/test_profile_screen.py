@@ -159,14 +159,17 @@ class Changes(unittest.TestCase):
         self.assertFalse(pf.differs(draft(work_types=None), draft(work_types=["remote"])))
 
 
-def render(mode, **over):
-    model = draft(titles=["product designer", "design manager"], skills=["Figma"], level="senior", one_level_up=True,
-                  city="Chicago", work_types=["remote", "hybrid"], alerts_started_at=None, alerts_paused_at=None)
+def render(mode, model=None, **over):
+    if model is None:
+        model = draft(titles=["product designer", "design manager"], skills=["Figma"], level="senior",
+                      one_level_up=True, city="Chicago", work_types=["remote", "hybrid"],
+                      alerts_started_at=datetime(2026, 10, 6), alerts_paused_at=None)
+    on, detail = pf.alerts_switch_state(model)
     ctx = {
         "mode": mode, "model": model, "level_options": pf.LEVEL_OPTIONS, "level_label": "Senior",
         "work_options": pf.WORK_OPTIONS, "work_checked": ["Remote", "Hybrid"], "preview_count": 2,
         "preview_items": [posting("Senior Product Designer")], "has_titles": True, "compare": None,
-        "week": {"reached": 21, "opened": 9, "applied": 2}, "started_label": "Oct 6", "paused_label": "",
+        "week": {"reached": 21, "opened": 9, "applied": 2}, "alerts_on": on, "alerts_detail": detail,
         "changes": 0, "error": None,
         "saved_snapshot": pf.snapshot_of(model), "resume": None, "reading": ("ok", None),
         "notice": None, "reading_steps": ["Opening your resume…", "Reading your experience…"],
@@ -200,37 +203,36 @@ class Template(unittest.TestCase):
         html = render("settings", model=draft(level=None, alerts_started_at=None, alerts_paused_at=None), level_label="Any level")
         self.assertRegex(html, r"data-needs-level hidden")
 
-    def test_settings_mode_has_status_pause_and_save_bar(self):
+    def test_settings_mode_has_the_alerts_switch_and_save_bar(self):
         html = render("settings")
-        self.assertIn("I&#39;m watching.", html)
-        self.assertIn("Since Oct 6.", html)
-        self.assertNotIn("Alerts have been on since", html)
+        self.assertIn('role="switch" aria-checked="true"', html)
+        self.assertIn("On since Oct 6", html)
         self.assertIn('value="pause"', html)
         self.assertIn("Save changes", html)
         self.assertNotIn("All changes saved", html)  # nothing to say when nothing is unsaved
         self.assertNotIn("start watching", html)
         self.assertIn("This week", html)
 
-    def test_the_status_is_compact_and_sits_beside_the_page_title(self):
+    def test_the_switch_sits_beside_the_page_title(self):
         html = render("settings")
         head, lede = html.index("fg-intro-head"), html.index('class="fg-lede"')
-        aside, watching = html.index("fg-intro-aside"), html.index("I&#39;m watching.")
-        self.assertTrue(head < aside < watching < lede, "the status belongs inside the headline row, before the lede")
-        self.assertIn("fg-status--compact", html)
-        self.assertIn("fg-button--ghost", html[watching:lede])  # Pause alerts is the quiet button
-        self.assertEqual(html.count("fg-status "), 1)
+        aside, switch = html.index("fg-intro-aside"), html.index('class="fg-switch"')
+        self.assertTrue(head < aside < switch < lede, "the switch belongs inside the headline row, before the lede")
+        self.assertEqual(html.count('role="switch"'), 1)
+        self.assertNotIn("fg-status", html)
 
     def test_setup_has_no_status_beside_the_title(self):
         html = render("setup")
         self.assertNotIn("fg-intro-aside", html)
         self.assertNotIn("fg-status", html)
+        self.assertNotIn('role="switch"', html)
 
-    def test_paused_shows_resume(self):
+    def test_paused_shows_the_switch_off_with_the_date(self):
         model = draft(alerts_started_at=None, alerts_paused_at=datetime(2026, 10, 10))
         html = render("settings", model=model)
-        self.assertIn("Alerts are paused.", html)
+        self.assertIn('aria-checked="false"', html)
+        self.assertIn("Paused since Oct 10", html)
         self.assertIn('value="resume"', html)
-        self.assertIn("Resume alerts", html)
 
     def test_setup_mode_has_start_button_and_no_status_or_finish_later(self):
         html = render("setup")
