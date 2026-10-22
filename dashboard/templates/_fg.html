@@ -51,14 +51,17 @@
 
 {#- ===================== Profile components (SC-46) ===================== -#}
 
-{#- Shared page header: wordmark plus context ("Step 2 of 2"). One pattern for onboarding and settings.
-    back="Back to dashboard" turns the context into a link back (back_href, default "/"): use it on pages
-    a person can leave, such as settings, so the way out reads as a way out. -#}
-{% macro header(context="", href="/", back="", back_href="/") -%}
+{#- Page header, on every page: the Scout wordmark (36px) first, then one or two actions at the end
+    of the row, passed as a call block. Going somewhere is a ghost button (Role preferences, Back to
+    dashboard); a second action is a secondary button (Sign out). Onboarding, which has no way out yet,
+    shows a line of context instead ("Getting started"). current=True marks the wordmark as this page.
+      {% call fg.header(current=True) %}<a class="fg-button fg-button--ghost" href="/profile">Role preferences</a>{% endcall %}
+      {{ fg.header("Getting started") }} -#}
+{% macro header(context="", href="/", current=False) -%}
 <header class="fg-header">
-  <a class="fg-wordmark" href="{{ href }}">Scout</a>
-  {%- if back %}
-  <a class="fg-link fg-header-link" href="{{ back_href }}">{{ back }}</a>
+  <a class="fg-wordmark" href="{{ href }}"{% if current %} aria-current="page"{% endif %}>Scout</a>
+  {%- if caller is defined %}
+  <div class="fg-header-actions">{{ caller() }}</div>
   {%- elif context %}
   <span class="fg-header-context">{{ context }}</span>
   {%- endif %}

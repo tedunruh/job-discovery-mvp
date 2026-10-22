@@ -20,7 +20,7 @@
     {%- if mode == "setup" %}
     {{ fg.header("Getting started") }}
     {%- else %}
-    {{ fg.header(back="Back to dashboard") }}
+    {% call fg.header() %}<a class="fg-button fg-button--ghost" href="/">Back to dashboard</a>{% endcall %}
     {%- endif %}
 
     {%- if mode == "setup" %}
