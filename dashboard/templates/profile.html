@@ -7,6 +7,7 @@
   {% include "_field_guide_head.html" %}
   <script src="/field-guide/js/profile.js" defer></script>
   <script src="/field-guide/js/resume.js" defer></script>
+  <script src="/field-guide/js/switch.js" defer></script>
   <style>
     body.fg-page { display: flex; flex-direction: column; min-height: 100vh; }
     .profile-main { flex: 1; padding-bottom: var(--fg-space-8); }
@@ -26,15 +27,12 @@
     {{ fg.intro("Tell me what to watch for.", "Add the job titles you're after, and I'll let you know when a new role fits. You can change any of this later in Settings.") }}
     {%- else %}
     {%- call fg.intro("Here's what I'm watching for.", "Change anything below, then save. Nothing takes effect until you do.") %}
-    {%- if model.alerts_paused_at %}
-    {%- call fg.status("Alerts are paused.", ("Since " ~ paused_label ~ ".") if paused_label else "", paused=True, compact=True) %}
-    <form method="post" action="/profile/alerts"><input type="hidden" name="action" value="resume"><button class="fg-button fg-button--primary" type="submit">Resume alerts</button></form>
-    {%- endcall %}
-    {%- else %}
-    {%- call fg.status("I'm watching.", ("Since " ~ started_label ~ ".") if started_label else "", compact=True) %}
-    <form method="post" action="/profile/alerts"><input type="hidden" name="action" value="pause"><button class="fg-button fg-button--ghost" type="submit">Pause alerts</button></form>
-    {%- endcall %}
-    {%- endif %}
+    {#- Alerts take effect right away, unlike the form below (it waits for Save), so this is a
+        Switch in its own form. switch.js flips it in place so unsaved edits survive. -#}
+    <form class="alerts-switch" method="post" action="/profile/alerts">
+      {{ fg.switch("alerts", "Alerts", on=alerts_on, detail=alerts_detail, name="action", value="pause" if alerts_on else "resume", type="submit", async=True, live="alerts-live") }}
+      <span class="fg-visually-hidden" role="status" id="alerts-live"></span>
+    </form>
     {%- endcall %}
     {%- endif %}
 

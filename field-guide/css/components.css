@@ -748,6 +748,78 @@ button.fg-link {
   border: 2px solid var(--fg-color-text-secondary);
 }
 
+/* ---------- Switch ---------- */
+/* Turns a setting on or off, and it takes effect right away (alerts). Not the Toggle:
+   a Toggle marks one item in a list (Applied); a Switch controls a setting. The whole
+   row is the button; the label never changes, the detail line under it says the state
+   in words ("On since Oct 1"), so color and knob position never carry it alone. */
+.fg-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fg-space-3);
+  min-height: var(--fg-size-touch-target);
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--fg-radius-md);
+  font-family: inherit;
+  color: var(--fg-color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.fg-switch-track {
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  width: calc(var(--fg-space-8) + var(--fg-space-2));  /* 40px */
+  height: var(--fg-space-6);                            /* 24px */
+  border: 1.5px solid var(--fg-color-text-secondary);
+  border-radius: var(--fg-radius-full);
+  background: transparent;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.fg-switch-thumb {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: var(--fg-space-4);
+  height: var(--fg-space-4);
+  border-radius: var(--fg-radius-full);
+  background: var(--fg-color-text-secondary);
+  transform: translateY(-50%);
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+.fg-switch[aria-checked="true"] .fg-switch-track {
+  background: var(--fg-color-action-selected);
+  border-color: var(--fg-color-action-selected);
+}
+.fg-switch[aria-checked="true"] .fg-switch-thumb {
+  background: var(--fg-color-text-on-action);
+  transform: translate(15px, -50%);  /* 3px from either end of the 40px track */
+}
+.fg-switch:hover .fg-switch-track { box-shadow: 0 0 0 4px var(--fg-color-signal-progress-subtle); }
+.fg-switch:focus-visible {
+  outline: 3px solid var(--fg-color-action-focus-ring);
+  outline-offset: 2px;
+}
+.fg-switch[aria-busy="true"] { cursor: progress; }
+.fg-switch:disabled { opacity: 0.45; cursor: not-allowed; }
+.fg-switch-text { display: flex; flex-direction: column; }
+.fg-switch-label {
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-demibold);
+  line-height: var(--fg-font-line-height-snug);
+}
+.fg-switch-detail {
+  font-size: var(--fg-font-size-sm);
+  font-weight: var(--fg-font-weight-medium);
+  line-height: var(--fg-font-line-height-snug);
+  color: var(--fg-color-text-secondary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fg-switch-track, .fg-switch-thumb { transition: none; }
+}
+
 /* ---------- Action bar ---------- */
 /* Sticks to the bottom of a long form: a note on the left, actions right. */
 .fg-action-bar {

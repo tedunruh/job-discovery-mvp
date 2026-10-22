@@ -138,7 +138,7 @@ is for supporting text only (metadata, hints, counts, section notes).
 | `.fg-button--ghost` | Forest text, no outline (header "Role preferences") |
 | `.fg-radio` | Checked = Forest check-disc |
 | `.fg-filter` / `.fg-filter-pill` / `.fg-menu` / `.fg-menu-item` | Dropdown filter on `<details>` via `fg.filter`; include `/field-guide/js/filter.js` for outside-click and Escape |
-| `.fg-toggle` | One item's on/off status ("Applied") via `fg.toggle`; disc carries the state, label stays fixed |
+| `.fg-toggle` | One item's on/off status ("Applied") via `fg.toggle`; disc carries the state, label stays fixed. For a setting, use the Switch |
 
 **Profile components (SC-46).** Every control is 44px tall (`--fg-size-touch-target`);
 `quality_check.py` fails any shorter control in the gallery.
@@ -157,6 +157,7 @@ is for supporting text only (metadata, hints, counts, section notes).
 | `fg.segmented(name, legend, options)` · `.fg-segmented` `.fg-segment` | One of a short ordered set; real radios (arrow keys work) |
 | `fg.add_row(id, label, list=)` · `.fg-add-row` | Field plus its own Add button. `list="id"` wires it to a chip list with `js/profile.js` (Add or Enter clones `<template id="id-template">`) |
 | `fg.status(title, detail, paused, compact)` · `.fg-status` | Is Scout watching; the words carry the state, not the dot. `compact` drops the box for one line, beside a page title |
+| `fg.switch(id, label, on, detail)` · `.fg-switch` · `js/switch.js` | A setting that takes effect right away (alerts on the profile page). Fixed label, state in words below. Not the Toggle, which marks one item in a list |
 | `fg.progress(id, steps)` · `.fg-progress` | Plain text that changes while something runs, over a bar that fills toward done; hidden until `js/resume.js` starts it |
 | `fg.action_bar(note)` · `.fg-action-bar` | Sticky bottom bar with a note and the save actions |
 | `fg.file_row(name, meta)` · `fg.dropzone(id, title, hint)` | A file the person added; where a file goes (`inline=True` inside a card) |
