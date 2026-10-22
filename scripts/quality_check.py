@@ -343,7 +343,8 @@ HEADER_INFO_JS = """() => {
     style: pick(b, ['fontFamily', 'fontSize', 'fontWeight', 'color', 'paddingLeft', 'paddingRight', 'borderRadius', 'height']),
   }));
   return { wordmark: wm && pick(wm, ['fontFamily', 'fontSize', 'fontWeight', 'letterSpacing', 'color']),
-           wordmarkTop: wm && wm.getBoundingClientRect().top, actions, vw: window.innerWidth };
+           wordmarkTop: wm && wm.getBoundingClientRect().top, actions, vw: window.innerWidth,
+           headline: (() => { const h1 = document.querySelector('h1.fg-display--page'); return h1 && getComputedStyle(h1).fontSize; })() };
 }"""
 
 
@@ -355,6 +356,8 @@ def header_info(page, path, w):
     if not info or not info["wordmark"]:
         return None
     check(info["wordmark"]["fontSize"] == "36px", f"wordmark is 36px  [{path} @{w}]", info["wordmark"]["fontSize"])
+    if info["headline"]:
+        check(info["headline"] == "28px", f"page headline (h1) is 28px, under the 36px wordmark  [{path} @{w}]", info["headline"])
     n = len(info["actions"])
     check(1 <= n <= 2, f"header has one or two actions  [{path} @{w}]", f"{n}: {[a['text'] for a in info['actions']]}")
     for a in info["actions"]:

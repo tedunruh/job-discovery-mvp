@@ -672,3 +672,17 @@ apart because nothing compared them.
       the two pages: the wordmark styles match, the first action is the same button (class and
       computed style), and the wordmark sits at the same height. Mutation-tested (a secondary
       nav button and the old page padding both fail at every width).
+
+### 2026-10-22 — Page headline (h1) down to 28px
+**Shipped:** `.fg-display--page` (the Fraunces h1 from `fg.intro`, on settings, onboarding and
+start) went from 36px (`4xl`) to 28px (`3xl`), a step under the 36px header wordmark (Ted).
+Token descriptions now say which size is which. The Figma "Page intro" headline is bound to
+`font/size/3xl`.
+**Rework count:** 0
+**Root cause of the request:** *the wordmark grew to 36px in the page-header change, the same
+size as the headline under it*, so the two competed. That change should have rechecked the type
+sizes next to the header.
+**Standing checks added:**
+- [x] Automated: quality_check checks that the settings headline is 28px at every width.
+- [ ] Manual: when a header or headline size changes, look at the two together. The header wordmark
+      stays a step above the page headline.
