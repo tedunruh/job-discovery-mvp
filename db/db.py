@@ -485,6 +485,30 @@ def resume_usage(conn, user_id):
     return mine, float(spend)
 
 
+def set_posting_description(conn, posting_id, text):
+    """Store a role's description (plain text) and when it was fetched. Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE postings SET description = %s, description_fetched_at = now() WHERE id = %s",
+            (text, posting_id),
+        )
+
+
+def clear_closed_descriptions(conn, grace_days=14):
+    """Drop the stored description of roles that closed more than `grace_days` ago, so storage doesn't
+    grow with every role Scout has ever seen. Returns how many were cleared. Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE postings SET description = NULL
+            WHERE status = 'closed' AND description IS NOT NULL
+              AND last_seen_at < now() - make_interval(days => %s)
+            """,
+            (grace_days,),
+        )
+        return cur.rowcount
+
+
 def mark_full_ingest_done(conn, company_id):
     with conn.cursor() as cur:
         cur.execute("UPDATE companies SET full_ingest_at = now() WHERE id = %s", (company_id,))
