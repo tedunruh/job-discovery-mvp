@@ -686,3 +686,25 @@ sizes next to the header.
 - [x] Automated: quality_check checks that the settings headline is 28px at every width.
 - [ ] Manual: when a header or headline size changes, look at the two together. The header wordmark
       stays a step above the page headline.
+
+### 2026-10-22 — SC-51 slice 1: reading job descriptions (no behavior change yet)
+**Shipped:** `collectors/descriptions.py` turns a role's description into plain text: Ashby and Lever
+from the list response Scout already downloads (no request), Greenhouse, Workable, Rippling and
+Workday with one request per role through a `FetchBudget` (run cap; a platform that answers 429/403
+five times is not asked again that run, per SC-61). `collectors/http.py` now honors `Retry-After`
+(capped at 30s). `db.set_posting_description` / `clear_closed_descriptions` and the two additive
+`postings` columns are in `schema.sql`. Nothing calls them from the collector yet (slice 2).
+**Rework count:** 2, both caught before commit. Unit tests found HTML-to-text leaving blank lines
+between bullets and a lone "- " for `<li><p>`. The real-endpoint check then found Ashby's own
+`descriptionPlain` carried 3+ blank lines in a row.
+**Root cause:** *the unit-test fixtures were tidy, and the plain-text fields were assumed clean
+while only the HTML path was cleaned.* Real payloads were the only thing that showed it.
+**Standing checks added:**
+- [x] Automated: tests for both HTML shapes and for plain-text tidying, and 11 mutation checks on
+      file copies (budget stop, Workday path, Retry-After cap, and more) all fail when the code is
+      broken. Never `git checkout` a file to undo a mutation.
+- [x] Manual, done each time a platform reader changes: fetch two real roles per platform
+      read-only and check for leftover tags, entities, blank-line runs and the length cap.
+- [x] Schema before code: the columns were applied twice (re-runnable) to a throwaway Neon branch
+      and both functions exercised there. Production has no description columns yet; apply
+      `schema.sql`'s SC-51 block to production before any code that writes them ships.
