@@ -650,3 +650,25 @@ README row and Figma component added.
 - [ ] Manual: in page scripts, read form URLs with `getAttribute("action")`, never `form.action`.
 **Note:** "Applied toggle centered on title line" @360/@390 fails locally with "no rows", on
 `main` too: the local DB has no recent postings to draw. Not a regression.
+
+### 2026-10-22 — One page header on every page
+**Shipped:** The dashboard's hand-built header (an `h1` "Scout" plus its own button row) and the
+settings header (wordmark plus a text link) are now one Field Guide component: `fg.header` with
+the 36px wordmark first and one or two actions at the end of the row, passed as a call block
+(`.fg-header-actions`). Going somewhere is a ghost button ("Role preferences" on the dashboard,
+"Back to dashboard" on settings, the same button now); a second action is secondary ("Sign out").
+Onboarding keeps its "Getting started" context. The wordmark went from 28px to 36px. The
+dashboard's top page padding is gone, so the wordmark sits at the same height on both pages. A
+ghost button at the end of the row lines its text up with the content edge. The dashboard keeps a
+visually hidden `h1` ("Open roles"). Gallery row, README row and Figma component updated.
+`.fg-header-link` removed.
+**Rework count:** 1. The first render left the dashboard wordmark 24px lower than on settings
+(page padding plus header padding), so the logo jumped between pages.
+**Root cause:** *two pages each built their own header*: fonts, button styles and spacing drifted
+apart because nothing compared them.
+**Standing checks added:**
+- [x] Automated: on dashboard and settings at every width, the page uses `header.fg-header`,
+      the wordmark is 36px, there are one or two actions and each is 44px and on screen. Across
+      the two pages: the wordmark styles match, the first action is the same button (class and
+      computed style), and the wordmark sits at the same height. Mutation-tested (a secondary
+      nav button and the old page padding both fail at every width).

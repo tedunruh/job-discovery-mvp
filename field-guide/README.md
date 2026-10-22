@@ -145,7 +145,7 @@ is for supporting text only (metadata, hints, counts, section notes).
 
 | Macro / class | Notes |
 |---|---|
-| `fg.header(context)` · `.fg-shell` `.fg-header` `.fg-wordmark` | One header for onboarding and settings: wordmark left, context right |
+| `{% call fg.header() %}…{% endcall %}` · `fg.header(context)` · `.fg-header` `.fg-wordmark` `.fg-header-actions` | One page header for every page: the 36px wordmark first, then one or two actions at the end of the row (ghost button to go somewhere, secondary for a second action such as Sign out). Onboarding shows context ("Getting started") instead |
 | `fg.intro(title, lede)` · `.fg-display--page` `.fg-lede` | Fraunces headline in Scout's voice, then what to do here. A call block puts something on the headline's right (`.fg-intro-aside`) |
 | `fg.card(id, title, help)` · `.fg-card` `--emphasis` `--discovery` | Flat card on `--fg-color-surface-card` (a step lighter than Parchment) with a hairline border. Emphasis = unsaved change (Forest outline) |
 | `fg.suggestion(eyebrow, statement, help)` · `.fg-voice` | Scout suggests a change: Goldenrod tint, statement in Fraunces |

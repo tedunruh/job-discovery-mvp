@@ -333,6 +333,55 @@ def check_alerts_switch_no_js(browser, base, token):
     ctx.close()
 
 
+HEADER_INFO_JS = """() => {
+  const h = document.querySelector('header.fg-header');
+  if (!h) return null;
+  const pick = (el, keys) => { const cs = getComputedStyle(el); return Object.fromEntries(keys.map(k => [k, cs[k]])); };
+  const wm = h.querySelector('.fg-wordmark');
+  const actions = [...h.querySelectorAll('.fg-header-actions .fg-button')].map(b => ({
+    text: b.textContent.trim(), cls: b.className, rect: b.getBoundingClientRect().toJSON(),
+    style: pick(b, ['fontFamily', 'fontSize', 'fontWeight', 'color', 'paddingLeft', 'paddingRight', 'borderRadius', 'height']),
+  }));
+  return { wordmark: wm && pick(wm, ['fontFamily', 'fontSize', 'fontWeight', 'letterSpacing', 'color']),
+           wordmarkTop: wm && wm.getBoundingClientRect().top, actions, vw: window.innerWidth };
+}"""
+
+
+def header_info(page, path, w):
+    """The page header is one component everywhere (Ted, Oct 22): the 36px wordmark, then one or two
+    actions at the end of the row, each a 44px Field Guide button inside the viewport."""
+    info = page.evaluate(HEADER_INFO_JS)
+    check(info is not None and info["wordmark"] is not None, f"page uses the Field Guide header  [{path} @{w}]")
+    if not info or not info["wordmark"]:
+        return None
+    check(info["wordmark"]["fontSize"] == "36px", f"wordmark is 36px  [{path} @{w}]", info["wordmark"]["fontSize"])
+    n = len(info["actions"])
+    check(1 <= n <= 2, f"header has one or two actions  [{path} @{w}]", f"{n}: {[a['text'] for a in info['actions']]}")
+    for a in info["actions"]:
+        r = a["rect"]
+        check(r["height"] >= 44 and r["left"] >= 0 and r["right"] <= info["vw"] + 0.5,
+              f"header action '{a['text']}' is 44px and on screen  [{path} @{w}]", f"{r}")
+    return info
+
+
+def check_headers_match(infos):
+    """Dashboard and settings headers share the wordmark style and the same 'go somewhere' button
+    (Role preferences / Back to dashboard), at every width. They were two hand-built headers once."""
+    for w in sorted({w for (_, w) in infos}):
+        a, b = infos.get(("/", w)), infos.get(("/profile", w))
+        if not a or not b or not a["actions"] or not b["actions"]:
+            check(False, f"dashboard and settings headers both measured  [@{w}]")
+            continue
+        check(a["wordmark"] == b["wordmark"], f"dashboard and settings wordmarks match  [@{w}]",
+              f"{a['wordmark']} vs {b['wordmark']}")
+        check(abs(a["wordmarkTop"] - b["wordmarkTop"]) <= 1, f"the wordmark sits at the same height on both pages  [@{w}]",
+              f"{a['wordmarkTop']:.1f} vs {b['wordmarkTop']:.1f}")
+        na, nb = a["actions"][0], b["actions"][0]
+        check(na["cls"] == nb["cls"] and na["style"] == nb["style"],
+              f"'{na['text']}' and '{nb['text']}' are the same button  [@{w}]",
+              f"{na['cls']} {na['style']} vs {nb['cls']} {nb['style']}")
+
+
 def check_back_link(ctx, base):
     """Settings has a visible way back to the dashboard, and it works (SC-46: "how do I go to the dashboard?")."""
     page = ctx.new_page()
@@ -429,6 +478,7 @@ def main():
             check_back_link(ctx, base)
             ctx.close()
             check_alerts_switch_no_js(browser, base, token)
+            header_infos = {}
             for (w, h) in VIEWPORTS:
                 mobile = w < MOBILE_MAX_WIDTH
                 ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=mobile, has_touch=mobile)
@@ -448,6 +498,8 @@ def main():
                         check_control_heights(page)
                     if path == "/profile" and w == VIEWPORTS[-1][0]:
                         check_control_heights(page)
+                    if path in ("/", "/profile"):
+                        header_infos[(path, w)] = header_info(page, path, w)
                     if path == "/login":
                         check_login_artwork(page, w, h)
                     if path == "/":
@@ -474,6 +526,7 @@ def main():
                         check_typefaces(page, f"{path} (setup)")
                         check_control_heights(page)
                 ctx.close()
+            check_headers_match(header_infos)
             browser.close()
     finally:
         server.shutdown()
