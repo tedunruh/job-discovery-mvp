@@ -623,3 +623,30 @@ the README updated (Ink 14.0:1, Ink 70% 5.4:1, Forest 7.9:1, disabled button 5.1
 `main` (`user_profiles`); applying `db/schema.sql` to the local DB fixed it.
 **Standing checks:**
 - [ ] Before running the quality check on a fresh `main`, apply `db/schema.sql` to the local DB.
+
+### 2026-10-22 — Alerts: a switch instead of a status line and a Pause button
+**Shipped:** New Field Guide **Switch** (`fg.switch`, `.fg-switch`, `role="switch"`): 40×24 track,
+Forest when on, a fixed label and a small detail line under it. It is not the Toggle: the Toggle
+marks an item (Applied), while the Switch changes a setting and takes effect at once. On settings
+it replaces "I'm watching. Since Oct 1. / Pause alerts" with "Alerts" plus "On since Oct 1" or
+"Paused since Oct 21" (Ted's idea). `field-guide/js/switch.js` posts it with fetch and flips it
+in place, so unsaved edits on the rest of the page survive. Without JavaScript it is a plain form
+button: the page reloads with the switch flipped. No notice banner either way (Ted: just the switch). Gallery spec row (on, off, disabled, no detail line),
+README row and Figma component added.
+**Rework count:** 2 (both caught before commit by the new checks)
+**Root causes:**
+1. *A form control named `action` shadows `form.action`*: `sw.form.action` returned the button,
+   so the fetch went to `/[object HTMLButtonElement]`, failed, and fell back to a full reload.
+   Fixed by reading `getAttribute("action")`.
+2. *A function-local import was copied into one route and not the other*: the no-JS post
+   crashed on `resume_mod` (a NameError). The unit tests render the template, not the route, so
+   only the browser check saw it.
+**Standing checks added:**
+- [x] Automated: quality_check flips the switch with an unsaved edit on the page. The page must
+      not reload (checked with a window marker, since the fallback redirects back to the same
+      URL), the edit must survive, and the detail line must say the new state. A second,
+      JavaScript-disabled context checks the form fallback flips the switch and its date line.
+      Mutation-tested: each check fails on its own bug.
+- [ ] Manual: in page scripts, read form URLs with `getAttribute("action")`, never `form.action`.
+**Note:** "Applied toggle centered on title line" @360/@390 fails locally with "no rows", on
+`main` too: the local DB has no recent postings to draw. Not a regression.

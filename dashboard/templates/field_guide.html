@@ -330,6 +330,20 @@
     </div>
   </section>
 
+  <section class="spec" data-component="switch">
+    <div>
+      <h3>Switch</h3>
+      <p class="spec-use">Use to turn a setting on or off when the change takes effect right away, like alerts. The label stays the same; the line under it says the state in words. Not the Toggle: a Toggle marks one item in a list, a Switch controls a setting.</p>
+      <code class="spec-code">{% raw %}{{ fg.switch(id, label, on, detail, name, value, type, async, live) }}{% endraw %} · .fg-switch · /field-guide/js/switch.js for in-place flips</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">On</span>{{ fg.switch("g-switch-on", "Alerts", on=True, detail="On since Oct 1") }}</div>
+      <div class="state"><span class="state-label">Off</span>{{ fg.switch("g-switch-off", "Alerts", on=False, detail="Paused since Oct 21") }}</div>
+      <div class="state"><span class="state-label">Disabled</span>{{ fg.switch("g-switch-dis", "Alerts", on=True, detail="On since Oct 1", disabled=True) }}</div>
+      <div class="state"><span class="state-label">No detail line</span>{{ fg.switch("g-switch-plain", "Show salary ranges", on=False) }}</div>
+    </div>
+  </section>
+
   <section class="spec" data-component="checkbox-group">
     <div>
       <h3>Checkbox group</h3>
