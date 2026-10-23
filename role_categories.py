@@ -251,3 +251,61 @@ def gate_widened(old, new) -> bool:
         return True
     old_city, new_city = _norm(old["city"]), _norm(new["city"])
     return bool(old_city) and new_city != old_city  # a city only narrows hybrid and on-site roles
+
+
+# --- SC-51 slice 4: a person's skills against a role's stored description ----------------------------
+# A role's score is how many of the person's skills its stored text mentions. The matching rule is plain on
+# purpose (decided on docs/SC-51-slice-4-decision-card.md): a skill matches as a whole word or phrase, any
+# capitalisation, after bracketed text is removed from the skill ("Accessibility (WCAG 2.2)" looks for
+# "accessibility"). No synonyms. `skill_regex` is the one rule: Python uses it here, and db.get_skill_matches
+# hands the same text to Postgres, so the dashboard and the tests cannot drift apart.
+
+MIN_SKILL_LENGTH = 2  # a one-letter "skill" would match stray letters, so it is not counted
+
+
+def skill_phrase(skill) -> str:
+    """What to look for in a description for one saved skill: bracketed text removed, whitespace collapsed,
+    lower case. Empty when nothing usable is left."""
+    text = " ".join(re.sub(r"\([^)]*\)", " ", skill or "").lower().split())
+    return text if len(text) >= MIN_SKILL_LENGTH else ""
+
+
+def skill_phrases(skills):
+    """The usable phrases for these skills: in order, without repeats (ignoring case and brackets)."""
+    seen, out = set(), []
+    for skill in skills or ():
+        phrase = skill_phrase(skill)
+        if phrase and phrase not in seen:
+            seen.add(phrase)
+            out.append(phrase)
+    return out
+
+
+def skill_regex(phrase: str) -> str:
+    """Whole word or phrase: not inside a longer run of letters or digits. Match it case-insensitively."""
+    return r"(?<![a-z0-9])" + re.escape(phrase) + r"(?![a-z0-9])"
+
+
+def skills_matched(text, skills):
+    """Which of the person's skills (as phrases) this text mentions."""
+    if not text:
+        return []
+    return [phrase for phrase in skill_phrases(skills) if re.search(skill_regex(phrase), text, re.IGNORECASE)]
+
+
+def effective_cutoff(cutoff, skills):
+    """The number of matches a role needs, or None for no cutoff. The person's number can never be higher than
+    the number of skills they have (or nothing could ever pass), and nobody with no usable skills has a cutoff."""
+    usable = len(skill_phrases(skills))
+    if not cutoff or cutoff < 1 or usable == 0:
+        return None
+    return min(int(cutoff), usable)
+
+
+def skill_status(matched_count, cutoff, has_text) -> str:
+    """"unscored" (no stored text: never hidden, nothing to say about it), "hidden" (under the cutoff) or "shown"."""
+    if not has_text:
+        return "unscored"
+    if cutoff is not None and matched_count < cutoff:
+        return "hidden"
+    return "shown"
