@@ -314,3 +314,8 @@ ALTER TABLE companies ADD COLUMN IF NOT EXISTS wide_scan_at TIMESTAMPTZ;
 -- A collector run only marks a board wide-scanned if that run loaded everyone's settings after this time, so a
 -- run already in flight cannot cancel a request made while it was running.
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS wide_requested_at TIMESTAMPTZ;
+
+-- SC-51 slice 4: how many of a person's skills a role's stored text must mention for the dashboard to show it.
+-- NULL = no minimum (nothing is hidden). Read and written only through db.get_user_skill_cutoff /
+-- set_user_skill_cutoff, which tolerate the column being absent, so the collector never depends on it.
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS skill_cutoff INTEGER;

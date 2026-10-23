@@ -542,6 +542,44 @@ def get_open_described_ids(conn, company_ids):
     return result
 
 
+def _optional(conn, run, default):
+    """Run `run()` inside a savepoint; on a database error (for example a column that is not there yet) undo just
+    that and return `default`. For features that must never break the page or the save that carries them."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SAVEPOINT optional_step")
+        try:
+            result = run()
+        except psycopg2.Error:
+            with conn.cursor() as cur:
+                cur.execute("ROLLBACK TO SAVEPOINT optional_step")
+            return default
+        with conn.cursor() as cur:
+            cur.execute("RELEASE SAVEPOINT optional_step")
+        return result
+    except psycopg2.Error:
+        return default
+
+
+def get_user_skill_cutoff(conn, user_id):
+    """How many of their skills a role must mention to be shown (SC-51 slice 4), or None for no minimum."""
+    def run():
+        with conn.cursor() as cur:
+            cur.execute("SELECT skill_cutoff FROM user_profiles WHERE user_id = %s", (user_id,))
+            row = cur.fetchone()
+            return row[0] if row else None
+    return _optional(conn, run, None)
+
+
+def set_user_skill_cutoff(conn, user_id, cutoff):
+    """Store the minimum (None clears it) on the person's profile row. Returns whether it was stored. Caller commits."""
+    def run():
+        with conn.cursor() as cur:
+            cur.execute("UPDATE user_profiles SET skill_cutoff = %s WHERE user_id = %s", (cutoff, user_id))
+            return True
+    return _optional(conn, run, False)
+
+
 def get_skill_matches(conn, posting_ids, skills):
     """{posting id: [skill phrases its stored text mentions]} for these roles that have stored text. Roles with
     no text are left out, so the caller can tell "matched nothing" from "never read". The matching happens in

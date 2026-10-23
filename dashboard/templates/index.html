@@ -122,6 +122,7 @@
     .posting-link::after { content: ""; position: absolute; inset: 0; }
     .posting-subline { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
     .posting-source { font-size: var(--fg-font-size-xs); color: var(--fg-color-text-secondary); }
+    .posting-skills { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
 
     .posting-second {
       display: flex;
@@ -205,6 +206,18 @@
     </p>
     {% endif %}
 
+    {% if skills_under %}
+    <p class="more">
+      {% if skills_all %}
+      <span class="fg-text-secondary">Showing {{ skills_under }} role{{ "" if skills_under == 1 else "s" }} under your skills cutoff.</span>
+      <a class="fg-link" href="/">Hide them</a>
+      {% else %}
+      <span class="fg-text-secondary">{{ skills_under }} role{{ " is" if skills_under == 1 else "s are" }} hidden by your skills cutoff.</span>
+      <a class="fg-link" href="/?skills=all">Show them</a>
+      {% endif %}
+    </p>
+    {% endif %}
+
     <ul class="postings">
       {% for p in postings %}
       <li class="posting">
@@ -212,6 +225,9 @@
           <p class="posting-title"><a class="posting-link" href="/open/{{ p.id }}" target="_blank" rel="noopener">{{ p.title }}</a></p>
           <p class="posting-subline">{{ p.company_name }}{% if p.location %} • {{ p.location }}{% endif %}</p>
           <p class="posting-source">Found on {{ p.ats_type|capitalize }}</p>
+          {%- if p.skill_line %}
+          <p class="posting-skills">{{ p.skill_line }}</p>
+          {%- endif %}
         </div>
         <div class="posting-second">
           <div class="posting-meta">
@@ -230,7 +246,7 @@
     {% if next_n %}
     <p class="more">
       <span class="fg-text-secondary">Showing {{ postings|length }} of {{ total }}</span>
-      <a class="fg-link" href="/?n={{ next_n }}">Show {{ page_size }} more</a>
+      <a class="fg-link" href="/?n={{ next_n }}{% if skills_all %}&amp;skills=all{% endif %}">Show {{ page_size }} more</a>
     </p>
     {% endif %}
   </section>

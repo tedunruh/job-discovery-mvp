@@ -115,7 +115,8 @@
       level: level ? level.value : "",
       up: up && up.checked ? "1" : "",
       city: form.elements.city ? keyOf(form.elements.city.value) : "",
-      work: work.sort().join("|")
+      work: work.sort().join("|"),
+      cutoff: form.elements.skill_cutoff ? form.elements.skill_cutoff.value : ""
     };
   }
 

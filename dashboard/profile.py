@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from flask import g, jsonify, redirect, render_template, request, url_for
 
 from dashboard.filters import WORK_TYPES, work_type
+from dashboard.skill_filter import apply_skill_cutoff
 from db.db import (
     create_profile_from_legacy,
     get_conn,
@@ -17,6 +18,7 @@ from db.db import (
     get_user_keywords,
     get_user_profile,
     get_user_role_categories,
+    get_user_skill_cutoff,
     get_user_work_types,
     get_week_stats,
     is_onboarded,
@@ -24,6 +26,7 @@ from db.db import (
     request_wide_catch_up,
     save_profile,
     set_alerts_paused,
+    set_user_skill_cutoff,
 )
 from role_categories import (
     DEFAULT_WORK_TYPES,
@@ -46,6 +49,7 @@ MAX_TITLES = 20
 MAX_SKILLS = 30
 MAX_VALUE_LENGTH = 60
 MAX_CITY_LENGTH = 80
+MAX_SKILL_CUTOFF = 10
 PREVIEW_DAYS = 7
 PREVIEW_SHOW = 3
 NO_TITLE_ERROR = "Add at least one job title to continue."
@@ -65,6 +69,20 @@ def clean_values(values, max_items, max_length=MAX_VALUE_LENGTH):
     return out[:max_items]
 
 
+def parse_cutoff(raw):
+    """The minimum number of skills a role must mention, from the form: 1 to MAX_SKILL_CUTOFF, or None for no minimum."""
+    try:
+        n = int((raw or "").strip())
+    except ValueError:
+        return None
+    return n if 1 <= n <= MAX_SKILL_CUTOFF else None
+
+
+def cutoff_options():
+    """The choices for the minimum, as (value, label) pairs: no minimum, then 1 of my skills, 2 of my skills..."""
+    return [("", "No minimum")] + [(str(n), f"{n} of my skills" if n > 1 else "1 of my skills") for n in range(1, MAX_SKILL_CUTOFF + 1)]
+
+
 def parse_profile_form(form):
     """The profile as the person filled it in. Anything typed into an "Add" field but not yet added
     counts too. No level means every level; no work type means the default (Remote), kept as None."""
@@ -79,6 +97,7 @@ def parse_profile_form(form):
         "one_level_up": bool(level) and level != LEVELS[-1] and "one_level_up" in form,
         "city": " ".join((form.get("city") or "").split())[:MAX_CITY_LENGTH] or None,
         "work_types": [key for key in WORK_TYPES if key in chosen] or None,
+        "skill_cutoff": parse_cutoff(form.get("skill_cutoff")),
     }
 
 
@@ -110,6 +129,7 @@ def differs(a, b):
         return (
             sorted(t.lower() for t in p["titles"]), sorted(s.lower() for s in p["skills"]), p["level"],
             p["one_level_up"], (p["city"] or "").lower(), tuple(effective_work_types(p["work_types"])),
+            p.get("skill_cutoff") or 0,
         )
     return norm(a) != norm(b)
 
@@ -123,6 +143,7 @@ def changed_count(saved, draft):
         (saved["one_level_up"], draft["one_level_up"]),
         ((saved["city"] or "").lower(), (draft["city"] or "").lower()),
         (effective_work_types(saved["work_types"]), effective_work_types(draft["work_types"])),
+        (saved.get("skill_cutoff") or 0, draft.get("skill_cutoff") or 0),
     ]
     return sum(1 for a, b in pairs if a != b)
 
@@ -137,6 +158,7 @@ def snapshot_of(model):
         "up": "1" if model["one_level_up"] else "",
         "city": (model["city"] or "").lower(),
         "work": "|".join(sorted(WORK_TYPES[k] for k in effective_work_types(model["work_types"]))),
+        "cutoff": str(model.get("skill_cutoff") or ""),
     }
 
 
@@ -158,7 +180,9 @@ def preview_for(conn, user_id, draft, days=PREVIEW_DAYS):
     if not draft["titles"]:
         return []
     since = datetime.now(timezone.utc) - timedelta(days=days)
-    return preview_rows(get_open_postings(conn, user_id, since=since, keywords=draft["titles"]), draft)
+    rows = preview_rows(get_open_postings(conn, user_id, since=since, keywords=draft["titles"]), draft)
+    # The count has to follow the minimum, or it would promise roles the dashboard then hides.
+    return apply_skill_cutoff(conn, rows, draft.get("skills"), draft.get("skill_cutoff"))[0]
 
 
 def _legacy_titles(conn, user_id):
@@ -183,6 +207,7 @@ def saved_profile(conn, user_id, onboarded):
                  "city": None}
         started, paused = (legacy_alerts_start(conn, user_id) if onboarded else None), None
     model["work_types"] = work_types
+    model["skill_cutoff"] = get_user_skill_cutoff(conn, user_id)
     model["alerts_started_at"], model["alerts_paused_at"] = started, paused
     return model
 
@@ -218,6 +243,8 @@ def view_context(conn, user_id, mode, model, saved=None, **extra):
         "level_label": LEVEL_LABELS.get(model["level"], ANY_LEVEL),
         "work_options": WORK_OPTIONS,
         "work_checked": [WORK_TYPES[k] for k in effective_work_types(model["work_types"])],
+        "cutoff_options": cutoff_options(),
+        "cutoff_selected": str(model.get("skill_cutoff") or ""),
         "preview_count": len(rows),
         "preview_items": rows[:PREVIEW_SHOW],
         "has_titles": bool(model["titles"]),
@@ -256,7 +283,8 @@ def register(app, require_login):
                     return render_template("profile.html", **view_context(
                         conn, user_id, mode, draft, saved=saved if onboarded else None, error=NO_TITLE_ERROR)), 400
                 before = saved_profile(conn, user_id, onboarded)
-                save_profile(conn, user_id, **draft)
+                save_profile(conn, user_id, **{k: v for k, v in draft.items() if k != "skill_cutoff"})
+                set_user_skill_cutoff(conn, user_id, draft["skill_cutoff"])
                 conn.commit()
                 if gate_widened(before, draft):
                     ask_for_catch_up(conn)
