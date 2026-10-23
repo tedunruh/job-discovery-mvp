@@ -939,14 +939,13 @@ def mark_wide_scanned(conn, company_ids, settings_loaded_at=None):
 
 
 def request_wide_catch_up(conn):
-    """Ask every discovered board (Workday excepted: it does not store these roles yet) for another quiet
-    first-style scan, because someone's settings now let in roles that were not stored. Returns how many
-    boards were asked. Caller commits."""
+    """Ask every discovered board for another quiet first-style scan, because someone's settings now let in
+    roles that were not stored. Returns how many boards were asked. Caller commits."""
     with conn.cursor() as cur:
         cur.execute(
             """
             UPDATE companies SET wide_scan_at = NULL, wide_requested_at = clock_timestamp()
-            WHERE tier IN ('hot', 'cold') AND ats_type <> 'workday'
+            WHERE tier IN ('hot', 'cold')
             """
         )
         return cur.rowcount

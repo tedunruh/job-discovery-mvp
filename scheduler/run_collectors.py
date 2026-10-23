@@ -40,7 +40,7 @@ from db.db import (
     upsert_postings,
 )
 from role_categories import alerts_active, matches_city, matches_profile, matches_profile_titles, matches_work_type
-from scheduler.describe import DescriptionStep, build_gate
+from scheduler.describe import DescriptionStep, build_gate, extra_workday_queries
 from scheduler.heartbeat import ping_failure, ping_success
 from scheduler.notify import notify_health_alerts, notify_new_postings
 
@@ -166,11 +166,16 @@ def _fetch_tail(company):
                 # first" to read. One cheap request returns a fingerprint; only page through
                 # everything when it changed - or on this tenant's turn in the rotation, in
                 # case one role replaced another and the count didn't move.
-                marker = workday.probe_marker(company["ats_identifier"])
+                extra = _describer.extra_queries if _describer is not None else ()
+                args = (company["ats_identifier"], extra) if extra else (company["ats_identifier"],)
+                marker = workday.probe_marker(*args)
                 forced = company["id"] % COLD_SLICES == _tail_slot()
-                if marker == company.get("scan_marker") and company["full_ingest_at"] is not None and not forced:
+                # A quiet catch-up is owed (a person's settings widened): scan even if the count didn't move.
+                owed = bool(extra) and company["id"] in _describer.wide_pending
+                if marker == company.get("scan_marker") and company["full_ingest_at"] is not None and not forced \
+                        and not owed:
                     return {"unchanged": True, "alive": True, "design": [], "marker": marker}, None
-                postings = workday.fetch_light(company["ats_identifier"])
+                postings = workday.fetch_light(*args)
             else:
                 postings = TAIL_COLLECTORS[ats](company["ats_identifier"])
         except Exception as e:
@@ -184,7 +189,7 @@ def _fetch_tail(company):
             if _describer is not None:
                 _describer.prepare(company, p)
             design.append(p)
-        elif _describer is not None and ats != "workday":  # Workday only searches design words (slice 2c)
+        elif _describer is not None:
             # SC-51 slice 2b: a role that is not a design role but passes someone's gate is kept too.
             p["is_design"] = False
             _describer.prepare(company, p)
@@ -203,8 +208,8 @@ def _tail_slot(now=None):
 
 
 def _marker_total(company):
-    """The match count in a Workday tenant's stored change marker ("design:451" -> 451), or 0."""
-    m = re.fullmatch(r"design:(\d+)", company.get("scan_marker") or "")
+    """The match count in a Workday tenant's stored change marker ("design:451" or "design:451|product manager:70" -> 451), or 0."""
+    m = re.match(r"design:(\d+)(?:\||$)", company.get("scan_marker") or "")
     return int(m.group(1)) if m else 0
 
 
@@ -287,8 +292,10 @@ def _run(health_alerts):
         all_user_keywords = get_all_user_keywords(conn)
         all_user_profiles = get_all_user_profiles(conn)
         all_users = get_all_users(conn)
-        _describer = DescriptionStep(build_gate(all_users, all_user_profiles, all_user_categories, all_user_keywords),
-                                     settings_loaded_at=settings_loaded_at)
+        _describer = DescriptionStep(
+            build_gate(all_users, all_user_profiles, all_user_categories, all_user_keywords),
+            settings_loaded_at=settings_loaded_at,
+            extra_queries=extra_workday_queries(all_users, all_user_profiles, all_user_categories, all_user_keywords))
         everything = get_companies_to_scan(conn)
         if not everything:
             print("No companies in the directory — nothing to do.")
@@ -474,6 +481,8 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
     step = _describer
     described = step.described_ids(conn, [c["id"] for c in tail]) if step is not None else {}
     wide_done = step.wide_scanned_ids(conn, [c["id"] for c in tail]) if step is not None else None
+    if step is not None and wide_done is not None:
+        step.wide_pending = {c["id"] for c in tail if c["id"] not in wide_done}
     stats = {"scanned": 0, "design_boards": 0, "writes": 0, "unchanged": 0, "empty": 0, "skipped_budget": 0,
              "ok": 0, "failed": 0, "first_scans": 0}
     acc = {"ok": [], "failed": [], "first": [], "empty": [], "markers": {}, "wide": []}
@@ -524,7 +533,7 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
                 # SC-51 slice 2b: non-design roles that pass someone's gate. The board's first wide
                 # scan stores them silently (they were already open, so not news); after that a new one alerts.
                 other = result.get("other", []) if wide_done is not None else []
-                first_wide = wide_done is not None and cid not in wide_done and company["ats_type"] != "workday"
+                first_wide = wide_done is not None and cid not in wide_done
                 roles = design + other
                 stored_for = stored.get(cid, {})
                 if roles or stored_for:

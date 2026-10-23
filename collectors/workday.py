@@ -123,15 +123,51 @@ def _urls(ats_identifier):
             BASE_URL.format(tenant=tenant, instance=instance, site=site))
 
 
-def probe_marker(ats_identifier: str) -> str:
-    """One request: the number of results matching "design". Workday needs a non-empty search
-    term, and limit=1 keeps the response tiny. Changes whenever a matching role appears or goes."""
+def probe_marker(ats_identifier: str, extra_queries=()) -> str:
+    """One tiny request per search: the number of results matching "design", then one for each extra
+    phrase (SC-51 slice 2c). Workday needs a non-empty search term, and limit=1 keeps the response tiny.
+    Changes whenever a matching role appears or goes, or when the set of extra phrases changes:
+    "design:451" or "design:451|product manager:184"."""
     cxs_url, _ = _urls(ats_identifier)
-    return f"design:{_post(cxs_url, LIGHT_QUERIES[0], 0, limit=1).get('total', 0)}"
+    marker = f"design:{_post(cxs_url, LIGHT_QUERIES[0], 0, limit=1).get('total', 0)}"
+    for query in extra_queries:
+        marker += f"|{query}:{_post(cxs_url, query, 0, limit=1).get('total', 0)}"
+    return marker
 
 
-def fetch_light(ats_identifier: str) -> list[dict]:
-    """Every result of the light queries, de-duplicated - a full paged scan of one tenant."""
+# SC-51 slice 2c: roles a person wants whose titles the design searches would not return ("product manager").
+# Workday's search also matches words inside descriptions, so a phrase's result count is mostly noise, but
+# the roles with the phrase in their title come first (measured: on tenants with 800 to 1,100 results the
+# title matches were all in the first five pages, then none). So page until two pages in a row have no result
+# whose title holds every word of the phrase, and never past EXTRA_MAX_PAGES.
+EXTRA_MAX_PAGES = 10
+EXTRA_QUIET_PAGES = 2
+
+
+def _fetch_extra(cxs_url, base_url, query, postings):
+    words = query.lower().split()
+    offset = total = quiet = 0
+    for _ in range(EXTRA_MAX_PAGES):
+        data = _post(cxs_url, query, offset)
+        jobs = data.get("jobPostings", [])
+        if not jobs:
+            break
+        if offset == 0:
+            total = data.get("total", 0)
+        hit = False
+        for job in jobs:
+            p = _normalize(job, base_url)
+            postings[p["ats_posting_id"]] = p
+            hit = hit or all(w in p["title"].lower() for w in words)
+        quiet = 0 if hit else quiet + 1
+        offset += PAGE_SIZE
+        if offset >= total or quiet >= EXTRA_QUIET_PAGES:
+            break
+
+
+def fetch_light(ats_identifier: str, extra_queries=()) -> list[dict]:
+    """Every result of the light queries, de-duplicated - a full paged scan of one tenant - plus the
+    leading results of each extra phrase."""
     cxs_url, base_url = _urls(ats_identifier)
     postings = {}
     for query in LIGHT_QUERIES:
@@ -150,4 +186,6 @@ def fetch_light(ats_identifier: str) -> list[dict]:
             offset += PAGE_SIZE
             if offset >= total:
                 break
+    for query in extra_queries:
+        _fetch_extra(cxs_url, base_url, query, postings)
     return list(postings.values())

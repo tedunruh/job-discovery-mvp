@@ -75,6 +75,7 @@ class BigWorkdayTenants(unittest.TestCase):
     def test_a_tenant_with_no_marker_yet_counts_as_small(self):
         self.assertEqual(rc._marker_total({"scan_marker": None}), 0)
         self.assertEqual(rc._marker_total({"scan_marker": "design:451"}), 451)
+        self.assertEqual(rc._marker_total({"scan_marker": "design:451|product manager:70"}), 451)
         self.assertEqual(rc._marker_total({"scan_marker": "rescan"}), 0)
 
 
