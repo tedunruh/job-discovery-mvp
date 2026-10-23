@@ -33,12 +33,14 @@ from db.db import (
     set_applied,
     set_user_work_types,
 )
+from dashboard.profile import ask_for_catch_up
 from dashboard.profile import register as register_profile_screens
 from dashboard.resume import register as register_resume
 from role_categories import (
     matches_city,
     matches_profile,
     matches_profile_titles,
+    work_types_widened,
 )
 
 app = Flask(__name__)
@@ -273,8 +275,11 @@ def index():
             # which can't see a cookie, and should follow the same Work type as the dashboard.
             conn = get_conn()
             try:
+                before = get_user_work_types(conn, user_id)
                 set_user_work_types(conn, user_id, chosen)
                 conn.commit()
+                if work_types_widened(before, chosen):
+                    ask_for_catch_up(conn)  # roles the old choice kept out are picked up quietly (SC-51)
             finally:
                 conn.close()
         return redirect(url_for("index"))

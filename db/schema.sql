@@ -309,3 +309,8 @@ ALTER TABLE postings ADD COLUMN IF NOT EXISTS description_fetched_at TIMESTAMPTZ
 -- already open), then sets this. Setting it back to NULL asks for another silent catch-up (e.g. when a
 -- profile widens what is wanted).
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS wide_scan_at TIMESTAMPTZ;
+
+-- SC-51 slice 3: when this board was last asked for a catch-up (a person's settings widened what is wanted).
+-- A collector run only marks a board wide-scanned if that run loaded everyone's settings after this time, so a
+-- run already in flight cannot cancel a request made while it was running.
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS wide_requested_at TIMESTAMPTZ;

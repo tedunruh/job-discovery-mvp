@@ -762,3 +762,36 @@ the one mistake nobody forgives. Silence is decided per board by a marker, not b
       role deleted to look new (1 write, 1 alert).
 - [x] Schema before code: `schema.sql` adds `companies.wide_scan_at`; apply it to production before the
       code ships.
+
+### 2026-10-23 — SC-51 slice 3: a settings change that widens what is wanted triggers a quiet catch-up
+**Shipped:** discovered boards only store roles somebody's gate lets through, so when a person's
+settings let in more (a new target title, a broader level or "one level up", an added Work type, a
+removed or changed city), roles that are already open but were never stored have to be picked up.
+`role_categories.gate_widened` / `work_types_widened` decide when; the profile save and the
+dashboard's Work type filter then call `ask_for_catch_up`, which sets `wide_scan_at = NULL` on every
+discovered board but Workday. Each board's next scan stores the newly wanted roles **silently**
+(slice 2b's first-wide-scan rule): hot boards within a run, cold ones within about 4 hours. Narrowing,
+or editing only skills, asks for nothing. The request is made after the save is committed and can never
+fail the save. Core boards need nothing: every role is already stored there.
+**Rework count:** 0 before commit, 1 found by rehearsal (below).
+**Root cause it guards against:** *a run already in flight finishes later and marks boards "done" using
+the old settings*, silently cancelling a request made while it ran. `companies.wide_requested_at` plus
+the database-clock time each run read everyone's settings (`DescriptionStep.settings_loaded_at`) lets a
+run mark a board only if no request came after it read.
+**Standing checks added:**
+- [x] Automated: the widening rules (titles, levels, Work types incl. default and Any, city), both save
+      routes (asks / does not ask), a failed request never raising into the save, the run handing its
+      settings time to the step, and marking against that time. 14 mutation checks on a copy of the repo
+      all fail when the code is broken (one first survived, "run passes no settings time", until a test
+      was added for it).
+- [x] Manual, on a throwaway Neon branch: column missing (run survives, feature off, health alert);
+      request made through the real function (8,242 boards asked; core and Workday untouched); an in-flight
+      run's marking skipped (0 of 5) and a later run's allowed (5 of 5); then two collector runs: 76
+      roles stored silently, none dated "found now", 0 alerts, 15 scanned boards re-marked, the rest
+      still waiting.
+- [x] Found by that rehearsal: the guard compared `now()` values, which are the *transaction's start*, so
+      two things in one transaction tied and the guard let the in-flight run through. Both sides now use
+      `clock_timestamp()`. Lesson: compare real clock readings, never `now()`, when ordering two events.
+- [x] Schema before code: `companies.wide_requested_at` (additive, in `schema.sql`). Apply it to
+      production before this ships; if it isn't there the collector survives with the feature off, but
+      the Work type filter and profile save would log a failed request and nothing would catch up.

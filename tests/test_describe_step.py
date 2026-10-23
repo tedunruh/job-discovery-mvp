@@ -285,9 +285,10 @@ class WideScan(unittest.TestCase):
         return {"ats_posting_id": rid, "title": title, "url": "u", "is_design": design, "wanted": wanted}
 
     def scan(self, wide_done, design=(), other=(), stored=None, board=None):
-        step = describe.DescriptionStep(lambda p: True)
+        step = describe.DescriptionStep(lambda p: True, settings_loaded_at="T-LOADED")
         step.store = lambda conn, company, postings: conn
         upserts, alerts, closed, marked = [], [], [], []
+        self.loaded_at = []
 
         def upsert(conn, cid, postings, backfill=False):
             upserts.append(([p["ats_posting_id"] for p in postings], backfill))
@@ -301,7 +302,7 @@ class WideScan(unittest.TestCase):
              mock.patch.object(describe._db, "get_wide_scanned_ids", lambda c, ids: wide_done) , \
              mock.patch.object(rc, "upsert_postings", upsert), \
              mock.patch.object(rc, "mark_stale_postings_closed", lambda c, cid, ids: closed.append(sorted(ids))), \
-             mock.patch.object(rc, "mark_wide_scanned", lambda c, ids: marked.extend(ids)), \
+             mock.patch.object(rc, "mark_wide_scanned", lambda c, ids, loaded_at=None: (marked.extend(ids), self.loaded_at.append(loaded_at))), \
              mock.patch.object(rc, "record_tail_scan_results", lambda *a, **k: None), \
              mock.patch.object(rc, "set_scan_markers", lambda *a: None), \
              mock.patch.object(rc, "promote_hot_boards", lambda c: 0), \
@@ -316,6 +317,11 @@ class WideScan(unittest.TestCase):
         self.assertEqual(alerts, [])                  # already open: not news
         self.assertEqual(marked, [9])
         self.assertEqual(closed, [["pm"]])
+
+    def test_a_board_is_marked_only_against_the_time_this_run_read_everyones_settings(self):
+        # A catch-up requested while this run was in flight must not be cancelled by this run's marking.
+        self.scan(wide_done=set(), other=[self.role("pm", "Product Manager", False)])
+        self.assertEqual(self.loaded_at, ["T-LOADED"])
 
     def test_after_that_a_new_wanted_role_alerts(self):
         pm = self.role("pm", "Product Manager", False)
@@ -390,6 +396,21 @@ class WideScan(unittest.TestCase):
         alerts = []
         rc._report_descriptions(step, alerts)
         self.assertTrue(any("non-design" in a for a in alerts))
+
+
+class RunPassesTheSettingsTime(unittest.TestCase):
+    def test_the_run_reads_the_database_clock_and_hands_it_to_the_step(self):
+        from tests.test_run_isolation import RunIsolation
+        seen = []
+        real = describe.DescriptionStep
+
+        def spy(*a, **k):
+            seen.append(k.get("settings_loaded_at"))
+            return real(*a, **k)
+
+        with mock.patch.object(rc, "get_db_now", lambda conn: "DB-NOW"), mock.patch.object(rc, "DescriptionStep", spy):
+            RunIsolation().run_it(tail_raises=False)
+        self.assertEqual(seen, ["DB-NOW"])
 
 
 if __name__ == "__main__":

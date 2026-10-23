@@ -21,6 +21,7 @@ from db.db import (
     get_week_stats,
     is_onboarded,
     legacy_alerts_start,
+    request_wide_catch_up,
     save_profile,
     set_alerts_paused,
 )
@@ -28,6 +29,7 @@ from role_categories import (
     DEFAULT_WORK_TYPES,
     LEVEL_LABELS,
     LEVELS,
+    gate_widened,
     matches_city,
     matches_profile_titles,
     matches_work_type,
@@ -78,6 +80,23 @@ def parse_profile_form(form):
         "city": " ".join((form.get("city") or "").split())[:MAX_CITY_LENGTH] or None,
         "work_types": [key for key in WORK_TYPES if key in chosen] or None,
     }
+
+
+def ask_for_catch_up(conn):
+    """Someone's settings now let in roles that discovered boards did not store. Ask the collector to pick
+    them up quietly on its next scans (SC-51 slice 3). Never fails the save that led here: that is already
+    committed, and a missed request only means roles are picked up when the next widening asks."""
+    try:
+        request_wide_catch_up(conn)
+        conn.commit()
+        return True
+    except Exception as e:  # noqa: BLE001
+        print(f"catch-up request failed: {type(e).__name__}: {e}")
+        try:
+            conn.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return False
 
 
 def effective_work_types(work_types):
@@ -236,8 +255,11 @@ def register(app, require_login):
                     draft.update(alerts_started_at=saved["alerts_started_at"], alerts_paused_at=saved["alerts_paused_at"])
                     return render_template("profile.html", **view_context(
                         conn, user_id, mode, draft, saved=saved if onboarded else None, error=NO_TITLE_ERROR)), 400
+                before = saved_profile(conn, user_id, onboarded)
                 save_profile(conn, user_id, **draft)
                 conn.commit()
+                if gate_widened(before, draft):
+                    ask_for_catch_up(conn)
                 return redirect(url_for("profile") if onboarded else url_for("index"))
             from dashboard import resume as resume_mod
 
