@@ -69,8 +69,9 @@ def build_gate(users, profiles, categories, keywords):
 
 
 class DescriptionStep:
-    def __init__(self, wanted, budget=None):
+    def __init__(self, wanted, budget=None, settings_loaded_at=None):
         self.wanted = wanted
+        self.settings_loaded_at = settings_loaded_at  # the database's clock when everyone's settings were read
         self.budget = budget or descriptions.FetchBudget(max_requests=REQUESTS_PER_RUN)
         self.stored = 0     # roles that got a description (or a note that there is none)
         self.waiting = 0    # wanted roles left for the next run: budget spent or platform refusing

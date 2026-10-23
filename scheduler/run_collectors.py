@@ -22,6 +22,7 @@ from db.db import (
     get_all_users,
     get_companies_to_scan,
     get_conn,
+    get_db_now,
     get_open_posting_hashes,
     mark_wide_scanned,
     get_source_health,
@@ -281,11 +282,13 @@ def _run(health_alerts):
                 f"Scheduler gap: {gap_minutes / 60:.1f}h since the previous collector run "
                 f"(expected every 15-30 min). New roles in that window were discovered late."
             )
+        settings_loaded_at = get_db_now(conn)  # before reading settings: see mark_wide_scanned
         all_user_categories = get_all_user_role_categories(conn)
         all_user_keywords = get_all_user_keywords(conn)
         all_user_profiles = get_all_user_profiles(conn)
         all_users = get_all_users(conn)
-        _describer = DescriptionStep(build_gate(all_users, all_user_profiles, all_user_categories, all_user_keywords))
+        _describer = DescriptionStep(build_gate(all_users, all_user_profiles, all_user_categories, all_user_keywords),
+                                     settings_loaded_at=settings_loaded_at)
         everything = get_companies_to_scan(conn)
         if not everything:
             print("No companies in the directory — nothing to do.")
@@ -477,7 +480,7 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
 
     def flush(conn):
         record_tail_scan_results(conn, acc["ok"], acc["failed"], acc["first"], acc["empty"])
-        mark_wide_scanned(conn, acc["wide"])
+        mark_wide_scanned(conn, acc["wide"], step.settings_loaded_at if step is not None else None)
         set_scan_markers(conn, acc["markers"])
         conn.commit()
         stats["ok"] += len(acc["ok"]); stats["failed"] += len(acc["failed"]); stats["first_scans"] += len(acc["first"])

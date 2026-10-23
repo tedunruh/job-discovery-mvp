@@ -198,3 +198,56 @@ def matches_work_type(posting_work_type, prefs) -> bool:
     if not prefs or len(set(prefs)) >= len(WORK_TYPE_KEYS):
         return True
     return posting_work_type in prefs
+
+
+# --- SC-51 slice 3: did a save let in roles the old settings kept out? ----------------------------
+# Discovered boards only store the roles somebody's gate lets through (see scheduler/describe.py), so when a
+# gate widens, roles that are already open but were never stored have to be picked up, quietly. These say
+# when. Narrowing, or changing only skills, needs nothing: every role such a person wants is already stored.
+
+def _allowed_levels(level, one_level_up):
+    """The levels a title may state and still pass, or None for every level."""
+    if not level:
+        return None
+    allowed = {level}
+    if one_level_up and level in LEVELS and LEVELS.index(level) + 1 < len(LEVELS):
+        allowed.add(LEVELS[LEVELS.index(level) + 1])
+    return allowed
+
+
+def level_widened(old_level, old_up, new_level, new_up) -> bool:
+    old, new = _allowed_levels(old_level, old_up), _allowed_levels(new_level, new_up)
+    if old is None:
+        return False
+    return new is None or not new <= old
+
+
+def _work_set(prefs):
+    if prefs is None:
+        prefs = DEFAULT_WORK_TYPES
+    if not prefs or len(set(prefs)) >= len(WORK_TYPE_KEYS):
+        return set(WORK_TYPE_KEYS)
+    return set(prefs)
+
+
+def work_types_widened(old, new) -> bool:
+    """Does the new Work type preference admit a work type the old one did not? (None = never chose.)"""
+    return not _work_set(new) <= _work_set(old)
+
+
+def _norm(text):
+    return " ".join((text or "").lower().split())
+
+
+def gate_widened(old, new) -> bool:
+    """Does saving profile `new` over `old` let in roles that `old` kept out? Both are dicts with titles,
+    level, one_level_up, city and work_types. Conservative: when unsure it says yes, which only costs a
+    quiet re-scan."""
+    if {_norm(t) for t in new["titles"]} - {_norm(t) for t in old["titles"]}:
+        return True
+    if level_widened(old["level"], old["one_level_up"], new["level"], new["one_level_up"]):
+        return True
+    if work_types_widened(old["work_types"], new["work_types"]):
+        return True
+    old_city, new_city = _norm(old["city"]), _norm(new["city"])
+    return bool(old_city) and new_city != old_city  # a city only narrows hybrid and on-site roles

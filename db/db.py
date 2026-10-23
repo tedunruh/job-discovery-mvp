@@ -903,17 +903,53 @@ def record_tail_scan_results(conn, ok_ids, failed_ids, first_scan_ids, empty_ids
 
 
 def get_wide_scanned_ids(conn, company_ids):
-    """Which of these boards have had their first wide scan (SC-51 slice 2b), as a set of company ids."""
+    """Which of these boards have had their first wide scan (SC-51 slice 2b), as a set of company ids.
+    Also reads wide_requested_at, so the query fails (and the feature switches itself off) unless the
+    whole slice-3 schema is there."""
     with conn.cursor() as cur:
-        cur.execute("SELECT id FROM companies WHERE wide_scan_at IS NOT NULL AND id = ANY(%s)", (list(company_ids),))
+        cur.execute(
+            "SELECT id, wide_requested_at FROM companies WHERE wide_scan_at IS NOT NULL AND id = ANY(%s)",
+            (list(company_ids),),
+        )
         return {r[0] for r in cur.fetchall()}
 
 
-def mark_wide_scanned(conn, company_ids):
-    """Record that these boards have had their first wide scan: from now on a new wanted role alerts."""
+def get_db_now(conn):
+    """The database's clock: one clock for "when did the run load everyone's settings" and "when was a
+    catch-up requested", whichever machine each ran on. clock_timestamp(), not now(): now() is the start of
+    the transaction, so two things in one transaction would tie."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT clock_timestamp()")
+        return cur.fetchone()[0]
+
+
+def mark_wide_scanned(conn, company_ids, settings_loaded_at=None):
+    """Record that these boards have had their first wide scan: from now on a new wanted role alerts.
+    Skipped for a board asked for a catch-up after `settings_loaded_at`: this run's picture of what people
+    want was out of date for it, so it stays due and the next run does the quiet catch-up."""
     if company_ids:
         with conn.cursor() as cur:
-            cur.execute("UPDATE companies SET wide_scan_at = now() WHERE id = ANY(%s)", (list(company_ids),))
+            cur.execute(
+                """
+                UPDATE companies SET wide_scan_at = now()
+                WHERE id = ANY(%s) AND (%s::timestamptz IS NULL OR wide_requested_at IS NULL OR wide_requested_at <= %s)
+                """,
+                (list(company_ids), settings_loaded_at, settings_loaded_at),
+            )
+
+
+def request_wide_catch_up(conn):
+    """Ask every discovered board (Workday excepted: it does not store these roles yet) for another quiet
+    first-style scan, because someone's settings now let in roles that were not stored. Returns how many
+    boards were asked. Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE companies SET wide_scan_at = NULL, wide_requested_at = clock_timestamp()
+            WHERE tier IN ('hot', 'cold') AND ats_type <> 'workday'
+            """
+        )
+        return cur.rowcount
 
 
 def promote_hot_boards(conn):
