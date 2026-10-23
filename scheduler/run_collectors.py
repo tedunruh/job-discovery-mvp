@@ -12,6 +12,7 @@ from collectors import ashby, greenhouse, lever, rippling, workable, workday
 from collectors.filters import is_design_role
 from dashboard.filters import work_type
 from db.db import (
+    clear_closed_descriptions,
     content_hash,
     ensure_conn,
     finish_scheduler_run,
@@ -37,6 +38,7 @@ from db.db import (
     upsert_postings,
 )
 from role_categories import alerts_active, matches_city, matches_profile, matches_profile_titles, matches_work_type
+from scheduler.describe import DescriptionStep, build_gate
 from scheduler.heartbeat import ping_failure, ping_success
 from scheduler.notify import notify_health_alerts, notify_new_postings
 
@@ -92,6 +94,9 @@ TAIL_COLLECTORS = dict(COLLECTORS, greenhouse=lambda ident: greenhouse.fetch(ide
 _ats_slots = {ats: threading.Semaphore(n) for ats, n in TAIL_PER_ATS.items()}
 _rate_limited = {}  # ats -> rate-limit answers so far this run
 _rate_lock = threading.Lock()
+# SC-51: the description step for this run (None when not running, so tests and scripts that call the
+# fetch functions directly are unaffected). The fetch workers read it to tag wanted roles.
+_describer = None
 
 
 class AtsBlocked(Exception):
@@ -137,6 +142,8 @@ def _fetch_company(company):
         return None, e
     for p in postings:
         p["is_design"] = is_design_role(p.get("title") or "")
+        if _describer is not None:
+            _describer.prepare(company, p)  # before the payload below is dropped
         if not p["is_design"]:
             p["raw_json"] = None
     return postings, None
@@ -172,6 +179,8 @@ def _fetch_tail(company):
     for p in storable:
         if is_design_role(p["title"]):
             p["is_design"] = True
+            if _describer is not None:
+                _describer.prepare(company, p)
             design.append(p)
     return {"design": design, "alive": bool(storable), "marker": marker}, None
 
@@ -253,6 +262,7 @@ def _wants_posting(user_id, posting, profiles, categories, keywords):
 
 
 def _run(health_alerts):
+    global _describer
     conn = get_conn()
     new_postings_by_user = {}  # user_id -> {"ntfy_topic": str, "postings": [...]}
     try:
@@ -267,6 +277,7 @@ def _run(health_alerts):
         all_user_keywords = get_all_user_keywords(conn)
         all_user_profiles = get_all_user_profiles(conn)
         all_users = get_all_users(conn)
+        _describer = DescriptionStep(build_gate(all_users, all_user_profiles, all_user_categories, all_user_keywords))
         everything = get_companies_to_scan(conn)
         if not everything:
             print("No companies in the directory — nothing to do.")
@@ -297,6 +308,7 @@ def _run(health_alerts):
 
         # ---- core companies: every role stored, full fetch -------------------------------
         t_core = time.time()
+        describe_later = []  # (company, its roles): descriptions are fetched after alerts have gone out
         with ThreadPoolExecutor(max_workers=FETCH_WORKERS) as pool:
             fetched = list(pool.map(_fetch_company, core))
 
@@ -352,6 +364,7 @@ def _run(health_alerts):
                     mark_full_ingest_done(conn, company_id)
                 if company.get("scan_marker") == "rescan":
                     set_scan_markers(conn, {company_id: None})
+                describe_later.append((company, storable))
             else:
                 # An anomalous empty result (nothing came back, or titles are
                 # blank - the signature of a schema change) shouldn't mass-close
@@ -369,6 +382,11 @@ def _run(health_alerts):
         print(f"core: {len(core)} companies in {time.time() - t_core:.0f}s")
         conn.commit()
         _deliver(new_postings_by_user, health_alerts)  # before the slow part, not after it
+        for company, roles in describe_later:  # requests, so after the alerts: never delays them
+            conn = _describer.store(conn, company, roles)
+            conn.commit()
+        describe_later.clear()
+        conn = _drop_old_descriptions(conn)
 
         # ---- discovered boards: design roles only, lean DB path ---------------------------
         if tail:
@@ -385,12 +403,46 @@ def _run(health_alerts):
                     pass
                 conn = ensure_conn(conn)
 
+        _report_descriptions(_describer, health_alerts)
         finish_scheduler_run(conn, run_id)
         conn.commit()
     finally:
+        _describer = None
         conn.close()
 
     _deliver(new_postings_by_user, health_alerts)  # alerts found by the discovered-board scan
+
+
+def _drop_old_descriptions(conn):
+    """Hourly: forget the text of roles that closed a while ago. Never takes the run down."""
+    if _tail_slot() % 4 != 0:
+        return conn
+    try:
+        n = clear_closed_descriptions(conn)
+        conn.commit()
+        if n:
+            print(f"cleared the description of {n} long-closed role(s)")
+    except Exception as e:  # noqa: BLE001
+        print(f"clearing old descriptions failed: {type(e).__name__}: {e}")
+        try:
+            conn.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        conn = ensure_conn(conn)
+    return conn
+
+
+def _report_descriptions(step, health_alerts):
+    if step is None:
+        return
+    print(step.summary())
+    if step.broken:
+        health_alerts.append(f"The description step was switched off for this run (roles are unaffected): {step.broken}")
+    blocked = step.budget.blocked()
+    if blocked and _tail_slot() % 4 == 0:  # remind hourly, not every run, while a block lasts
+        names = ", ".join(a.capitalize() for a in blocked)
+        health_alerts.append(f"{names} is rate-limiting description requests. Those roles wait for the next run; "
+                             f"no action needed unless this lasts a day.")
 
 
 def _scan_tail(conn, tail, health_alerts, fan_out):
@@ -406,6 +458,8 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
     _rate_limited.clear()
     blocked = {}  # ats -> boards left unrequested because it was rate-limiting us
     stored = get_open_posting_hashes(conn, [c["id"] for c in tail])
+    step = _describer
+    described = step.described_ids(conn, [c["id"] for c in tail]) if step is not None else {}
     stats = {"scanned": 0, "design_boards": 0, "writes": 0, "unchanged": 0, "empty": 0, "skipped_budget": 0,
              "ok": 0, "failed": 0, "first_scans": 0}
     acc = {"ok": [], "failed": [], "first": [], "empty": [], "markers": {}}
@@ -457,6 +511,8 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
                     # Same roles, same content as last time: no database work at all.
                     if not backfill and {str(p["ats_posting_id"]): content_hash(p) for p in design} == stored_for:
                         stats["unchanged"] += 1
+                        if step is not None and step.lacking(design, described.get(cid, ())):
+                            conn = step.store(conn, company, design)  # roles already stored, now wanted
                         continue
                     new_ids = upsert_postings(conn, cid, design, backfill=backfill)
                     if not backfill:
@@ -466,6 +522,8 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
                                 fan_out(conn, company, posting, posting_id)
                     mark_stale_postings_closed(conn, cid, [str(p["ats_posting_id"]) for p in design])
                     stats["writes"] += 1
+                    if step is not None:
+                        conn = step.store(conn, company, design)
                 if backfill:
                     acc["first"].append(cid)
             flush(conn)  # progress is saved after every batch
