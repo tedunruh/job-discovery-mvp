@@ -99,8 +99,9 @@ fingerprint (`'rescan'` = silent re-scan).
   Check Render's deploy status via its API and `scheduler_runs` for the next run.
 
 **Working agreements (learned the hard way)**
-- The assistant has **no GitHub credentials**: the user pushes. Run `git status` / `git log`
-  first (the user often commits themselves). Never force-push without explicit steps; a Pull/Sync
+- The user pushes (GitHub Desktop); the assistant does not push. The GitHub CLI is installed at
+  `~/.local/bin/gh` (not on PATH; use the full path) and signed in, so the assistant can open PRs
+  and read CI and run logs. Run `git status` / `git log` first (the user often commits themselves). Never force-push without explicit steps; a Pull/Sync
   button re-merges rewritten history.
 - **Don't build what wasn't asked.** A company-tracking page was built from a decision card and
   removed. Ask or confirm before adding user-facing features. Keep solutions simple.
