@@ -23,6 +23,7 @@ from db.db import (
     get_companies_to_scan,
     get_conn,
     get_open_posting_hashes,
+    mark_wide_scanned,
     get_source_health,
     mark_full_ingest_done,
     mark_notified,
@@ -151,8 +152,8 @@ def _fetch_company(company):
 
 def _fetch_tail(company):
     """Worker-thread fetch for a discovered board. Returns (result, None) or (None, exception)
-    where result = {"design": [storable design postings], "alive": any real posting came
-    back}. Only design postings are kept; everything else is dropped immediately."""
+    where result = {"design": [storable design postings], "other": [non-design postings that pass
+    someone's gate], "alive": any real posting came back}. Everything else is dropped immediately."""
     ats = company["ats_type"]
     marker = None
     with _ats_slots.get(ats, threading.Semaphore(2)):
@@ -175,14 +176,21 @@ def _fetch_tail(company):
             _note_rate_limit(ats, e)
             return None, e
     storable = [p for p in postings if _is_storable(p)]
-    design = []
+    design, other = [], []
     for p in storable:
         if is_design_role(p["title"]):
             p["is_design"] = True
             if _describer is not None:
                 _describer.prepare(company, p)
             design.append(p)
-    return {"design": design, "alive": bool(storable), "marker": marker}, None
+        elif _describer is not None and ats != "workday":  # Workday only searches design words (slice 2c)
+            # SC-51 slice 2b: a role that is not a design role but passes someone's gate is kept too.
+            p["is_design"] = False
+            _describer.prepare(company, p)
+            if p["wanted"]:
+                p["raw_json"] = None  # the text, if the list had it, is already in p["description"]
+                other.append(p)
+    return {"design": design, "other": other, "alive": bool(storable), "marker": marker}, None
 
 
 def _is_storable(p):
@@ -438,6 +446,8 @@ def _report_descriptions(step, health_alerts):
     print(step.summary())
     if step.broken:
         health_alerts.append(f"The description step was switched off for this run (roles are unaffected): {step.broken}")
+    if step.wide_broken:
+        health_alerts.append(f"Storing wanted non-design roles was switched off for this run (roles are unaffected): {step.wide_broken}")
     blocked = step.budget.blocked()
     if blocked and _tail_slot() % 4 == 0:  # remind hourly, not every run, while a block lasts
         names = ", ".join(a.capitalize() for a in blocked)
@@ -460,18 +470,21 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
     stored = get_open_posting_hashes(conn, [c["id"] for c in tail])
     step = _describer
     described = step.described_ids(conn, [c["id"] for c in tail]) if step is not None else {}
+    wide_done = step.wide_scanned_ids(conn, [c["id"] for c in tail]) if step is not None else None
     stats = {"scanned": 0, "design_boards": 0, "writes": 0, "unchanged": 0, "empty": 0, "skipped_budget": 0,
              "ok": 0, "failed": 0, "first_scans": 0}
-    acc = {"ok": [], "failed": [], "first": [], "empty": [], "markers": {}}
+    acc = {"ok": [], "failed": [], "first": [], "empty": [], "markers": {}, "wide": []}
 
     def flush(conn):
         record_tail_scan_results(conn, acc["ok"], acc["failed"], acc["first"], acc["empty"])
+        mark_wide_scanned(conn, acc["wide"])
         set_scan_markers(conn, acc["markers"])
         conn.commit()
         stats["ok"] += len(acc["ok"]); stats["failed"] += len(acc["failed"]); stats["first_scans"] += len(acc["first"])
         for k in ("ok", "failed", "first", "empty"):
             acc[k] = []
         acc["markers"] = {}
+        acc["wide"] = []
 
     with ThreadPoolExecutor(max_workers=TAIL_WORKERS) as pool:
         for start in range(0, len(tail), TAIL_CHUNK):
@@ -505,27 +518,41 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
                     acc["markers"][cid] = result["marker"]
                 backfill = company["full_ingest_at"] is None
                 design = result["design"]
+                # SC-51 slice 2b: non-design roles that pass someone's gate. The board's first wide
+                # scan stores them silently (they were already open, so not news); after that a new one alerts.
+                other = result.get("other", []) if wide_done is not None else []
+                first_wide = wide_done is not None and cid not in wide_done and company["ats_type"] != "workday"
+                roles = design + other
                 stored_for = stored.get(cid, {})
-                if design or stored_for:
+                if roles or stored_for:
                     stats["design_boards"] += 1 if design else 0
                     # Same roles, same content as last time: no database work at all.
-                    if not backfill and {str(p["ats_posting_id"]): content_hash(p) for p in design} == stored_for:
+                    if not backfill and {str(p["ats_posting_id"]): content_hash(p) for p in roles} == stored_for:
                         stats["unchanged"] += 1
-                        if step is not None and step.lacking(design, described.get(cid, ())):
-                            conn = step.store(conn, company, design)  # roles already stored, now wanted
-                        continue
-                    new_ids = upsert_postings(conn, cid, design, backfill=backfill)
-                    if not backfill:
+                        if step is not None and step.lacking(roles, described.get(cid, ())):
+                            conn = step.store(conn, company, roles)  # roles already stored, now wanted
+                    else:
+                        new_ids = upsert_postings(conn, cid, design, backfill=backfill) if design else {}
+                        new_other = upsert_postings(conn, cid, other, backfill=backfill or first_wide) if other else {}
                         for posting in design:
                             posting_id = new_ids.get(str(posting["ats_posting_id"]))
-                            if posting_id is not None:
+                            if posting_id is not None and not backfill:
                                 fan_out(conn, company, posting, posting_id)
-                    mark_stale_postings_closed(conn, cid, [str(p["ats_posting_id"]) for p in design])
-                    stats["writes"] += 1
-                    if step is not None:
-                        conn = step.store(conn, company, design)
+                        for posting in other:
+                            posting_id = new_other.get(str(posting["ats_posting_id"]))
+                            if posting_id is not None and not (backfill or first_wide):
+                                fan_out(conn, company, posting, posting_id)
+                        if wide_done is not None or step is None:
+                            # (When slice 2b is switched off for the run, stored non-design roles aren't in
+                            # `roles`, so closing "everything not seen" would wrongly close them.)
+                            mark_stale_postings_closed(conn, cid, [str(p["ats_posting_id"]) for p in roles])
+                        stats["writes"] += 1
+                        if step is not None:
+                            conn = step.store(conn, company, roles)
                 if backfill:
                     acc["first"].append(cid)
+                if first_wide:
+                    acc["wide"].append(cid)
             flush(conn)  # progress is saved after every batch
     promoted = promote_hot_boards(conn)
     conn.commit()
