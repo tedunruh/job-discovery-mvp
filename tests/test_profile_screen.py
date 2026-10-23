@@ -72,6 +72,13 @@ class ParseForm(unittest.TestCase):
         none = pf.parse_profile_form(form(titles="x1", level="Any level", level_note="Led a team.", level_note_level="senior"))
         self.assertIsNone(none["level_note"])
 
+    def test_the_minimum_is_a_whole_number_from_one_to_ten_or_nothing(self):
+        for raw, want in (("3", 3), (" 10 ", 10), ("1", 1), ("", None), (None, None), ("0", None), ("11", None),
+                          ("-2", None), ("x", None), ("2.5", None)):
+            self.assertEqual(pf.parse_cutoff(raw), want, raw)
+        self.assertEqual(pf.parse_profile_form(form(titles="x1", skill_cutoff="4"))["skill_cutoff"], 4)
+        self.assertIsNone(pf.parse_profile_form(form(titles="x1"))["skill_cutoff"])
+
     def test_no_title_means_an_empty_list(self):
         self.assertEqual(pf.parse_profile_form(form(level="Senior"))["titles"], [])
 
@@ -98,7 +105,7 @@ def posting(title, location="Remote - US", remote_type="remote"):
 
 def draft(**over):
     base = {"titles": ["product designer"], "skills": [], "level": None, "one_level_up": False, "city": None,
-            "work_types": None}
+            "work_types": None, "skill_cutoff": None}
     base.update(over)
     return base
 
@@ -155,6 +162,11 @@ class Changes(unittest.TestCase):
             self.assertEqual(pf.changed_count(saved, draft(**change)), 1, change)
         self.assertEqual(pf.changed_count(draft(level="senior"), draft(level="senior", one_level_up=True)), 1)
 
+    def test_a_changed_minimum_counts_as_one_change_and_off_equals_unset(self):
+        self.assertEqual(pf.changed_count(draft(), draft(skill_cutoff=3)), 1)
+        self.assertTrue(pf.differs(draft(), draft(skill_cutoff=3)))
+        self.assertFalse(pf.differs(draft(skill_cutoff=None), draft()))
+
     def test_unset_work_type_equals_remote(self):
         self.assertFalse(pf.differs(draft(work_types=None), draft(work_types=["remote"])))
 
@@ -168,6 +180,7 @@ def render(mode, model=None, **over):
     ctx = {
         "mode": mode, "model": model, "level_options": pf.LEVEL_OPTIONS, "level_label": "Senior",
         "work_options": pf.WORK_OPTIONS, "work_checked": ["Remote", "Hybrid"], "preview_count": 2,
+        "cutoff_options": pf.cutoff_options(), "cutoff_selected": str(model.get("skill_cutoff") or ""),
         "preview_items": [posting("Senior Product Designer")], "has_titles": True, "compare": None,
         "week": {"reached": 21, "opened": 9, "applied": 2}, "alerts_on": on, "alerts_detail": detail,
         "changes": 0, "error": None,
@@ -298,7 +311,7 @@ class Template(unittest.TestCase):
     def test_the_saved_profile_is_handed_to_the_page_script(self):
         model = draft(titles=["new one"], alerts_started_at=None, alerts_paused_at=None)
         html = render("settings", model=model, saved_snapshot=pf.snapshot_of(draft(titles=["old one"])), changes=1)
-        self.assertIn('data-saved=\'{"city": "", "level": "Any level", "skills": "", "titles": "old one"', html)
+        self.assertIn('data-saved=\'{"city": "", "cutoff": "", "level": "Any level", "skills": "", "titles": "old one"', html)
         self.assertIn("1 change not saved.", html)
 
     def test_settings_has_a_link_back_to_the_dashboard_and_setup_does_not(self):
@@ -351,7 +364,18 @@ class Template(unittest.TestCase):
         snap = pf.snapshot_of(draft(titles=["B title", "a title"], level="senior", one_level_up=True, city="Chicago",
                                     work_types=["remote", "hybrid"]))
         self.assertEqual(snap, {"titles": "a title|b title", "skills": "", "level": "Senior", "up": "1",
-                                "city": "chicago", "work": "Hybrid|Remote"})
+                                "city": "chicago", "work": "Hybrid|Remote", "cutoff": ""})
+        self.assertEqual(pf.snapshot_of(draft(skill_cutoff=3))["cutoff"], "3")
+
+    def test_the_skills_card_has_the_minimum_with_the_saved_value_selected(self):
+        html = render("settings", model=draft(skills=["Figma"], skill_cutoff=3, alerts_started_at=None, alerts_paused_at=None))
+        self.assertIn('for="skill_cutoff">Show roles that match at least</label>', html)
+        self.assertIn('<option value="3" selected>3 of my skills</option>', html)
+        self.assertIn('<option value="">No minimum</option>', html)
+        self.assertIn("hide roles that mention fewer of these", html)
+        self.assertNotIn("I'll start using this soon", html)
+        off = render("settings")
+        self.assertIn('<option value="" selected>No minimum</option>', off)
 
     def test_no_deal_breakers_card(self):
         self.assertNotIn("rather not hear", render("settings"))

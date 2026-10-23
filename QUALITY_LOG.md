@@ -852,3 +852,36 @@ the preview and tests in Python, so both take the same `skill_regex` text.
       every page load.
 - [x] Any change to `skill_regex` must re-run that comparison: Python's and Postgres's regex dialects are
       close but not identical.
+
+### 2026-10-23 — SC-51 slice 4a: skills minimum on the profile and the dashboard
+**Shipped:** a person can set a minimum number of their skills a role's stored text must mention
+(Skills card: "Show roles that match at least [N of my skills]", 1 to 10, default no minimum). With one set,
+the dashboard hides roles that mention fewer, says so ("182 roles are hidden by your skills cutoff. Show
+them"), and names what each role mentions ("Mentions Figma, CSS"). A role with no stored text is never
+hidden ("Not scored for your skills"). The minimum is capped at the number of skills the person has; no
+skills or no minimum changes nothing and costs no lookup. The profile's live preview counts follow the
+minimum. Alerts are unchanged. Nobody has a minimum yet, so nothing changes for anyone until they set one.
+Reuses `fg.select` (no new Field Guide component). One additive column, `user_profiles.skill_cutoff`,
+read and written only through savepoint-guarded helpers.
+**Rework count:** 1. My first idea for the line on the row showed "Accessibility (WCAG 2.2)" although only
+"accessibility" is matched; shown without the bracket now.
+**Root cause it guards against:** *a filter that hides roles looks like a broken dashboard unless it says
+what it did and what it could not judge.* So: the hidden count with a way back, the matched skills by name, and
+unread roles shown, not hidden.
+**Standing checks added:**
+- [x] Automated: the filter (drops under the minimum and counts them, never hides unread roles, names skills as
+      written, show-them keeps them with an honest line, cap at number of skills, no lookup without a minimum),
+      the dashboard page, the "show more" link keeping show-them, the profile preview, the save order and the
+      guarded column helpers. 20 mutation checks on a copy of the repo all fail when the code is broken (three
+      first survived: the paging link, reading the saved value for the form, and the select's selected value;
+      tests were added for each).
+- [x] Automated, in the browser (`scripts/quality_check.py`, now 259 checks): changing the minimum counts as an
+      unsaved change and putting it back clears the count. The Python tests cannot run `profile.js`, which was
+      where this field could silently have been left out of the unsaved-change snapshot. Proven to fail when
+      the field is dropped from the script.
+- [x] Manual, throwaway Neon branch, real dashboard and real data, no mocks: with a minimum of 2 the
+      dashboard goes 254 to 194 roles (60 hidden), with 4 it goes to 72 (182 hidden); every shown role has
+      stored text with at least that many matches, or none (shown by rule); "show them" restores all 254. The
+      minimum adds about 120 ms to a load that takes 1.8 s on that path (1810 ms to 1927 ms).
+- [x] A page change that adds a column must read it through a guarded helper if the page or the collector
+      would otherwise break without it (`db._optional`); the column was also applied to production first.

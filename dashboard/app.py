@@ -27,6 +27,7 @@ from db.db import (
     get_user_work_types,
     get_session_user,
     get_user_role_categories,
+    get_user_skill_cutoff,
     is_onboarded,
     log_event,
     log_visit,
@@ -34,6 +35,7 @@ from db.db import (
     set_user_work_types,
 )
 from dashboard.profile import ask_for_catch_up
+from dashboard.skill_filter import apply_skill_cutoff
 from dashboard.profile import register as register_profile_screens
 from dashboard.resume import register as register_resume
 from role_categories import (
@@ -326,6 +328,18 @@ def index():
             if matches_profile(p["title"], p["is_design"], role_categories, keywords)
         ]
 
+    # SC-51 slice 4: with a minimum number of skills set, roles whose text mentions fewer are not shown (roles
+    # with no stored text always are). Nothing is looked up for anyone without a minimum.
+    skills_all = request.args.get("skills") == "all"
+    skills_under = 0
+    if profile is not None and profile["skills"]:
+        conn = get_conn()
+        try:
+            cutoff = get_user_skill_cutoff(conn, user_id)
+            postings, skills_under = apply_skill_cutoff(conn, postings, profile["skills"], cutoff, show_all=skills_all)
+        finally:
+            conn.close()
+
     total = len(postings)
     limit = min(max(request.args.get("n", PAGE_SIZE, type=int), PAGE_SIZE), MAX_SHOWN)
     shown = postings[:limit]
@@ -341,6 +355,8 @@ def index():
         work_type_options=WORK_TYPES,
         ranges=RANGES,
         posted_range=posted_range,
+        skills_under=skills_under,
+        skills_all=skills_all,
     )
 
 

@@ -312,6 +312,31 @@ def check_leave_warning(ctx, base):
     page.close()
 
 
+def check_skills_minimum(ctx, base):
+    """The skills minimum (SC-51 slice 4) is part of the profile like any other field: changing it counts as an
+    unsaved change and enables Save; putting it back clears the count. profile.js compares a snapshot of the form
+    with the saved one, so a field left out of that snapshot would silently never count."""
+    page = ctx.new_page()
+    page.goto(base + "/profile", wait_until="load")
+    select = page.locator("#skill_cutoff")
+    check(select.count() == 1, "the profile has a skills minimum", f"found {select.count()}")
+    if select.count() != 1:
+        page.close()
+        return
+    original = select.input_value()
+    other = "3" if original != "3" else "2"
+    select.select_option(other)
+    page.wait_for_timeout(200)
+    check((page.text_content(".fg-action-bar-note") or "").strip() == "1 change not saved." and page.is_enabled("#save-button"),
+          "changing the skills minimum counts as an unsaved change and enables Save",
+          (page.text_content(".fg-action-bar-note") or "").strip())
+    select.select_option(original)
+    page.wait_for_timeout(200)
+    check((page.text_content(".fg-action-bar-note") or "").strip() == "" and not page.is_enabled("#save-button"),
+          "...and putting it back clears the count", (page.text_content(".fg-action-bar-note") or "").strip())
+    page.close()
+
+
 def check_alerts_switch_no_js(browser, base, token):
     """Without JavaScript the alerts switch is still a working form button: it posts and the page
     reloads with the switch flipped and its date line updated (no notice banner)."""
@@ -479,6 +504,7 @@ def main():
             check_filter_states(ctx.new_page(), base)
             check_leave_warning(ctx, base)
             check_back_link(ctx, base)
+            check_skills_minimum(ctx, base)
             ctx.close()
             check_alerts_switch_no_js(browser, base, token)
             header_infos = {}

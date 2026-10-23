@@ -97,7 +97,7 @@
           </div>
           {%- endcall %}
 
-          {%- call(part) fg.card("skills", "Skills and strengths", "Saved. I'll start using this soon.") %}
+          {%- call(part) fg.card("skills", "Skills and strengths", "Set a minimum below and I'll hide roles that mention fewer of these.") %}
           {{ fg.add_row("skills_new", "Add a skill", placeholder="For example, Prototyping", list="skills-list") }}
           <ul class="fg-chips" id="skills-list">
             {%- for s in model.skills %}
@@ -105,6 +105,8 @@
             {%- endfor %}
           </ul>
           <template id="skills-list-template">{{ fg.chip("__label__", name="skills") }}</template>
+          {{ fg.select("skill_cutoff", "Show roles that match at least", cutoff_options, selected=cutoff_selected) }}
+          <p class="fg-card-help">Roles I haven't read yet always show, marked as not scored.</p>
           {%- endcall %}
         </div>
 
