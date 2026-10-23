@@ -62,6 +62,18 @@ class Ask(unittest.TestCase):
         conn.commit.assert_called_once()
 
 
+class Request(unittest.TestCase):
+    def test_the_request_includes_workday_boards(self):
+        from db import db as dbmod
+        conn = mock.MagicMock()
+        cur = conn.cursor.return_value.__enter__.return_value
+        cur.rowcount = 3
+        self.assertEqual(dbmod.request_wide_catch_up(conn), 3)
+        sql = cur.execute.call_args[0][0].lower()
+        self.assertNotIn("workday", sql)
+        self.assertIn("wide_scan_at = null", sql)
+
+
 class Routes(unittest.TestCase):
     def setUp(self):
         self.client = dashboard_app.app.test_client()

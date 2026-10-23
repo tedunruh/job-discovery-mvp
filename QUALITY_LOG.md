@@ -795,3 +795,36 @@ run mark a board only if no request came after it read.
 - [x] Schema before code: `companies.wide_requested_at` (additive, in `schema.sql`). Apply it to
       production before this ships; if it isn't there the collector survives with the feature off, but
       the Work type filter and profile save would log a failed request and nothing would catch up.
+
+### 2026-10-23 — SC-51 slice 2c: Workday boards keep non-design roles that pass someone's gate
+**Shipped:** Workday only searched design words, so non-design roles never came back from it. It now
+also searches each target-title phrase someone wants that the design words would not return
+(`describe.extra_workday_queries`: non-design titles, or old keywords for people without a profile,
+sorted, at most 6). The change marker carries each phrase's count (`design:451|product manager:184`),
+so a new phrase or a moved count triggers a scan, and a quiet catch-up that is owed forces one even when
+no count moved. Wanted roles are stored under the same silent first wide scan as other platforms;
+Workday is no longer excluded from the catch-up request. With nobody wanting a non-design title there
+are no extra phrases and Workday behaves exactly as before: no new requests.
+**Paging rule (measured, not assumed):** Workday's search also matches words inside descriptions, so a
+phrase's result count is mostly noise (a tenant reported 1,714 results for "product manager" and had 8
+such titles). On tenants with 800 to 1,100 results, every title match was in the first five pages. An
+extra search therefore stops after two pages in a row with no title containing all the phrase's words,
+and never goes past 10 pages. Broad phrases ("engineer") can still outrun that: best effort, by design.
+**Rework count:** 0 before commit; two weak tests found by mutation (below).
+**Root cause it guards against:** *assuming a search engine's total means what it says.* The first probe
+showed "design: 125 results, 0 titles containing design".
+**Standing checks added:**
+- [x] Automated: paging stops after two quiet pages / at the cap / at the total; titles sharing only some
+      of the words are not matches; no extra phrases means exactly the old requests; markers carry each
+      count; an owed catch-up forces a scan only when there are extra phrases; Workday gets the silent
+      first wide scan and later alerts; the run hands the phrases to the step. 19 mutation checks on a copy
+      of the repo all fail when the code is broken. Two first survived (a decoy title sharing one word;
+      the run not passing the phrases), so tests were added.
+- [x] Manual, throwaway Neon branch, three real tenants with product-manager titles and a stand-in user:
+      stored 8, 13 and 2 real PM titles with text, none dated "found now", markers carry the phrase, repeat
+      run 0 writes, a removed role with a changed count alerts once, and a catch-up request with unchanged
+      markers forces the scan (9 s -> 59 s) and re-marks all three, 0 writes, 0 alerts.
+- [x] Found by the rehearsal, not a defect: changing someone's keywords directly in SQL (skipping the
+      app's catch-up request) made 5 old non-design roles alert. Gate changes must go through the app so
+      the request is made; any script that edits what someone wants must call `request_wide_catch_up`.
+- [x] No schema change in this slice.

@@ -358,10 +358,13 @@ class WideScan(unittest.TestCase):
         up, alerts, closed, marked, _ = self.scan(wide_done={9}, other=[pm], stored={"pm": rc.content_hash(pm)})
         self.assertEqual((up, alerts, closed), ([], [], []))
 
-    def test_workday_is_left_for_later(self):
+    def test_workday_gets_the_same_silent_first_wide_scan(self):
         board = dict(self.BOARD, ats_type="workday")
-        _, _, _, marked, _ = self.scan(wide_done=set(), board=board)
-        self.assertEqual(marked, [])                  # Workday boards are not given the wide marker yet
+        pm = self.role("/job/pm", "Product Manager", False)
+        up, alerts, _, marked, _ = self.scan(wide_done=set(), other=[pm], board=board)
+        self.assertEqual((up, alerts, marked), ([(["/job/pm"], True)], [], [9]))
+        up, alerts, _, marked, _ = self.scan(wide_done={9}, other=[pm], board=board, stored={"old": "h"})
+        self.assertEqual((up, alerts, marked), ([(["/job/pm"], False)], ["/job/pm"], []))
 
     def test_the_worker_keeps_wanted_non_design_roles_and_drops_the_rest(self):
         step = describe.DescriptionStep(lambda p: p["title"] == "Product Manager")
@@ -379,16 +382,26 @@ class WideScan(unittest.TestCase):
         kept = res["other"][0]
         self.assertEqual((kept["description"], kept["raw_json"], kept["is_design"]), ("Own the roadmap", None, False))
 
-    def test_the_worker_keeps_no_extra_roles_for_workday_or_without_a_describer(self):
+    def test_the_worker_keeps_no_extra_roles_without_a_describer(self):
         postings = [{"ats_posting_id": "1", "title": "Product Manager", "url": "u", "raw_json": {}}]
-        step = describe.DescriptionStep(lambda p: True)
         with mock.patch.object(rc, "_describer", None), mock.patch.dict(rc.TAIL_COLLECTORS, {"ashby": lambda i: postings}):
             self.assertEqual(rc._fetch_tail(dict(self.BOARD))[0]["other"], [])
-        wd = dict(self.BOARD, ats_type="workday")
+
+    def test_the_workday_worker_keeps_wanted_roles_from_the_extra_searches(self):
+        step = describe.DescriptionStep(lambda p: p["title"] == "Product Manager", extra_queries=("product manager",))
+        postings = [{"ats_posting_id": "/job/1", "title": "Product Manager", "url": "u", "raw_json": {}},
+                    {"ats_posting_id": "/job/2", "title": "Cook", "url": "u", "raw_json": {}}]
+        seen = {}
+        wd = dict(self.BOARD, ats_type="workday", scan_marker=None)
         with mock.patch.object(rc, "_describer", step), \
-             mock.patch.object(rc.workday, "probe_marker", lambda i: "m"), \
-             mock.patch.object(rc.workday, "fetch_light", lambda i: postings):
-            self.assertEqual(rc._fetch_tail(wd)[0]["other"], [])
+             mock.patch.object(rc.workday, "probe_marker", lambda *a: seen.setdefault("probe", a) and "design:5|product manager:9"), \
+             mock.patch.object(rc.workday, "fetch_light", lambda *a: seen.setdefault("fetch", a) and postings):
+            res, err = rc._fetch_tail(wd)
+        self.assertIsNone(err)
+        self.assertEqual([p["ats_posting_id"] for p in res["other"]], ["/job/1"])
+        self.assertEqual(seen["probe"], ("b", ("product manager",)))   # the extra phrases reach both searches
+        self.assertEqual(seen["fetch"], ("b", ("product manager",)))
+        self.assertEqual(res["marker"], "design:5|product manager:9")
 
     def test_the_report_names_a_switched_off_wide_scan(self):
         step = describe.DescriptionStep(lambda p: True)
@@ -398,19 +411,97 @@ class WideScan(unittest.TestCase):
         self.assertTrue(any("non-design" in a for a in alerts))
 
 
+class WorkdayCatchUp(unittest.TestCase):
+    """A quiet catch-up owed to a Workday board forces a scan even when its change marker did not move,
+    but only when there are extra phrases (otherwise nothing could have been missed)."""
+
+    def board(self):
+        return {"id": 5, "name": "w", "ats_type": "workday", "ats_identifier": "w.wd1/S",
+                "full_ingest_at": "2026-10-01", "tier": "hot", "scan_marker": "design:5|product manager:9",
+                "last_checked_at": None}
+
+    def fetch(self, extra, pending):
+        step = describe.DescriptionStep(lambda p: True, extra_queries=extra)
+        step.wide_pending = set(pending)
+        scans = []
+        with mock.patch.object(rc, "_describer", step), mock.patch.object(rc, "_tail_slot", lambda now=None: 7), \
+             mock.patch.object(rc.workday, "probe_marker", lambda *a: "design:5|product manager:9" if len(a) == 2 else "design:5"), \
+             mock.patch.object(rc.workday, "fetch_light", lambda *a: scans.append(a) or []):
+            res, _ = rc._fetch_tail(self.board())
+        return res, scans
+
+    def test_owed_and_extras_forces_a_scan(self):
+        res, scans = self.fetch(("product manager",), pending={5})
+        self.assertEqual(len(scans), 1)
+        self.assertFalse(res.get("unchanged"))
+
+    def test_not_owed_and_unchanged_skips_the_scan(self):
+        res, scans = self.fetch(("product manager",), pending=set())
+        self.assertEqual(scans, [])
+        self.assertTrue(res["unchanged"])
+
+    def test_owed_but_no_extra_phrases_changes_nothing(self):
+        board = self.board(); board["scan_marker"] = "design:5"
+        step = describe.DescriptionStep(lambda p: True)
+        step.wide_pending = {5}
+        with mock.patch.object(rc, "_describer", step), mock.patch.object(rc, "_tail_slot", lambda now=None: 7), \
+             mock.patch.object(rc.workday, "probe_marker", lambda *a: "design:5"):
+            res, _ = rc._fetch_tail(board)
+        self.assertTrue(res["unchanged"])
+
+    def test_the_scan_tells_the_step_which_boards_are_owed(self):
+        step = describe.DescriptionStep(lambda p: True)
+        with mock.patch.object(rc, "_describer", step), \
+             mock.patch.object(rc, "_fetch_tail", lambda c: ({"unchanged": True, "alive": True, "design": [], "marker": None}, None)), \
+             mock.patch.object(rc, "get_open_posting_hashes", lambda c, ids: {}), \
+             mock.patch.object(describe._db, "get_open_described_ids", lambda c, ids: {}), \
+             mock.patch.object(describe._db, "get_wide_scanned_ids", lambda c, ids: {5}), \
+             mock.patch.object(rc, "mark_wide_scanned", lambda *a: None), \
+             mock.patch.object(rc, "record_tail_scan_results", lambda *a, **k: None), \
+             mock.patch.object(rc, "set_scan_markers", lambda *a: None), \
+             mock.patch.object(rc, "promote_hot_boards", lambda c: 0), \
+             mock.patch.object(rc, "ensure_conn", lambda c: c):
+            rc._scan_tail(Conn(), [dict(self_board, id=i) for i in (5, 6, 7)
+                                   for self_board in [{"name": "b", "ats_type": "workday", "ats_identifier": "w.wd1/S",
+                                                       "full_ingest_at": "x", "tier": "hot", "scan_marker": None,
+                                                       "last_checked_at": None}]], [], lambda *a: None)
+        self.assertEqual(step.wide_pending, {6, 7})
+
+
+class ExtraQueries(unittest.TestCase):
+    users = [{"id": 1}, {"id": 2}, {"id": 3}]
+
+    def test_only_non_design_phrases_become_extra_searches(self):
+        profiles = {1: {"titles": ["Product Designer", "Product  Manager", "UX Researcher"]},
+                    2: {"titles": ["product manager", "Data Analyst"]}}
+        got = describe.extra_workday_queries(self.users, profiles, {}, {3: ["accountant"]})
+        self.assertEqual(got, ("accountant", "data analyst", "product manager"))   # sorted, de-duplicated, no design
+
+    def test_nobody_wanting_non_design_roles_means_no_extra_searches(self):
+        self.assertEqual(describe.extra_workday_queries(self.users, {1: {"titles": ["product designer"]}}, {}, {}), ())
+
+    def test_the_list_is_capped(self):
+        profiles = {1: {"titles": [f"role {c}" for c in "abcdefghij"]}}
+        self.assertEqual(len(describe.extra_workday_queries(self.users, profiles, {}, {})), describe.MAX_EXTRA_QUERIES)
+
+
 class RunPassesTheSettingsTime(unittest.TestCase):
     def test_the_run_reads_the_database_clock_and_hands_it_to_the_step(self):
         from tests.test_run_isolation import RunIsolation
         seen = []
+        self.extra = []
         real = describe.DescriptionStep
 
         def spy(*a, **k):
             seen.append(k.get("settings_loaded_at"))
+            self.extra.append(k.get("extra_queries"))
             return real(*a, **k)
 
-        with mock.patch.object(rc, "get_db_now", lambda conn: "DB-NOW"), mock.patch.object(rc, "DescriptionStep", spy):
+        with mock.patch.object(rc, "get_db_now", lambda conn: "DB-NOW"), mock.patch.object(rc, "DescriptionStep", spy), \
+             mock.patch.object(rc, "extra_workday_queries", lambda *a: ("product manager",)):
             RunIsolation().run_it(tail_raises=False)
         self.assertEqual(seen, ["DB-NOW"])
+        self.assertEqual(self.extra, [("product manager",)])   # and the Workday phrases people want
 
 
 if __name__ == "__main__":

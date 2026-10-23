@@ -17,11 +17,13 @@ from contextlib import contextmanager
 import psycopg2
 
 from collectors import descriptions
+from collectors.filters import is_design_role
 from dashboard.filters import work_type
 from db import db as _db
 from role_categories import matches_city, matches_profile, matches_profile_titles, matches_work_type
 
 REQUESTS_PER_RUN = 200  # description requests one run may make (the rest wait for the next run)
+MAX_EXTRA_QUERIES = 6   # Workday phrases searched beyond the design words: each costs requests per tenant
 
 
 @contextmanager
@@ -41,6 +43,21 @@ def _savepoint(conn):
         raise
     with conn.cursor() as cur:
         cur.execute("RELEASE SAVEPOINT describe")
+
+
+def extra_workday_queries(users, profiles, categories, keywords):
+    """The target-title phrases the Workday design searches would not already return (SC-51 slice 2c):
+    each person's titles (or old keywords, without a profile) that are not design roles. Lower case,
+    de-duplicated, sorted so the same people always give the same list, at most MAX_EXTRA_QUERIES."""
+    phrases = set()
+    for user in users:
+        profile = profiles.get(user["id"])
+        titles = profile["titles"] if profile is not None else keywords.get(user["id"], [])
+        for title in titles:
+            phrase = " ".join((title or "").lower().split())
+            if len(phrase) >= 2 and not is_design_role(phrase):
+                phrases.add(phrase)
+    return tuple(sorted(phrases)[:MAX_EXTRA_QUERIES])
 
 
 def build_gate(users, profiles, categories, keywords):
@@ -69,8 +86,10 @@ def build_gate(users, profiles, categories, keywords):
 
 
 class DescriptionStep:
-    def __init__(self, wanted, budget=None, settings_loaded_at=None):
+    def __init__(self, wanted, budget=None, settings_loaded_at=None, extra_queries=()):
         self.wanted = wanted
+        self.extra_queries = tuple(extra_queries)  # Workday phrases to search beyond the design words
+        self.wide_pending = set()  # discovered boards still owed a quiet wide scan, set by the scan
         self.settings_loaded_at = settings_loaded_at  # the database's clock when everyone's settings were read
         self.budget = budget or descriptions.FetchBudget(max_requests=REQUESTS_PER_RUN)
         self.stored = 0     # roles that got a description (or a note that there is none)
