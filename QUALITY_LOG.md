@@ -708,3 +708,32 @@ while only the HTML path was cleaned.* Real payloads were the only thing that sh
 - [x] Schema before code: the columns were applied twice (re-runnable) to a throwaway Neon branch
       and both functions exercised there. Production has no description columns yet; apply
       `schema.sql`'s SC-51 block to production before any code that writes them ships.
+
+### 2026-10-22 — SC-51 slice 2: the collector fetches descriptions for wanted roles
+**Shipped:** `scheduler/describe.py`. A role is *wanted* when it passes at least one person's gate
+(target titles, level, work type, city; old categories and keywords for people without a profile; paused
+alerts don't matter). Wanted roles that are already stored get a description: from the list payload when it
+has one (Ashby, Lever, Greenhouse's full core board), otherwise one request per role under a 200-request
+run budget. Core roles are described after alerts are delivered, never before. A role the platform has no
+text for is stored as "" so it isn't asked again. Hourly, long-closed roles lose their text. Nothing new
+is stored: roles that weren't stored before still aren't (slice 2b, with the silent catch-up).
+**Rework count:** 2 before commit. (1) A rehearsal with the columns missing, i.e. code shipped before the
+schema, took down the whole discovered-board scan: one "which roles already have text" query sat outside
+the savepoint guard. (2) The first version fetched core descriptions before alerts went out, so a big
+catch-up would have delayed alerts by minutes.
+**Root cause:** *two kinds of path were only tested on the happy path: the new code's own failure mode (its
+table missing) and its place in the run's ordering.* Unit tests with fakes passed both times; only running
+the real path on a branch showed them.
+**Standing checks added:**
+- [x] Automated: gate (each of title, level, work type, city, legacy users, paused alerts), the step (budget,
+      failed request, nothing-to-store, nothing pending while requests run, savepoint on a database error),
+      the discovered-board scan (changed, unchanged-but-newly-wanted, unchanged-and-done, columns missing)
+      and "alerts before descriptions". 16 mutation checks on a copy of the repo all fail when the code is
+      broken. Two first passed only because the tests were weak (a fixture that couldn't fail, an
+      `AssertionError` swallowed by the code's own `except`): after a mutation survives, fix the test.
+- [x] Manual, for any change to the run's order or to a table the run reads: rehearse the real
+      `_run` on a throwaway Neon branch **twice**, once *before* the schema exists (the run must survive
+      and say so) and once after (storing, then idempotent on the second run). Alerts, health pushes and
+      pings are stubbed. Cross-check by recomputing the gate on the stored rows: wanted == described.
+- [x] A wide-open gate on the same boards (700 stored on run 1, 156 left for run 2, no failures) proves
+      the budget without touching production.
