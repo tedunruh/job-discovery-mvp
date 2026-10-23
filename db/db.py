@@ -7,6 +7,8 @@ import secrets
 import psycopg2
 import psycopg2.extras
 
+from role_categories import skill_phrases, skill_regex
+
 # Health-tracking thresholds (see source_health table).
 FAILURE_THRESHOLD = 3  # consecutive transient failures before marking 'degraded'
 ZERO_RESULT_THRESHOLD = 3  # consecutive anomalous zero-result cycles before 'isolated'
@@ -538,6 +540,23 @@ def get_open_described_ids(conn, company_ids):
         for cid, ats_id in cur.fetchall():
             result.setdefault(cid, set()).add(ats_id)
     return result
+
+
+def get_skill_matches(conn, posting_ids, skills):
+    """{posting id: [skill phrases its stored text mentions]} for these roles that have stored text. Roles with
+    no text are left out, so the caller can tell "matched nothing" from "never read". The matching happens in
+    Postgres (the same rule as role_categories.skills_matched) so only a few booleans per role come back, not
+    5 KB of text."""
+    phrases = skill_phrases(skills)
+    if not phrases or not posting_ids:
+        return {}
+    columns = ", ".join("(description ~* %s)" for _ in phrases)
+    with conn.cursor() as cur:
+        cur.execute(
+            f"SELECT id, {columns} FROM postings WHERE id = ANY(%s) AND description IS NOT NULL AND description <> ''",
+            [skill_regex(p) for p in phrases] + [list(posting_ids)],
+        )
+        return {row[0]: [p for p, hit in zip(phrases, row[1:]) if hit] for row in cur.fetchall()}
 
 
 def mark_full_ingest_done(conn, company_id):

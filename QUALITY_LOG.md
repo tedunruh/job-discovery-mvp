@@ -828,3 +828,27 @@ showed "design: 125 results, 0 titles containing design".
       app's catch-up request) made 5 old non-design roles alert. Gate changes must go through the app so
       the request is made; any script that edits what someone wants must call `request_wide_catch_up`.
 - [x] No schema change in this slice.
+
+### 2026-10-23 — SC-51 slice 4a, piece 1: the skill matching rule (no UI yet)
+**Shipped:** the rule that scores a role against a person's skills, and nothing that uses it yet.
+`role_categories.skill_phrases / skill_regex / skills_matched / effective_cutoff / skill_status`: a skill
+matches as a whole word or phrase, any capitalisation, after bracketed text is removed from it; repeats
+count once; a one-letter "skill" is not counted; the person's cutoff can never exceed the number of skills
+they have; a role with no stored text is "unscored" and never hidden. `db.get_skill_matches` runs the same
+rule inside Postgres, returning only a few booleans per role, not the text. No schema change, no behaviour
+change for anyone.
+**Rework count:** 0. The matching rule was measured on real descriptions before it was written (the card's
+cutoff table), which is what changed the first design from a percent to a count.
+**Root cause it guards against:** *one rule written twice drifts.* The dashboard will match in Postgres and
+the preview and tests in Python, so both take the same `skill_regex` text.
+**Standing checks added:**
+- [x] Automated: normalising, whole-word, symbols (c++, node.js), no synonyms, repeats, no text, the cutoff
+      cap, the three statuses, and the SQL's shape (one boolean per skill, text-only roles, same regex). 15
+      mutation checks on a copy of the repo all fail when the code is broken. One "survivor" was a mutation
+      that replaced a line with itself: check that a mutation changes something before trusting "missed".
+- [x] Manual, read-only on production: Python and Postgres compared on the 735 stored descriptions, with the
+      13 real skills and with awkward ones (symbols, brackets, repeats): 0 differences over 1,910 and 697
+      matches. Postgres took 250 to 400 ms for 735 roles; fine now, to watch once the dashboard runs it on
+      every page load.
+- [x] Any change to `skill_regex` must re-run that comparison: Python's and Postgres's regex dialects are
+      close but not identical.
