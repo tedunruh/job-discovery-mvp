@@ -107,12 +107,15 @@ def tidy_text(text, limit=MAX_CHARS):
 # ---------------------------------------------------------------- already in the list response
 
 def from_list_payload(ats_type, raw):
-    """The description out of a posting's list-response payload (Ashby, Lever), or None."""
+    """The description out of a posting's list-response payload (Ashby, Lever, and Greenhouse when it was
+    fetched with content), or None."""
     if not isinstance(raw, dict):
         return None
     if ats_type == "ashby":
         text = tidy_text(raw.get("descriptionPlain")) or html_to_text(raw.get("descriptionHtml"))
         return text or None
+    if ats_type == "greenhouse":  # only present when the full board was fetched (core companies)
+        return html_to_text(raw.get("content")) or None
     if ats_type == "lever":
         parts = [tidy_text(raw.get("descriptionPlain")) or html_to_text(raw.get("description"))]
         for block in raw.get("lists") or []:

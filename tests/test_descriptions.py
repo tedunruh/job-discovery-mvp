@@ -74,6 +74,10 @@ class InListPlatforms(unittest.TestCase):
         self.assertIn("What you'll do\n- Design flows\n- Run research", text)
         self.assertTrue(text.endswith("We are an equal opportunity employer."))
 
+    def test_greenhouse_full_board_payload_carries_the_escaped_html_content(self):
+        raw = {"content": "&lt;p&gt;Design &amp;amp; build&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Own flows&lt;/li&gt;&lt;/ul&gt;"}
+        self.assertEqual(d.from_list_payload("greenhouse", raw), "Design & build\n\n- Own flows")
+
     def test_plain_text_from_the_platform_gets_runs_of_blank_lines_collapsed(self):
         # Found by the real-endpoint check: Ashby's descriptionPlain had three or more newlines in a row.
         messy = "Intro  \r\n\r\n\r\n\r\nWhat you'll do\n\n\n\n- Design flows  \n"
@@ -83,7 +87,8 @@ class InListPlatforms(unittest.TestCase):
         self.assertNotIn("\n\n\n", text)
 
     def test_other_platforms_and_junk_return_none(self):
-        self.assertIsNone(d.from_list_payload("greenhouse", {"content": "x"}))
+        self.assertIsNone(d.from_list_payload("workday", {"content": "x"}))
+        self.assertIsNone(d.from_list_payload("greenhouse", {"title": "light fetch, no content"}))
         self.assertIsNone(d.from_list_payload("lever", None))
         self.assertIsNone(d.from_list_payload("lever", "text"))
 

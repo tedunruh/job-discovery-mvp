@@ -509,6 +509,37 @@ def clear_closed_descriptions(conn, grace_days=14):
         return cur.rowcount
 
 
+def get_postings_missing_description(conn, company_id, ats_posting_ids):
+    """{ats_posting_id: postings.id} for these open roles of one company that have no description yet
+    (NULL; an empty string means "fetched, the platform had none" and is not asked for again)."""
+    if not ats_posting_ids:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT ats_posting_id, id FROM postings
+            WHERE company_id = %s AND status = 'open' AND description IS NULL AND ats_posting_id = ANY(%s)
+            """,
+            (company_id, list(ats_posting_ids)),
+        )
+        return {ats_id: pid for ats_id, pid in cur.fetchall()}
+
+
+def get_open_described_ids(conn, company_ids):
+    """{company_id: {ats_posting_id, ...}} of open roles that already have a description (or a note that
+    there is none), in one query: lets the discovered-board scan skip boards with nothing to do."""
+    result = {}
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT company_id, ats_posting_id FROM postings "
+            "WHERE status = 'open' AND description IS NOT NULL AND company_id = ANY(%s)",
+            (list(company_ids),),
+        )
+        for cid, ats_id in cur.fetchall():
+            result.setdefault(cid, set()).add(ats_id)
+    return result
+
+
 def mark_full_ingest_done(conn, company_id):
     with conn.cursor() as cur:
         cur.execute("UPDATE companies SET full_ingest_at = now() WHERE id = %s", (company_id,))
