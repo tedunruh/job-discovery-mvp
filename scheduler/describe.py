@@ -76,6 +76,7 @@ class DescriptionStep:
         self.waiting = 0    # wanted roles left for the next run: budget spent or platform refusing
         self.failed = 0     # requests that failed outright
         self.broken = None  # the database error that switched the step off, if any
+        self.wide_broken = None  # the database error that switched off storing non-design roles, if any
 
     # ---- in the fetch worker ------------------------------------------------------------------
 
@@ -99,6 +100,18 @@ class DescriptionStep:
         except psycopg2.Error as e:
             self._break(e, conn)
             return {}
+
+    def wide_scanned_ids(self, conn, company_ids):
+        """Boards that have had their first wide scan, or None when the database can't say (slice 2b is
+        then off for the run: wanted non-design roles are not stored, and nothing is closed)."""
+        if self.wide_broken:
+            return None
+        try:
+            with _savepoint(conn):
+                return _db.get_wide_scanned_ids(conn, company_ids)
+        except psycopg2.Error as e:
+            self.wide_broken = f"{type(e).__name__}: {e}"
+            return None
 
     def lacking(self, postings, described):
         """Wanted roles with no description yet, given the ats ids that already have one."""

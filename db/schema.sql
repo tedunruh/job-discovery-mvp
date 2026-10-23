@@ -303,3 +303,9 @@ CREATE INDEX IF NOT EXISTS idx_resume_parses_user_month ON resume_parses (user_i
 -- closes (db.clear_closed_descriptions) so storage stays small. The raw payload is not kept for this.
 ALTER TABLE postings ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE postings ADD COLUMN IF NOT EXISTS description_fetched_at TIMESTAMPTZ;
+
+-- SC-51 slice 2b: discovered boards also store the non-design roles that pass someone's gate. NULL = this board
+-- has not had its first wide scan yet: that scan stores such roles silently (no alerts for roles that were
+-- already open), then sets this. Setting it back to NULL asks for another silent catch-up (e.g. when a
+-- profile widens what is wanted).
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS wide_scan_at TIMESTAMPTZ;

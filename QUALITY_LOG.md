@@ -737,3 +737,28 @@ the real path on a branch showed them.
       pings are stubbed. Cross-check by recomputing the gate on the stored rows: wanted == described.
 - [x] A wide-open gate on the same boards (700 stored on run 1, 156 left for run 2, no failures) proves
       the budget without touching production.
+
+### 2026-10-23 — SC-51 slice 2b: discovered boards keep non-design roles that pass someone's gate
+**Shipped:** a discovered board used to keep design roles only. It now also keeps any other role that
+passes at least one person's gate (title, level, work type, city; their old keywords if they have no
+profile). Ashby, Lever, Greenhouse, Workable and Rippling only: Workday still searches design words
+only (slice 2c). A board's **first wide scan is silent**: those roles were already open, so they are
+stored dated by the ATS (not "found today") and nobody is alerted. `companies.wide_scan_at` records
+that it happened; after it, a new wanted role alerts like a new design role. Setting it back to NULL
+asks for another silent catch-up (slice 3's job when a profile widens what is wanted). Their
+descriptions come through the slice-2 step, under the same per-run budget.
+**Rework count:** 0 before commit. Written from the slice-2 lesson: the column's absence was
+rehearsed first.
+**Root cause it guards against:** *storing more roles looks like "new roles"*, and alerting old jobs is
+the one mistake nobody forgives. Silence is decided per board by a marker, not by guessing from dates.
+**Standing checks added:**
+- [x] Automated: first scan silent, later scan alerts, design alerts unchanged during the first wide
+      scan, a board with nothing wanted still gets marked, unchanged boards cost nothing, Workday
+      excluded (worker and scan), column missing means nothing non-design is stored and **nothing is
+      closed**. 12 mutation checks on a copy of the repo all fail when the code is broken.
+- [x] Manual rehearsal on a throwaway Neon branch with real boards and a stand-in user who wants
+      "engineer": column missing (run survives, health alert says why) → first wide scan (76 stored, 0
+      alerts, none dated today, 15 boards marked, Workday untouched) → repeat (0 writes) → one stored
+      role deleted to look new (1 write, 1 alert).
+- [x] Schema before code: `schema.sql` adds `companies.wide_scan_at`; apply it to production before the
+      code ships.

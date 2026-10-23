@@ -274,5 +274,123 @@ class DescriptionsComeAfterAlerts(unittest.TestCase):
         self.assertLess(order.index("deliver"), order.index("store"))
 
 
+class WideScan(unittest.TestCase):
+    """SC-51 slice 2b: non-design roles that pass someone's gate are stored at discovered boards; the first
+    wide scan of a board is silent, after that a new one alerts."""
+
+    BOARD = {"id": 9, "name": "b", "ats_type": "ashby", "ats_identifier": "b", "full_ingest_at": "2026-10-01",
+             "tier": "hot", "scan_marker": None, "last_checked_at": None}
+
+    def role(self, rid, title, design, wanted=True):
+        return {"ats_posting_id": rid, "title": title, "url": "u", "is_design": design, "wanted": wanted}
+
+    def scan(self, wide_done, design=(), other=(), stored=None, board=None):
+        step = describe.DescriptionStep(lambda p: True)
+        step.store = lambda conn, company, postings: conn
+        upserts, alerts, closed, marked = [], [], [], []
+
+        def upsert(conn, cid, postings, backfill=False):
+            upserts.append(([p["ats_posting_id"] for p in postings], backfill))
+            return {str(p["ats_posting_id"]): 100 + i for i, p in enumerate(postings)}
+
+        result = {"design": list(design), "other": list(other), "alive": True, "marker": None}
+        with mock.patch.object(rc, "_describer", step), \
+             mock.patch.object(rc, "_fetch_tail", lambda c: (result, None)), \
+             mock.patch.object(rc, "get_open_posting_hashes", lambda c, ids: {9: stored or {}}), \
+             mock.patch.object(describe._db, "get_open_described_ids", lambda c, ids: {}), \
+             mock.patch.object(describe._db, "get_wide_scanned_ids", lambda c, ids: wide_done) , \
+             mock.patch.object(rc, "upsert_postings", upsert), \
+             mock.patch.object(rc, "mark_stale_postings_closed", lambda c, cid, ids: closed.append(sorted(ids))), \
+             mock.patch.object(rc, "mark_wide_scanned", lambda c, ids: marked.extend(ids)), \
+             mock.patch.object(rc, "record_tail_scan_results", lambda *a, **k: None), \
+             mock.patch.object(rc, "set_scan_markers", lambda *a: None), \
+             mock.patch.object(rc, "promote_hot_boards", lambda c: 0), \
+             mock.patch.object(rc, "ensure_conn", lambda c: c):
+            rc._scan_tail(Conn(), [board or dict(self.BOARD)], [], lambda conn, company, p, pid: alerts.append(p["ats_posting_id"]))
+        return upserts, alerts, closed, marked, step
+
+    def test_the_first_wide_scan_stores_wanted_roles_silently_and_marks_the_board(self):
+        pm = self.role("pm", "Product Manager", False)
+        up, alerts, closed, marked, _ = self.scan(wide_done=set(), other=[pm])
+        self.assertEqual(up, [(["pm"], True)])        # stored with backfill: dated by the ATS, not "found today"
+        self.assertEqual(alerts, [])                  # already open: not news
+        self.assertEqual(marked, [9])
+        self.assertEqual(closed, [["pm"]])
+
+    def test_after_that_a_new_wanted_role_alerts(self):
+        pm = self.role("pm", "Product Manager", False)
+        up, alerts, closed, marked, _ = self.scan(wide_done={9}, other=[pm], stored={"old": "h"})
+        self.assertEqual(up, [(["pm"], False)])
+        self.assertEqual(alerts, ["pm"])
+        self.assertEqual(marked, [])                  # already marked; nothing to do again
+
+    def test_design_roles_still_alert_during_the_first_wide_scan(self):
+        d = self.role("d", "Product Designer", True)
+        pm = self.role("pm", "Product Manager", False)
+        up, alerts, _, _, _ = self.scan(wide_done=set(), design=[d], other=[pm])
+        self.assertEqual(alerts, ["d"])               # the design path is exactly as before
+        self.assertEqual(up, [(["d"], False), (["pm"], True)])
+
+    def test_nothing_wanted_still_marks_the_board_so_a_later_new_role_alerts(self):
+        _, _, _, marked, _ = self.scan(wide_done=set(), design=[], other=[], stored={})
+        self.assertEqual(marked, [9])
+
+    def test_when_the_column_is_missing_non_design_roles_are_ignored_and_nothing_is_closed(self):
+        pm = self.role("pm", "Product Manager", False)
+        d = self.role("d", "Product Designer", True)
+        with mock.patch.object(describe._db, "get_wide_scanned_ids", side_effect=psycopg2.errors.UndefinedColumn("x")):
+            step_probe = describe.DescriptionStep(lambda p: True)
+            self.assertIsNone(step_probe.wide_scanned_ids(Conn(), [9]))
+        up, alerts, closed, marked, step = self.scan(wide_done=None, design=[d], other=[pm],
+                                                      stored={"pm": "h", "d": "old"})
+        self.assertEqual(up, [(["d"], False)])        # the non-design role is not touched
+        self.assertEqual(closed, [])                  # and the stored one is not closed as "gone"
+        self.assertEqual(marked, [])
+
+    def test_an_unchanged_board_with_wanted_roles_costs_nothing(self):
+        pm = self.role("pm", "Product Manager", False)
+        up, alerts, closed, marked, _ = self.scan(wide_done={9}, other=[pm], stored={"pm": rc.content_hash(pm)})
+        self.assertEqual((up, alerts, closed), ([], [], []))
+
+    def test_workday_is_left_for_later(self):
+        board = dict(self.BOARD, ats_type="workday")
+        _, _, _, marked, _ = self.scan(wide_done=set(), board=board)
+        self.assertEqual(marked, [])                  # Workday boards are not given the wide marker yet
+
+    def test_the_worker_keeps_wanted_non_design_roles_and_drops_the_rest(self):
+        step = describe.DescriptionStep(lambda p: p["title"] == "Product Manager")
+        raw = {"descriptionPlain": "Own the roadmap"}
+        postings = [
+            {"ats_posting_id": "1", "title": "Product Manager", "url": "u", "raw_json": raw},
+            {"ats_posting_id": "2", "title": "Accountant", "url": "u", "raw_json": raw},
+            {"ats_posting_id": "3", "title": "Product Designer", "url": "u", "raw_json": raw},
+        ]
+        with mock.patch.object(rc, "_describer", step), mock.patch.dict(rc.TAIL_COLLECTORS, {"ashby": lambda i: postings}):
+            res, err = rc._fetch_tail(dict(self.BOARD))
+        self.assertIsNone(err)
+        self.assertEqual([p["ats_posting_id"] for p in res["design"]], ["3"])
+        self.assertEqual([p["ats_posting_id"] for p in res["other"]], ["1"])
+        kept = res["other"][0]
+        self.assertEqual((kept["description"], kept["raw_json"], kept["is_design"]), ("Own the roadmap", None, False))
+
+    def test_the_worker_keeps_no_extra_roles_for_workday_or_without_a_describer(self):
+        postings = [{"ats_posting_id": "1", "title": "Product Manager", "url": "u", "raw_json": {}}]
+        step = describe.DescriptionStep(lambda p: True)
+        with mock.patch.object(rc, "_describer", None), mock.patch.dict(rc.TAIL_COLLECTORS, {"ashby": lambda i: postings}):
+            self.assertEqual(rc._fetch_tail(dict(self.BOARD))[0]["other"], [])
+        wd = dict(self.BOARD, ats_type="workday")
+        with mock.patch.object(rc, "_describer", step), \
+             mock.patch.object(rc.workday, "probe_marker", lambda i: "m"), \
+             mock.patch.object(rc.workday, "fetch_light", lambda i: postings):
+            self.assertEqual(rc._fetch_tail(wd)[0]["other"], [])
+
+    def test_the_report_names_a_switched_off_wide_scan(self):
+        step = describe.DescriptionStep(lambda p: True)
+        step.wide_broken = "UndefinedColumn: wide_scan_at"
+        alerts = []
+        rc._report_descriptions(step, alerts)
+        self.assertTrue(any("non-design" in a for a in alerts))
+
+
 if __name__ == "__main__":
     unittest.main()

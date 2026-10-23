@@ -902,6 +902,20 @@ def record_tail_scan_results(conn, ok_ids, failed_ids, first_scan_ids, empty_ids
             cur.execute("UPDATE companies SET full_ingest_at = now() WHERE id = ANY(%s)", (list(first_scan_ids),))
 
 
+def get_wide_scanned_ids(conn, company_ids):
+    """Which of these boards have had their first wide scan (SC-51 slice 2b), as a set of company ids."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT id FROM companies WHERE wide_scan_at IS NOT NULL AND id = ANY(%s)", (list(company_ids),))
+        return {r[0] for r in cur.fetchall()}
+
+
+def mark_wide_scanned(conn, company_ids):
+    """Record that these boards have had their first wide scan: from now on a new wanted role alerts."""
+    if company_ids:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE companies SET wide_scan_at = now() WHERE id = ANY(%s)", (list(company_ids),))
+
+
 def promote_hot_boards(conn):
     """A cold board that now has a design role becomes hot (scanned every run). Returns how many."""
     with conn.cursor() as cur:
