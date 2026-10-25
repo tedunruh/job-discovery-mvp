@@ -1021,3 +1021,33 @@ button's label. (2) The route's dashed trail showed through the translucent done
 - [x] Never trust `element.hidden = false` on an SVG; set the attribute.
 - [ ] Not done: the Figma mirror of the Button's working state (a rebuild request for the designer; code is the source
       of truth).
+
+### 2026-10-25 — SC-54: tester names removed from the public repo's history
+**Shipped:** the repo has been public since the free Actions minutes, and two sprint write-ups
+(docs/SC-42-byo-ai-key-spike.md and docs/SC-45-open-discovery-grooming.md) named testers by first name in
+three lines. The current files were already clean; the history was not. History was rewritten so those lines
+read "a tester": 147 commits, 18 branches, every branch tip byte-for-byte the same contents as before, only
+the commit IDs changed. A full backup of the old history was made first (`before-scrub.bundle`, in the session's
+scratch folder; verified complete). A fresh clone of GitHub afterwards has 0 lines mentioning a tester. The site
+redeployed from the new `main` (`bf314d7`) with no change in behaviour. No accounts, database rows or sign-ins
+were involved: accounts live in Neon, never in git.
+**Before searching:** no real email addresses, no API keys or tokens (five provider patterns), and one
+connection-string-shaped line that is a placeholder in `.env.example`.
+**Rework count:** 2 in the tooling, none in the result: the first rewrite attempt failed because the shell's
+plain `python3` is a stub that fails inside git's filter (use the project's own Python), and my first
+verification script read the wrong column of git's output and reported "0" for the wrong reason.
+**Root cause:** *names were written into documents because the people were the source of the facts.* The
+documents were about testers' feedback and decisions, in a repo that was private when they were written.
+**Standing checks added:**
+- [x] Automated: `tests/test_no_tester_names.py` reads the tester names from `private/` at run time (so no name
+      is ever written in the repo) and fails if any appears in a tracked file; it names the file, never the
+      person. Skipped on machines without `private/`, so it protects the place the documents are written.
+      Proven to fail when a name is added to a copy.
+- [x] A verification that can't fail proves nothing: both the rewrite check and the name check were shown to
+      report the "before" state (3 lines) before they were trusted to report "after" (0).
+- [ ] Remaining, GitHub's side: the 20 merged pull requests keep their old commits reachable through hidden
+      links (refs/pull/*) until GitHub support removes them. Not done; the names are no longer in any branch.
+- [x] A local branch `backup/pre-scrub` (an older snapshot, 80 files behind `main`) still holds the old history
+      on this machine only. It is not on GitHub. Do not push it.
+- [x] After a history rewrite, delete stale local branches before using GitHub Desktop's Push or Sync: any of
+      them would put the old commits back.
