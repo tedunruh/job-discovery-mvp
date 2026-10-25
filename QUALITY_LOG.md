@@ -959,3 +959,31 @@ direct link.
       link; with it, the alert carries Scout's link; a tap with no sign-in forwards and counts 1, a second tap 2,
       a HEAD preview 0, an unknown link leaks nothing.
 - [x] A change that puts Scout between a person and an outside page must say what happens when Scout is asleep.
+
+### 2026-10-25 — SC-58: applied jobs leave the main list
+**Shipped:** the dashboard has a **Status** filter beside Work type and Posted: *Not applied yet* (the default),
+*Applied* and *All*, remembered for the session. Marking a job Applied keeps its row where it is for one more page
+load, with the toggle checked and "Applied just now"; unchecking it is the undo. On the next refresh or filter
+change the row leaves, and the open-roles count already excludes it. Marking returns to the same row (an anchor)
+and keeps "Show more" and "Show them" as they were, so the page no longer jumps to the top and forgets where you
+were. The applied state was already saved per person; nothing about it changed. No schema change, no new Field Guide
+component (the filter, toggle and radio are the existing ones; the kept row's styling is page-local like the other
+row classes).
+**Was today's behaviour a bug?** (the card's first criterion) No: the state saved and showed the same way every time,
+the row simply never left the list. The one real rough edge was the reload to the top and losing "Show more", now fixed.
+**Rework count:** 1 in my own work: the kept row counted as one of the 50 shown, so "Show 50 more" miscounted by one
+(found by a test I wrote for it, fixed before commit).
+**Root cause it guards against:** *a confirmation row that is also a list row gets counted as both.* The kept row is
+excluded from the count, from "Showing X of Y" and from the page size.
+**Standing checks added:**
+- [x] Automated: the three Status views and their empty state, the filter's pill and options, the choice remembered
+      and an unknown value ignored (and not wiping the chosen view), the kept row (in place, checked, saying so, not a
+      link, out of the count), gone on refresh, settled by a filter change, a new answer or un-marking another job,
+      undo returning the job to its place, the anchor and page size on the redirect (capped), and the counts. 21
+      mutation checks on a copy of the repo all fail when the code is broken (three first survived; two real gaps
+      got tests, one was a cosmetic mutation).
+- [x] Browser (`scripts/quality_check.py`, 277 of 277) and by hand on a throwaway Neon branch with real clicks:
+      687 open roles, click Applied, 686 with "Applied just now" and the URL on the row, refresh drops it (checked by
+      the job's own id, not its title: another company can have the same title), the Applied view shows it, undoing
+      from there and going back gives 687, phone layout fine.
+- [x] Check a row by its id, never its title, when a list can hold the same title twice.

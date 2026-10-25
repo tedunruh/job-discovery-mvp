@@ -135,6 +135,12 @@
 
     .applied-form { position: relative; z-index: 1; }
 
+    /* SC-58: the job just marked applied stays where it is for one more page load, checked, saying so; unchecking
+       it is the undo. It leaves the list on the next refresh or filter change. */
+    .posting--done:hover { background: transparent; }
+    .posting--done .posting-title { color: var(--fg-color-text-secondary); }
+    .posting-done-text { color: var(--fg-color-text-primary); }
+
     @media (max-width: 680px) {
       body > .fg-header { padding-inline: 0; }
       .board { margin-top: var(--fg-space-4); padding: var(--fg-space-3); }
@@ -195,14 +201,26 @@
             {% endfor %}
           </form>
         {% endcall %}
+
+        {% call fg.filter("filter-status", "Status", statuses[status]) %}
+          <form class="fg-menu" method="get" action="/">
+            {% for key, label in statuses.items() %}
+            <label class="fg-menu-item">
+              <input class="fg-radio" type="radio" name="status" value="{{ key }}" onchange="this.form.submit()" {{ "checked" if key == status else "" }}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </form>
+        {% endcall %}
       </div>
       <p class="role-count">{{ total }} open role{{ "" if total == 1 else "s" }}</p>
     </div>
 
     {% if not total %}
     <p class="empty">
-      {% if posted_range == "all" %}No roles found{% else %}No roles discovered {{ ranges[posted_range][1] }}{% endif %}{% if work_label != "Any" %} matching {{ work_label }}{% endif %}.
-      {% if posted_range != "all" %}Try a wider range.{% endif %}
+      {% if status == "applied" %}You haven't marked any of these roles as applied yet. Mark one Applied and it will show here.
+      {% else %}{% if posted_range == "all" %}No roles found{% else %}No roles discovered {{ ranges[posted_range][1] }}{% endif %}{% if work_label != "Any" %} matching {{ work_label }}{% endif %}.
+      {% if posted_range != "all" %}Try a wider range.{% endif %}{% endif %}
     </p>
     {% endif %}
 
@@ -220,7 +238,27 @@
 
     <ul class="postings">
       {% for p in postings %}
-      <li class="posting">
+      {% if p.just_applied %}
+      <li class="posting posting--done" id="posting-{{ p.id }}">
+        <div class="posting-lead">
+          <p class="posting-title">{{ p.title }}</p>
+          <p class="posting-subline">{{ p.company_name }}{% if p.location %} • {{ p.location }}{% endif %}</p>
+        </div>
+        <div class="posting-second">
+          <div class="posting-meta" role="status" aria-live="polite">
+            <p>Discovered {{ p.first_seen_at|humanize }}</p>
+            <p class="posting-done-text">Applied just now</p>
+          </div>
+          <form class="applied-form" method="post" action="/set_applied/{{ p.id }}">
+            <input type="hidden" name="applied" value="false">
+            {%- if keep_n %}<input type="hidden" name="n" value="{{ keep_n }}">{% endif %}
+            {%- if skills_all %}<input type="hidden" name="skills" value="all">{% endif %}
+            {{ fg.toggle("Applied", pressed=True, title="Applied. Click to unmark", extra_class="applied-toggle") }}
+          </form>
+        </div>
+      </li>
+      {% else %}
+      <li class="posting" id="posting-{{ p.id }}">
         <div class="posting-lead">
           <p class="posting-title"><a class="posting-link" href="/open/{{ p.id }}" target="_blank" rel="noopener">{{ p.title }}</a></p>
           <p class="posting-subline">{{ p.company_name }}{% if p.location %} • {{ p.location }}{% endif %}</p>
@@ -236,16 +274,19 @@
           </div>
           <form class="applied-form" method="post" action="/set_applied/{{ p.id }}">
             <input type="hidden" name="applied" value="{{ 'false' if p.applied else 'true' }}">
+            {%- if keep_n %}<input type="hidden" name="n" value="{{ keep_n }}">{% endif %}
+            {%- if skills_all %}<input type="hidden" name="skills" value="all">{% endif %}
             {{ fg.toggle("Applied", pressed=p.applied, title="Applied — click to unmark" if p.applied else "Mark as applied", extra_class="applied-toggle") }}
           </form>
         </div>
       </li>
+      {% endif %}
       {% endfor %}
     </ul>
 
     {% if next_n %}
     <p class="more">
-      <span class="fg-text-secondary">Showing {{ postings|length }} of {{ total }}</span>
+      <span class="fg-text-secondary">Showing {{ shown_count }} of {{ total }}</span>
       <a class="fg-link" href="/?n={{ next_n }}{% if skills_all %}&amp;skills=all{% endif %}">Show {{ page_size }} more</a>
     </p>
     {% endif %}
