@@ -862,6 +862,41 @@ def revoke_user_sessions(conn, user_id):
         return cur.rowcount
 
 
+def get_return_events(conn, user_id, days=90):
+    """What the dashboard needs to welcome someone back from a job (SC-63): ({posting id: when this person last
+    opened it}, {posting id: when they last answered "Not yet"}). An open is a dashboard click ('opened') or a tap on
+    a push alert ('opened_alert'). Looks back `days`; older opens are not marked Viewed."""
+    opens, dismissals = {}, {}
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT posting_id, event_type, max(created_at) FROM user_events
+            WHERE user_id = %s AND posting_id IS NOT NULL
+              AND event_type IN ('opened', 'opened_alert', 'ask_dismissed')
+              AND created_at > now() - make_interval(days => %s)
+            GROUP BY posting_id, event_type
+            """,
+            (user_id, days),
+        )
+        for pid, kind, when in cur.fetchall():
+            target = dismissals if kind == "ask_dismissed" else opens
+            if pid not in target or when > target[pid]:
+                target[pid] = when
+    return opens, dismissals
+
+
+def get_applied_among(conn, user_id, posting_ids):
+    """The ids among these that this person has marked applied."""
+    if not posting_ids:
+        return set()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT posting_id FROM user_postings WHERE user_id = %s AND applied AND posting_id = ANY(%s)",
+            (user_id, list(posting_ids)),
+        )
+        return {r[0] for r in cur.fetchall()}
+
+
 def log_event(conn, user_id, event_type, posting_id=None):
     """Append an engagement event (see user_events in schema.sql)."""
     with conn.cursor() as cur:

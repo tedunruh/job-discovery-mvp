@@ -22,6 +22,7 @@ build isn't present).
 """
 import glob
 import json
+import re
 import logging
 import os
 import sys
@@ -445,6 +446,105 @@ def check_signin_states(browser, base):
     ctx.close()
 
 
+def check_return_ask(browser, base, token):
+    """Coming back from a job (SC-63): open a job in another tab, return, and the job's own row asks "Did you apply for
+    this one?" without a reload and without taking focus; the latest job opened is the one asked about and the others
+    say Viewed; "Not yet" closes it for good (until the job is opened again); a reload shows it with no script; and a
+    phone fits it. The job's outside page is stubbed, so nothing leaves the machine."""
+    ctx = browser.new_context(viewport={"width": 1280, "height": 900})
+    ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+    ctx.route(re.compile(r"^https?://(?!127\.0\.0\.1)"), lambda route: route.fulfill(status=200, body="the job's own page"))
+    page = ctx.new_page()
+    page.goto(base + "/?range=all", wait_until="load")
+    page.goto(base + "/", wait_until="load")
+    ids = page.evaluate("[...document.querySelectorAll('li.posting')].slice(0, 3).map(li => li.id.replace('posting-', ''))")
+    check(len(ids) == 3, "the dashboard has jobs to open for the coming-back check", f"{ids}")
+    if len(ids) < 3:
+        ctx.close()
+        return
+
+    def open_in_new_tab(job):
+        with ctx.expect_page() as popup:
+            page.locator(f"#posting-{job} a.posting-link").click()
+        popup.value.wait_for_load_state("load")
+        popup.value.close()
+
+    def come_back():
+        page.bring_to_front()
+        page.evaluate("window.dispatchEvent(new Event('focus'))")
+
+    def asking():
+        return page.evaluate("[...document.querySelectorAll('.posting--asking')].map(li => li.id.replace('posting-', ''))")
+
+    check(asking() == [], "nothing is asked before a job has been opened", f"{asking()}")
+    open_in_new_tab(ids[0])
+    focus_before = page.evaluate("document.activeElement.outerHTML.slice(0, 80)")   # after our own click on the link
+    come_back()
+    page.wait_for_selector(f"#posting-{ids[0]} [data-ask]", timeout=8000)
+    row = page.locator(f"#posting-{ids[0]}")
+    check(asking() == [ids[0]] and "Did you apply for this one?" in row.inner_text() and "You opened it" in row.inner_text(),
+          "back from a job, its own row asks 'Did you apply for this one?' (no reload)", row.inner_text()[:140])
+    check("Viewed" in row.inner_text(), "...and says Viewed", row.inner_text()[:140])
+    focus_after = page.evaluate("document.activeElement.outerHTML.slice(0, 80)")
+    check(focus_after == focus_before, "...without taking focus", f"{focus_before!r} -> {focus_after!r}")
+    check(page.locator("#return-live").inner_text().startswith("Welcome back. Did you apply for"), "...and announces it to screen readers", page.locator("#return-live").inner_text())
+    check(page.locator(f"#posting-{ids[0]} button.fg-toggle").is_visible(), "...and yes is the row's own Applied toggle")
+
+    # a second job: only the latest asks, the first just says Viewed
+    open_in_new_tab(ids[1])
+    page.wait_for_timeout(2200)       # the script waits a moment between asks
+    come_back()
+    page.wait_for_selector(f"#posting-{ids[1]} [data-ask]", timeout=8000)
+    first = page.locator(f"#posting-{ids[0]}")
+    check(asking() == [ids[1]] and "Welcome back" not in first.inner_text() and "Viewed" in first.inner_text(),
+          "after a second job only the latest asks and the first says Viewed", f"{asking()} | {first.inner_text()[:100]}")
+    check("You also looked at 1 other role" in page.locator(f"#posting-{ids[1]}").inner_text(), "...and the question mentions the other one")
+
+    # a reload shows it with no script: the server draws it
+    page.reload(wait_until="load")
+    check(asking() == [ids[1]], "after a reload the question is still on the latest job", f"{asking()}")
+
+    # Not yet: closed now and after a reload
+    page.locator(f"#posting-{ids[1]} [data-ask-dismiss]").click()
+    page.wait_for_timeout(500)
+    check(asking() == [], "'Not yet' closes the question", f"{asking()}")
+    page.reload(wait_until="load")
+    check(asking() == [], "...and it stays closed after a reload (until that job is opened again)", f"{asking()}")
+
+    # opening it again asks again
+    page.wait_for_timeout(2200)
+    open_in_new_tab(ids[1])
+    come_back()
+    page.wait_for_selector(f"#posting-{ids[1]} [data-ask]", timeout=8000)
+    check(asking() == [ids[1]], "opening the job again asks again", f"{asking()}")
+
+    # yes: the Applied toggle; the question is gone and the row confirms
+    page.locator(f"#posting-{ids[1]} button.fg-toggle").click()
+    page.wait_for_load_state("load")
+    check(asking() == [] and "Applied just now" in page.locator(f"#posting-{ids[1]}").inner_text(),
+          "marking it Applied answers the question and the row says so", page.locator(f"#posting-{ids[1]}").inner_text()[:100])
+    ctx.close()
+
+    # a phone: the question fits
+    mctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    mctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+    mctx.route(re.compile(r"^https?://(?!127\.0\.0\.1)"), lambda route: route.fulfill(status=200, body="the job's own page"))
+    mp = mctx.new_page()
+    mp.goto(base + "/", wait_until="load")
+    other = mp.evaluate("[...document.querySelectorAll('li.posting')].map(li => li.id.replace('posting-', '')).find(id => id !== %s)" % ids[1])
+    with mctx.expect_page() as popup:
+        mp.locator(f"#posting-{other} a.posting-link").click()
+    popup.value.wait_for_load_state("load")
+    popup.value.close()
+    mp.bring_to_front()
+    mp.evaluate("window.dispatchEvent(new Event('focus'))")
+    mp.wait_for_selector(f"#posting-{other} [data-ask]", timeout=8000)
+    geo = mp.evaluate("""(id) => { const r = document.querySelector('#posting-' + id + ' [data-ask]').getBoundingClientRect();
+        return {left: r.left, right: r.right, vw: window.innerWidth, sw: document.documentElement.scrollWidth} }""", other)
+    check(geo["left"] >= 0 and geo["right"] <= geo["vw"] and geo["sw"] <= geo["vw"], "on a phone the question fits the screen with no sideways scroll", str(geo))
+    mctx.close()
+
+
 def check_alerts_switch_no_js(browser, base, token):
     """Without JavaScript the alerts switch is still a working form button: it posts and the page
     reloads with the switch flipped and its date line updated (no notice banner)."""
@@ -615,6 +715,7 @@ def main():
             check_skills_minimum(ctx, base)
             ctx.close()
             check_signin_states(browser, base)
+            check_return_ask(browser, base, token)
             check_alerts_switch_no_js(browser, base, token)
             header_infos = {}
             for (w, h) in VIEWPORTS:

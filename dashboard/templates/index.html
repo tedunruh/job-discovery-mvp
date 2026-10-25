@@ -1,4 +1,20 @@
 {% import "_fg.html" as fg %}
+{#- SC-63. These two are drawn on the server for the rows that need them and also sit in <template>s, which
+    field-guide/js/return.js copies when a tab regains focus, so the page and the script never disagree on markup. -#}
+{% macro viewed_line(when) -%}
+<p class="posting-viewed" data-viewed><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M9.5 2.5H13.5V6.5M13.5 2.5L7.5 8.5M11.5 9.5V12.5C11.5 13.05 11.05 13.5 10.5 13.5H3.5C2.95 13.5 2.5 13.05 2.5 12.5V5.5C2.5 4.95 2.95 4.5 3.5 4.5H6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Viewed <span data-viewed-when>{{ when }}</span></p>
+{%- endmacro %}
+{% macro ask_block(id, help) -%}
+<div class="row-ask" data-ask>
+  <div class="row-ask-text">
+    <p class="fg-voice">Welcome back. Did you apply for this one?</p>
+    <p class="fg-card-help" data-ask-help>{{ help }}</p>
+  </div>
+  <form class="fg-row" method="post" action="/ask/dismiss/{{ id }}">
+    <button class="fg-button fg-button--secondary" type="submit" data-ask-dismiss>Not yet</button>
+  </form>
+</div>
+{%- endmacro %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -6,6 +22,7 @@
   <title>Scout</title>
   {% include "_field_guide_head.html" %}
   <script src="/field-guide/js/filter.js" defer></script>
+  <script src="/field-guide/js/return.js" defer></script>
   <style>
     /* Layout follows Figma "Scout Job Discovery Dashboard" (226:849): a Sage band
        with topographic contours behind the header, then the list in a
@@ -141,6 +158,23 @@
     .posting--done .posting-title { color: var(--fg-color-text-secondary); }
     .posting-done-text { color: var(--fg-color-text-primary); }
 
+    /* SC-63: coming back from a job. Everything happens on the job's own row, not in a banner. A Viewed line in the
+       meta column (icon plus words, never colour alone); the row you came back from gets a Discovery outline and
+       opens a question under its details. */
+    .posting-meta { display: flex; flex-direction: column; gap: var(--fg-space-1); }
+    .posting-viewed { display: inline-flex; align-items: center; gap: var(--fg-space-1); color: var(--fg-color-text-primary); }
+    .posting-viewed svg { flex: none; }
+    .posting--asking { box-shadow: inset 0 0 0 2px var(--fg-color-signal-discovery); }
+    .row-ask {
+      grid-column: 1 / -1; position: relative; z-index: 1;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      gap: var(--fg-space-3) var(--fg-space-4); padding-top: var(--fg-space-3);
+      border-top: 1px solid var(--fg-color-border-subtle);
+    }
+    .row-ask-text { display: flex; flex-direction: column; gap: var(--fg-space-1); min-width: 0; flex: 1 1 320px; }
+    .row-ask .fg-voice { font-size: var(--fg-font-size-lg); }
+    .row-ask .fg-card-help { margin: 0; }
+
     @media (max-width: 680px) {
       body > .fg-header { padding-inline: 0; }
       .board { margin-top: var(--fg-space-4); padding: var(--fg-space-3); }
@@ -155,8 +189,12 @@
         grid-template-columns: minmax(0, 1fr) auto;
         grid-template-areas:
           "lead applied"
-          "meta meta";
+          "meta meta"
+          "ask ask";
       }
+      .row-ask { grid-area: ask; }
+      .row-ask .fg-row { width: 100%; }
+      .row-ask .fg-row .fg-button { width: 100%; }
       .posting-lead { grid-area: lead; }
       .posting-second { display: contents; }
       .posting-meta { grid-area: meta; }
@@ -176,7 +214,11 @@
   {% endcall %}
   <h1 class="fg-visually-hidden">Open roles</h1>
 
-  <section class="board" aria-label="Open roles">
+  <section class="board" aria-label="Open roles" data-return-url="/return.json">
+    {#- A live region that is always in the page, so a screen reader hears the question when it appears. -#}
+    <p class="fg-visually-hidden" role="status" aria-live="polite" id="return-live"></p>
+    <template id="return-viewed-template">{{ viewed_line("__when__") }}</template>
+    <template id="return-ask-template">{{ ask_block("__id__", "__help__") }}</template>
     <div class="toolbar">
       <div class="filters">
         {% call fg.filter("filter-work", "Work type", work_label) %}
@@ -258,7 +300,7 @@
         </div>
       </li>
       {% else %}
-      <li class="posting" id="posting-{{ p.id }}">
+      <li class="{{ 'posting posting--asking' if p.ask_help else 'posting' }}" id="posting-{{ p.id }}">
         <div class="posting-lead">
           <p class="posting-title"><a class="posting-link" href="/open/{{ p.id }}" target="_blank" rel="noopener">{{ p.title }}</a></p>
           <p class="posting-subline">{{ p.company_name }}{% if p.location %} • {{ p.location }}{% endif %}</p>
@@ -270,6 +312,9 @@
         <div class="posting-second">
           <div class="posting-meta">
             <p>Discovered {{ p.first_seen_at|humanize }}</p>
+            {%- if p.viewed_ago %}
+            {{ viewed_line(p.viewed_ago) }}
+            {%- endif %}
             {# LinkedIn line ("Not seen on LinkedIn" / "Seen on LinkedIn 3 hours ago") goes here once LinkedIn sightings are recorded. #}
           </div>
           <form class="applied-form" method="post" action="/set_applied/{{ p.id }}">
@@ -279,6 +324,9 @@
             {{ fg.toggle("Applied", pressed=p.applied, title="Applied — click to unmark" if p.applied else "Mark as applied", extra_class="applied-toggle") }}
           </form>
         </div>
+        {%- if p.ask_help %}
+        {{ ask_block(p.id, p.ask_help) }}
+        {%- endif %}
       </li>
       {% endif %}
       {% endfor %}

@@ -1051,3 +1051,33 @@ documents were about testers' feedback and decisions, in a repo that was private
       on this machine only. It is not on GitHub. Do not push it.
 - [x] After a history rewrite, delete stale local branches before using GitHub Desktop's Push or Sync: any of
       them would put the old commits back.
+
+### 2026-10-25 — SC-63: "Did you apply for this one?" when someone comes back from a job
+**Shipped:** a job the person has opened says **Viewed** with when (icon plus words). The job they opened *last* asks,
+on its own row (a Discovery outline and a question under its details): "Welcome back. Did you apply for this one?",
+"If you did, mark it Applied. You opened it 12 minutes ago.", and a **Not yet** button. Yes is the row's existing Applied
+toggle (which then follows SC-58: "Applied just now"). If several jobs were opened only the latest asks and the help line
+says how many others are marked Viewed. "Not yet" closes it for good until that job is opened again. It appears the moment
+the tab comes back into view (a small script asks the server what is true now), and also on any reload. It never takes
+focus and never blocks anything; a hidden live region announces it to screen readers. A push-alert tap counts as an open
+(SC-55). No schema change: opens were already logged, and "Not yet" is a new kind of event in the same table.
+**Rules chosen (check with Ted):** asked about only if opened in the last 24 hours (older opens are just Viewed); only the
+single latest-opened job is ever asked about, so after "Not yet" the next-older job does not step in; a job that is not on
+the current page (filtered out, or past "Show more") cannot ask, and nothing is asked about an applied job.
+**Rework count:** 2, both in my own checks, none in the page: the first sign of a failure was a test that matched the hidden
+`<template>` copies as well as the page; and my browser check blamed the page for a focus change that was my own click.
+**Root cause:** *a check that cannot tell the thing it checks from its own scaffolding.* Tests now read the page without
+its templates; the focus check is taken after the click and before the return.
+**Standing checks added:**
+- [x] Automated, the rule (`dashboard/return_ask.py`): nothing opened, the latest only, the 24-hour edge, older opens not counted,
+      applied, "Not yet" then opened again, the next-older job not stepping in, and the help line singular and plural.
+- [x] Automated, server: the question and Viewed lines on the right rows with the right help, several opens, no focus
+      attributes, a live region, a job off the page, the templates the script copies, the state endpoint (JSON, never
+      cached, applied jobs left out, sign-in needed) and the "Not yet" route (quiet answer for the script, back to the
+      same row without it, an unknown job records nothing). 22 mutation checks on a copy of the repo.
+- [x] Automated, in a real browser (`scripts/quality_check.py`, 310 checks): open a job in another tab, return, and the row asks
+      with no reload and no change of focus; a second job moves the question and the first says Viewed; a reload still shows
+      it; "Not yet" closes it, stays closed after a reload and asks again once the job is opened again; Applied answers it; a
+      phone fits it. The job's outside page is stubbed, so nothing leaves the machine. 6 deliberate breakages of the script
+      each fail a check.
+- [ ] Not done: the Figma mirror of the Viewed line and the asking row (code is the source of truth).

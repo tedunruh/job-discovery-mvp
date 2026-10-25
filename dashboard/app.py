@@ -5,7 +5,7 @@ from functools import wraps
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, g, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, g, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 
 from dashboard.auth import (
     create_magic_link,
@@ -20,8 +20,10 @@ from db.db import (
     create_session,
     delete_session,
     get_conn,
+    get_applied_among,
     get_open_postings,
     get_posting_url,
+    get_return_events,
     get_user_keywords,
     get_user_profile,
     get_user_work_types,
@@ -36,6 +38,7 @@ from db.db import (
     set_user_work_types,
 )
 from dashboard.profile import ask_for_catch_up
+from dashboard.return_ask import choose_ask, help_text
 from dashboard.skill_filter import apply_skill_cutoff
 from dashboard.profile import register as register_profile_screens
 from dashboard.resume import register as register_resume
@@ -319,6 +322,7 @@ def index():
             set_user_work_types(conn, user_id, saved_work_types)
             conn.commit()
         postings = get_open_postings(conn, user_id, since=cutoff, keywords=keywords)
+        opens, dismissals = get_return_events(conn, user_id)  # SC-63: what they opened, and what they said "Not yet" to
     finally:
         conn.close()
 
@@ -372,6 +376,15 @@ def index():
                 break
             real += 1
         shown.append(p)
+
+    # SC-63: jobs they opened say so, and the job they opened last asks whether they applied (if it is on this page).
+    now = datetime.now(timezone.utc)
+    ask_id, others = choose_ask(opens, dismissals, {p["id"] for p in shown if p["applied"]}, now)
+    for p in shown:
+        if p["id"] in opens:
+            p["viewed_ago"] = humanize_posted_at(opens[p["id"]])
+            if p["id"] == ask_id and not p.get("just_applied"):
+                p["ask_help"] = help_text(p["viewed_ago"], others)
 
     return render_template(
         "index.html",
@@ -444,6 +457,43 @@ def set_range():
     session.permanent = True
     session["posted_range"] = choice if choice in RANGES else DEFAULT_RANGE
     return redirect(url_for("index"))
+
+
+@app.route("/return.json")
+@require_login
+def return_state():
+    """What a dashboard that has just come back into view should show (SC-63): which jobs were opened, and which
+    one to ask about. The page asks for this when its tab regains focus, so the question appears without a reload."""
+    conn = get_conn()
+    try:
+        opens, dismissals = get_return_events(conn, g.user_id)
+        applied = get_applied_among(conn, g.user_id, list(opens))
+    finally:
+        conn.close()
+    ask_id, others = choose_ask(opens, dismissals, applied, datetime.now(timezone.utc))
+    body = {
+        "ask": ({"id": ask_id, "help": help_text(humanize_posted_at(opens[ask_id]), others)} if ask_id else None),
+        "viewed": {str(pid): humanize_posted_at(when) for pid, when in opens.items() if pid not in applied},
+    }
+    response = jsonify(body)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/ask/dismiss/<int:posting_id>", methods=["POST"])
+@require_login
+def dismiss_ask(posting_id):
+    """"Not yet": the question about this job is not asked again unless they open it again."""
+    conn = get_conn()
+    try:
+        if get_posting_url(conn, posting_id):
+            log_event(conn, g.user_id, "ask_dismissed", posting_id)
+            conn.commit()
+    finally:
+        conn.close()
+    if request.headers.get("X-Requested-With") == "fetch":
+        return "", 204
+    return redirect(url_for("index", _anchor=f"posting-{posting_id}"))
 
 
 @app.route("/set_applied/<int:posting_id>", methods=["POST"])
