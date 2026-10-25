@@ -337,6 +337,114 @@ def check_skills_minimum(ctx, base):
     page.close()
 
 
+def check_signin_states(browser, base):
+    """The sign-in page says what is happening (SC-62). The wordmark, field and button never move; the status area
+    sits below the button; sending shows a working button of the same width; a sent link is named; "send another"
+    unlocks; a bad address, too many tries and a failed request each say so; and a phone has no overflow. The sign-in
+    request is held and answered by the check itself, so no email is ever sent."""
+    ctx = browser.new_context(viewport={"width": 1280, "height": 800})
+    page = ctx.new_page()
+    held = []
+    page.route("**/login", lambda route: held.append(route) if route.request.method == "POST" else route.continue_())
+    page.goto(base + "/login", wait_until="load")
+
+    def box(selector):
+        return page.locator(selector).bounding_box()
+
+    def visible_messages():
+        return page.evaluate("[...document.querySelectorAll('.auth-status [data-state]')].filter(e => !e.hidden).map(e => e.dataset.state)")
+
+    label = lambda: (page.locator("#signin-button .signin-label").inner_text() or "").strip()
+    rest = {k: box(k) for k in (".wordmark", "#email", "#signin-button")}
+    check(label() == "Email me a sign-in link" and not visible_messages(), "sign-in at rest says what the button does and shows no message", f"{label()!r} {visible_messages()}")
+
+    # an incomplete address: our message, no request
+    page.fill("#email", "pat@example")
+    page.click("#signin-button")
+    check(visible_messages() == ["invalid"] and not held, "an incomplete email is caught with a message and sends nothing", f"{visible_messages()} requests={len(held)}")
+
+    # sending: busy, same width and colors, label and spinner
+    page.fill("#email", "quality-check-signin@example.invalid")
+    page.click("#signin-button")
+    page.wait_for_function("document.getElementById('signin-button').getAttribute('aria-busy') === 'true'")
+    busy = page.evaluate("""() => { const b = document.getElementById('signin-button'); const cs = getComputedStyle(b);
+        return {label: b.querySelector('.signin-label').textContent, spinner: !b.querySelector('.fg-spinner').hidden,
+                disabled: b.disabled, ariaDisabled: b.getAttribute('aria-disabled'), primary: b.classList.contains('fg-button--primary'),
+                bg: cs.backgroundColor, width: b.getBoundingClientRect().width,
+                spin: (() => { const sp = getComputedStyle(b.querySelector('.fg-spinner')); return {w: parseFloat(sp.width), anim: sp.animationName}; })()} }""")
+    check(busy["label"] == "Sending…" and busy["spinner"] and busy["ariaDisabled"] == "true" and not busy["disabled"] and busy["primary"],
+          "while sending the button is busy (spinner, 'Sending…', not disabled) and keeps its colors", str(busy))
+    check(busy["spin"]["w"] > 0 and busy["spin"]["anim"] == "fg-spin", "...and the spinner is drawn and turning (the Field Guide style is there)", str(busy["spin"]))
+    check(abs(busy["width"] - rest["#signin-button"]["width"]) < 1, "...and keeps its width", f"{busy['width']} vs {rest['#signin-button']['width']}")
+    check(len(held) == 1, "...and exactly one request was made", f"requests={len(held)}")
+    page.click("#signin-button", force=True)           # pressing it again while busy does nothing
+    page.wait_for_timeout(150)
+    check(len(held) == 1, "...and pressing it again while busy sends nothing more", f"requests={len(held)}")
+
+    # sent: named address, button done, nothing above the message moved
+    page.evaluate("document.getElementById('signin-form').setAttribute('data-resend-seconds', '1')")
+    held.pop().fulfill(status=200, body="ok")
+    page.wait_for_function("document.querySelector('.auth-status [data-state=sent]') && !document.querySelector('.auth-status [data-state=sent]').hidden")
+    sent_box = box(".auth-status [data-state=sent]")
+    check(label() == "Link sent" and page.locator("#signin-button").is_disabled(), "once sent the button says 'Link sent' and is done", label())
+    check_box = box("#signin-button .signin-check")
+    check(bool(check_box) and check_box["width"] > 0 and box("#signin-button .fg-spinner") is None, "...with a check mark showing and no spinner", str(check_box))
+    check("quality-check-signin@example.invalid" in page.locator(".auth-status [data-state=sent]").inner_text()
+          and page.locator(".auth-status [data-state=sent] .msg-title").inner_text() == "Check your email",
+          "the confirmation says 'Check your email' and names the address")
+    moved = {k: abs(box(k)["y"] - rest[k]["y"]) + abs(box(k)["x"] - rest[k]["x"]) for k in rest}
+    check(max(moved.values()) < 1, "nothing above the message moved when it appeared", str(moved))
+    check(sent_box["y"] >= box("#signin-button")["y"] + box("#signin-button")["height"], "the message sits below the button", f"{sent_box['y']} vs {box('#signin-button')}")
+    page.wait_for_function("document.querySelector('#signin-button .signin-label').textContent === 'Send another link'", timeout=5000)
+    check(page.locator("#signin-button").is_enabled() and "fg-button--secondary" in (page.locator("#signin-button").get_attribute("class") or ""),
+          "after the wait 'Send another link' unlocks as a secondary button")
+
+    # typing a new address starts again
+    page.fill("#email", "someone-else@example.invalid")
+    check(label() == "Email me a sign-in link" and not visible_messages(), "typing a different address starts again")
+
+    # too many tries on this device: seeded memory, no request
+    page.evaluate("""() => { const now = Date.now(); localStorage.setItem('scout.signin.sends', JSON.stringify({'busy@example.invalid': [now-1000, now-2000, now-3000, now-4000, now-5000]})); }""")
+    page.fill("#email", "busy@example.invalid")
+    page.click("#signin-button")
+    check(visible_messages() == ["throttled"] and not held, "after too many tries the page says so and sends nothing", f"{visible_messages()} requests={len(held)}")
+
+    # a failed request is said plainly and the button comes back
+    page.fill("#email", "failing@example.invalid")
+    page.click("#signin-button")
+    page.wait_for_function("document.getElementById('signin-button').getAttribute('aria-busy') === 'true'")
+    held.pop().fulfill(status=500, body="no")
+    page.wait_for_function("[...document.querySelectorAll('.auth-status [data-state]')].some(e => !e.hidden && e.dataset.state === 'failed')")
+    check(label() == "Email me a sign-in link" and page.locator("#signin-button").is_enabled(), "a failed request says so and the button is ready again")
+    ctx.close()
+
+    # a phone: the confirmation fits the screen
+    ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    page = ctx.new_page()
+    page.route("**/login", lambda route: route.fulfill(status=200, body="ok") if route.request.method == "POST" else route.continue_())
+    page.goto(base + "/login", wait_until="load")
+    page.fill("#email", "a-rather-long-address-for-a-phone@example.invalid")
+    page.click("#signin-button")
+    page.wait_for_function("document.querySelector('.auth-status [data-state=sent]') && !document.querySelector('.auth-status [data-state=sent]').hidden")
+    geo = page.evaluate("""() => { const r = document.querySelector('.auth-status [data-state=sent]').getBoundingClientRect();
+        return {left: r.left, right: r.right, bottom: r.bottom, vw: window.innerWidth, vh: window.innerHeight, sw: document.documentElement.scrollWidth} }""")
+    check(geo["left"] >= 0 and geo["right"] <= geo["vw"] and geo["bottom"] <= geo["vh"] and geo["sw"] <= geo["vw"],
+          "on a phone the confirmation fits the screen with no sideways scroll", str(geo))
+    ctx.close()
+
+    # no script at all: the plain post still works and the page says so
+    ctx = browser.new_context(viewport={"width": 1280, "height": 800}, java_script_enabled=False)
+    page = ctx.new_page()
+    page.goto(base + "/login", wait_until="load")
+    page.fill("#email", "nobody-qc-nojs@example.invalid")
+    page.click("#signin-button")
+    page.wait_for_load_state("load")
+    text = page.locator(".auth-status").inner_text()
+    check("Check your email" in text and "nobody-qc-nojs@example.invalid" in text and page.locator("#signin-button").inner_text().strip() == "Send another link",
+          "with no script the plain form still works and the page says the link is on its way", text[:120])
+    ctx.close()
+
+
 def check_alerts_switch_no_js(browser, base, token):
     """Without JavaScript the alerts switch is still a working form button: it posts and the page
     reloads with the switch flipped and its date line updated (no notice banner)."""
@@ -506,6 +614,7 @@ def main():
             check_back_link(ctx, base)
             check_skills_minimum(ctx, base)
             ctx.close()
+            check_signin_states(browser, base)
             check_alerts_switch_no_js(browser, base, token)
             header_infos = {}
             for (w, h) in VIEWPORTS:

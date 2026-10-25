@@ -136,6 +136,7 @@ is for supporting text only (metadata, hints, counts, section notes).
 | `.fg-message` + `--success` / `--attention` / `--discovery` | Signal color in fill and left rule, text stays Ink |
 | `.fg-link` | Forest |
 | `.fg-button--ghost` | Forest text, no outline (header "Role preferences") |
+| `.fg-button[aria-busy="true"]` + `.fg-spinner` | Working state (SC-62): the button keeps its colors and width, the label says what is happening, a spinner sits before it. `aria-busy` and `aria-disabled`, never `disabled`, so focus stays. Reduced motion slows the spinner |
 | `.fg-radio` | Checked = Forest check-disc |
 | `.fg-filter` / `.fg-filter-pill` / `.fg-menu` / `.fg-menu-item` | Dropdown filter on `<details>` via `fg.filter`; include `/field-guide/js/filter.js` for outside-click and Escape |
 | `.fg-toggle` | One item's on/off status ("Applied") via `fg.toggle`; disc carries the state, label stays fixed. For a setting, use the Switch |

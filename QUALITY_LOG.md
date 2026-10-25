@@ -987,3 +987,37 @@ excluded from the count, from "Showing X of Y" and from the page size.
       the job's own id, not its title: another company can have the same title), the Applied view shows it, undoing
       from there and going back gives 687, phone layout fine.
 - [x] Check a row by its id, never its title, when a list can hold the same title twice.
+
+### 2026-10-25 — SC-62: the sign-in screen shows that the email is on its way
+**Shipped:** the sign-in page now says what is happening, following the design mock. The button reads "Email me a
+sign-in link". Pressing it shows a working button (spinner, "Sending…", same colors and width, not disabled); the
+page does not move. Then "Link sent" with a check mark, and below the button a confirmation, "Check your email" with
+the address named ("If you have access, a sign-in link is on its way to <address>. It works once and expires in 15
+minutes."). After 30 seconds the button becomes a secondary "Send another link". An incomplete address, too many tries
+and a failed request each say so, in the same place. The form still works as a plain post with no script. New Field
+Guide piece: the button's working state (`aria-busy` plus `.fg-spinner`), with a gallery section, README row and CSS.
+No schema change.
+**Copy I wrote that the mock did not have** (check with the designer): the failed-request message ("That didn't go
+through" / "Check your connection and try again.") and a title for the bad-sign-in-link message ("That link didn't
+work"). The label is now "Email" (sentence case), up from the old lower-case "email".
+**SC-33 rule kept:** nothing on the page says whether an address is registered. "Too many tries" is a limit on this
+device (5 links per address in 15 minutes, remembered in the browser), not the server's per-address cap, which still
+answers every address identically; a test proves a registered, an unknown and a rate-limited address get the same page.
+**Rework count:** 2 in my own work, both found by looking at a picture, not by a check: (1) the "Link sent" check mark
+never appeared, because an SVG has no `hidden` property and my script assigned it; my browser check only read the
+button's label. (2) The route's dashed trail showed through the translucent done button.
+**Root cause:** *a check that reads text cannot see a missing icon or a see-through button.* Both are now checked
+(the mark's size, the spinner's size and animation) and the page is photographed at desktop and phone width.
+**Standing checks added:**
+- [x] Automated, server: copy, wording and limits on the form, every message present and hidden, status area after the
+      button as a live region, the plain-post page naming the address with "Send another link", identical answers for
+      registered / unknown / capped addresses, a hostile address escaped, a bad link's reason shown. 16 mutation checks.
+- [x] Automated, in the browser (`scripts/quality_check.py`, 295 checks): at rest; an incomplete address sends nothing;
+      sending is busy with a drawn, turning spinner, the same width, one request, a second press ignored; sent shows
+      the mark and names the address; nothing above the message moves and it sits below the button; "Send another
+      link" unlocks; typing starts again; too many tries and a failed request say so; a phone has no sideways scroll;
+      with no script the plain form works. 12 deliberate breakages of the page each fail a check. The request is held
+      and answered by the check itself, so no email is ever sent.
+- [x] Never trust `element.hidden = false` on an SVG; set the attribute.
+- [ ] Not done: the Figma mirror of the Button's working state (a rebuild request for the designer; code is the source
+      of truth).

@@ -108,6 +108,23 @@ button.fg-link {
   border-color: transparent;
   cursor: not-allowed;
 }
+/* Working (SC-62): a button that has started something that takes a moment. It is busy, not unavailable, so it
+   keeps its own colors and width (no gray disabled look); the label says what is happening ("Sending...") and a
+   spinner sits before it. Markup: aria-busy="true" and aria-disabled="true", never disabled, so focus stays put
+   and a screen reader hears the new label. Reduced motion slows the spinner instead of stopping it. */
+.fg-button[aria-busy="true"] { cursor: progress; }
+.fg-spinner {
+  box-sizing: border-box;
+  flex: none;
+  width: var(--fg-size-control);
+  height: var(--fg-size-control);
+  border-radius: var(--fg-radius-full);
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: fg-spin 0.8s linear infinite;
+}
+@keyframes fg-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .fg-spinner { animation-duration: 2.4s; } }
 /* Disabled form controls share the button's treatment: same opacity, no pointer. */
 :where(.fg-checkbox, .fg-radio, .fg-input, .fg-toggle):disabled { opacity: 0.45; cursor: not-allowed; }
 

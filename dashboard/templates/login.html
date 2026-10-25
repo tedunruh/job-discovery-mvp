@@ -58,6 +58,7 @@
   <meta charset="utf-8">
   <title>Sign in — Scout</title>
   {% include "_field_guide_head.html" %}
+  <script src="/field-guide/js/signin.js" defer></script>
   <style>
     body {
       min-height: 100vh;
@@ -81,16 +82,39 @@
       font-size: var(--fg-font-size-wordmark);
       white-space: nowrap;
     }
-    .auth,
-    .auth-form {
+    /* SC-62: the form is the anchor. The status area sits below the button and out of the flow, so showing a
+       message moves nothing above it (the centered card keeps its height). It is always in the page, as a polite
+       live region. */
+    .auth {
+      position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: var(--fg-space-6);
     }
     .auth .fg-field,
-    .auth .fg-button,
-    .auth .fg-message { width: 280px; }
+    .auth .fg-button { width: 280px; }
+    .auth-status {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      width: 280px;
+      margin-top: var(--fg-space-4);
+      z-index: 2;
+    }
+    /* The message tints are see-through, so the route trail showed through on a phone: lay the tint over an opaque
+       card fill so the message sits in front of the trail. */
+    .auth-status .fg-message { background-color: var(--fg-color-surface-card); }
+    .auth-status .fg-message--success { background-image: linear-gradient(var(--fg-color-signal-progress-subtle), var(--fg-color-signal-progress-subtle)); }
+    .auth-status .fg-message--attention { background-image: linear-gradient(var(--fg-color-signal-attention-subtle), var(--fg-color-signal-attention-subtle)); }
+    /* The same for the button once it is done or secondary: its fills are see-through too. */
+    .auth .fg-button:disabled { background-color: var(--fg-color-surface-card); background-image: linear-gradient(var(--fg-color-action-secondary-fill), var(--fg-color-action-secondary-fill)); }
+    .auth .fg-button--secondary:not(:hover) { background-color: var(--fg-color-surface-card); }
+    .msg-title { margin: 0; font-weight: var(--fg-font-weight-demibold); }
+    .msg-body { margin: var(--fg-space-1) 0 0; font-size: var(--fg-font-size-md); overflow-wrap: anywhere; }
+    .msg-title + .msg-body { margin-top: var(--fg-space-1); }
+    .msg-body:first-child { margin-top: 0; }
+    .msg-body strong { font-weight: var(--fg-font-weight-demibold); }
 
     /* ---------- Animated route decoration (Figma motion, nodes 121:2052 / 140:137) ----------
        Purely decorative background: a dashed trail reveals itself dash-by-dash over a shared
@@ -265,20 +289,44 @@
 
   <div class="card">
     <h1 class="fg-display wordmark">Scout</h1>
-    <div class="auth">
-      {% if sent %}
-        <p class="fg-message fg-message--success">If that email is on the list, a sign-in link is on its way. It expires in 15 minutes and works once.</p>
-      {% elif error %}
-        <p class="fg-message fg-message--attention">{{ error }}</p>
-      {% endif %}
-      <form class="auth-form" method="post" action="/login">
-        <div class="fg-field">
-          <label class="fg-label" for="email">email</label>
-          <input class="fg-input" type="email" id="email" name="email" placeholder="you@example.com" value="{{ last_email or '' }}" autocomplete="username email" required {{ '' if last_email else 'autofocus' }}>
+    <form class="auth" id="signin-form" method="post" action="/login" novalidate
+          data-resend-seconds="30" data-max-sends="5" data-window-minutes="15"
+          data-label-ready="Email me a sign-in link" data-label-sending="Sending…" data-label-sent="Link sent" data-label-resend="Send another link">
+      <div class="fg-field">
+        <label class="fg-label" for="email">Email</label>
+        <input class="fg-input" type="email" id="email" name="email" placeholder="you@example.com" value="{{ last_email or '' }}" autocomplete="username email" {{ '' if last_email else 'autofocus' }}>
+      </div>
+      {#- After a plain post (no script) the page itself says the link is on its way, and offers another one right away. -#}
+      <button class="signin-btn fg-button {{ 'fg-button--secondary' if sent else 'fg-button--primary' }}" type="submit" id="signin-button">
+        <span class="fg-spinner" aria-hidden="true" hidden></span>
+        <svg class="signin-check" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" hidden><path d="M4 9.4L7.4 12.8L14 5.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="signin-label">{{ 'Send another link' if sent else 'Email me a sign-in link' }}</span>
+      </button>
+      <div class="auth-status" role="status" aria-live="polite">
+        <div class="fg-message fg-message--success" data-state="sent"{% if not sent %} hidden{% endif %}>
+          <p class="msg-title">Check your email</p>
+          <p class="msg-body">If you have access, a sign-in link is on its way to <strong data-email>{{ last_email or '' }}</strong>. It works once and expires in 15 minutes.</p>
         </div>
-        <button class="signin-btn fg-button fg-button--primary" type="submit">Send sign-in link</button>
-      </form>
-    </div>
+        <div class="fg-message fg-message--attention" data-state="invalid" hidden>
+          <p class="msg-title">That email looks incomplete</p>
+          <p class="msg-body">Check it and try again, like you@example.com.</p>
+        </div>
+        <div class="fg-message fg-message--attention" data-state="throttled" hidden>
+          <p class="msg-title">Too many tries for now</p>
+          <p class="msg-body">Wait a few minutes, then send the link again.</p>
+        </div>
+        <div class="fg-message fg-message--attention" data-state="failed" hidden>
+          <p class="msg-title">That didn't go through</p>
+          <p class="msg-body">Check your connection and try again.</p>
+        </div>
+        {%- if error %}
+        <div class="fg-message fg-message--attention" data-state="error">
+          <p class="msg-title">That link didn't work</p>
+          <p class="msg-body">{{ error }}</p>
+        </div>
+        {%- endif %}
+      </div>
+    </form>
   </div>
 
   <script>

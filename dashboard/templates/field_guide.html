@@ -261,6 +261,21 @@
     </div>
   </section>
 
+  <section class="spec" data-component="button-working">
+    <div>
+      <h3>Button: working state</h3>
+      <p class="spec-use">Use when a button starts something that takes a moment (sending an email, saving). It keeps its own colors and width, the label says what is happening, and a spinner sits before it. Not disabled: focus stays put and a screen reader hears the new label.</p>
+      <code class="spec-code">.fg-button[aria-busy="true"][aria-disabled="true"] · .fg-spinner</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Primary, ready</span><button class="fg-button fg-button--primary" type="button">Send</button></div>
+      <div class="state"><span class="state-label">Primary, working</span><button class="fg-button fg-button--primary" type="button" aria-busy="true" aria-disabled="true"><span class="fg-spinner" aria-hidden="true"></span>Sending…</button></div>
+      <div class="state"><span class="state-label">Primary, done</span><button class="fg-button fg-button--primary" type="button" disabled><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M4 9.4L7.4 12.8L14 5.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Sent</button></div>
+      <div class="state"><span class="state-label">Secondary, working</span><button class="fg-button fg-button--secondary" type="button" aria-busy="true" aria-disabled="true"><span class="fg-spinner" aria-hidden="true"></span>Refreshing…</button></div>
+      <div class="state"><span class="state-label">Ghost, working</span><button class="fg-button fg-button--ghost" type="button" aria-busy="true" aria-disabled="true"><span class="fg-spinner" aria-hidden="true"></span>Checking…</button></div>
+    </div>
+  </section>
+
   <section class="spec" data-component="icon-button">
     <div>
       <h3>Icon button</h3>
