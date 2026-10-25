@@ -26,6 +26,7 @@ from db.db import (
     get_user_profile,
     get_user_work_types,
     get_session_user,
+    get_alert_target,
     get_user_role_categories,
     get_user_skill_cutoff,
     is_onboarded,
@@ -442,6 +443,23 @@ def open_posting(posting_id):
     finally:
         conn.close()
     return redirect(url) if url else redirect(url_for("index"))
+
+
+@app.route("/a/<token>")
+def open_from_alert(token):
+    """A tap on a push notification (SC-55). The link is private to one person and one job, so no sign-in is needed
+    (a phone often has no session): log that they opened it, then send them on to the job's own page. A link
+    preview that only asks for the headers (HEAD) is forwarded without counting. Unknown token: the dashboard."""
+    conn = get_conn()
+    try:
+        target = get_alert_target(conn, token)
+        if target and request.method != "HEAD":
+            user_id, posting_id, _ = target
+            log_event(conn, user_id, "opened_alert", posting_id)
+            conn.commit()
+    finally:
+        conn.close()
+    return redirect(target[2]) if target and target[2] else redirect(url_for("index"))
 
 
 if __name__ == "__main__":

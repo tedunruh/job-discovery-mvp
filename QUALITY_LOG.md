@@ -932,3 +932,30 @@ answer I should have asked for first was "show me how it works today, and what w
       and ask what is wrong with it, before offering options. Options I invented are not the user's answer.
 - [x] Do not add ordering, scoring or ranking to a list that is already "newest first" unless it was asked for
       by name.
+
+### 2026-10-25 — SC-55: taps on push notifications are counted
+**Shipped:** a push alert for a single new job now links to Scout (`/a/<private token>`), which logs an
+`opened_alert` event and forwards to the job's own page, with no sign-in needed (a phone often has no session).
+`scripts/engagement.py` has a new `from_alert` column. A link preview that only asks for headers (HEAD) is
+forwarded without counting; an unknown link goes to the dashboard and reveals nothing. The token is random, one
+per person and job, in one new column (`user_postings.alert_token`), read and written through guarded helpers, so
+if the column is missing alerts go out with the job's own link exactly as before.
+**Deliberate trade-off:** Scout's site sleeps overnight on the free plan (kept awake 6 AM to midnight Central), and
+a sleeping site would make the first tap wait about a minute. So between midnight and 6 AM Central alerts keep the
+direct link and those opens are NOT counted. Grouped alerts (several jobs in one push) have no single link, so they
+are unchanged and not counted.
+**Rework count:** 1, in my own tests: a placeholder test that asserted nothing was caught on review and replaced with
+a real check of when the token helper is called.
+**Root cause it guards against:** *routing a tap through a service that can be asleep or down turns a tracking
+feature into an outage of the alert itself.* Hence the quiet hours, the guarded column and the fallback to the
+direct link.
+**Standing checks added:**
+- [x] Automated: the link in the alert, the quiet-hours boundaries (5:59 off, 6:00 on, 23:59 on), the route (valid
+      link forwards and counts once with no sign-in; preview not counted; unknown or address-less link goes to the
+      dashboard), the token helpers (kept once made, random, missing column gives none), the whole collector run
+      (link only while awake and only when a token exists; none even requested overnight) and the summary's column
+      order. 18 mutation checks on a copy of the repo all fail when the code is broken.
+- [x] Manual, throwaway Neon branch, real alerts: with the column missing the alert is still sent with the direct
+      link; with it, the alert carries Scout's link; a tap with no sign-in forwards and counts 1, a second tap 2,
+      a HEAD preview 0, an unknown link leaks nothing.
+- [x] A change that puts Scout between a person and an outside page must say what happens when Scout is asleep.

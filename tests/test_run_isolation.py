@@ -24,7 +24,10 @@ USER = {"id": 7, "ntfy_topic": "topic-7", "work_types": []}
 
 
 class RunIsolation(unittest.TestCase):
+    alert_token = None  # what the (stubbed) alert-link helper hands back; SC-55 tests set it
+
     def run_it(self, tail_raises):
+        self.token_calls = []  # (user id, posting id) each time an alert link was asked for
         sent, alerts, events = [], [], []
         posting = {"ats_posting_id": "p1", "title": "Senior Product Designer", "url": "http://x/1",
                    "location": "Remote - United States", "remote_type": "remote", "raw_json": {}, "is_design": True}
@@ -41,6 +44,7 @@ class RunIsolation(unittest.TestCase):
             "record_fetch_success": lambda *a, **k: None,
             "upsert_postings": lambda c, cid, p, backfill=False: {"p1": 55},
             "mark_notified": lambda *a, **k: events.append("marked_sent"),
+            "ensure_alert_token": lambda *a, **k: (self.token_calls.append(a[1:]), self.alert_token)[1],
             "mark_stale_postings_closed": lambda *a, **k: None,
             "finish_scheduler_run": lambda *a, **k: events.append("run_finished"),
             "notify_new_postings": lambda postings, topic, **k: (events.append("alert_delivered"), sent.append((topic, postings)), True)[2],

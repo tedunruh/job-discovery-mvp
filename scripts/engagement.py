@@ -13,7 +13,7 @@ load_dotenv(".env.local")
 
 from db.db import get_conn  # noqa: E402
 
-EVENTS = ["sign_in", "visit", "opened", "applied"]
+EVENTS = ["sign_in", "visit", "opened", "from_alert", "applied"]  # from_alert = opened a job by tapping a push notification
 
 
 def main():
@@ -26,6 +26,7 @@ def main():
                    count(*) FILTER (WHERE e.event_type = 'sign_in'),
                    count(*) FILTER (WHERE e.event_type = 'visit'),
                    count(*) FILTER (WHERE e.event_type = 'opened'),
+                   count(*) FILTER (WHERE e.event_type = 'opened_alert'),
                    count(*) FILTER (WHERE e.event_type = 'applied'),
                    max(e.created_at)
             FROM users u
@@ -40,10 +41,10 @@ def main():
     conn.close()
 
     print(f"Engagement, last {days} days\n")
-    print(f"{'user':<32}" + "".join(f"{e:>9}" for e in EVENTS) + "   last active")
+    print(f"{'user':<32}" + "".join(f"{e:>12}" for e in EVENTS) + "   last active")
     for email, *counts, last in rows:
         last_s = last.strftime("%Y-%m-%d %H:%M") if last else "-"
-        print(f"{email:<32}" + "".join(f"{c:>9}" for c in counts) + f"   {last_s}")
+        print(f"{email:<32}" + "".join(f"{c:>12}" for c in counts) + f"   {last_s}")
 
 
 if __name__ == "__main__":

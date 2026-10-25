@@ -124,8 +124,8 @@ CREATE INDEX IF NOT EXISTS user_sessions_user_id_idx ON user_sessions (user_id);
 
 -- Lightweight engagement log (SC-19): append-only, one row per event. Types:
 -- sign_in (magic link redeemed), visit (dashboard loaded), opened (clicked a
--- posting's link), applied (marked a posting applied). posting_id is set for
--- opened/applied. No analytics layer - scripts/engagement.py reads it directly.
+-- posting's link), opened_alert (tapped a push notification, SC-55), applied (marked a posting applied).
+-- posting_id is set for opened/opened_alert/applied. No analytics layer - scripts/engagement.py reads it directly.
 CREATE TABLE IF NOT EXISTS user_events (
     id BIGSERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -319,3 +319,10 @@ ALTER TABLE companies ADD COLUMN IF NOT EXISTS wide_requested_at TIMESTAMPTZ;
 -- NULL = no minimum (nothing is hidden). Read and written only through db.get_user_skill_cutoff /
 -- set_user_skill_cutoff, which tolerate the column being absent, so the collector never depends on it.
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS skill_cutoff INTEGER;
+
+-- SC-55: a private link per alert, so a tap on a push notification can be counted. The alert's link goes to
+-- Scout (/a/<token>), which logs an "opened_alert" event and forwards to the job's own page. Random, one per
+-- (person, job); NULL for alerts sent before this existed. Read and written only through db.ensure_alert_token /
+-- get_alert_target, which tolerate the column being absent, so the collector never depends on it.
+ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS alert_token TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS user_postings_alert_token_idx ON user_postings (alert_token) WHERE alert_token IS NOT NULL;

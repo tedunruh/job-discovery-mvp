@@ -21,6 +21,7 @@ from db.db import (
     get_all_user_role_categories,
     get_all_users,
     get_companies_to_scan,
+    ensure_alert_token,
     get_conn,
     get_db_now,
     get_open_posting_hashes,
@@ -42,7 +43,7 @@ from db.db import (
 from role_categories import alerts_active, matches_city, matches_profile, matches_profile_titles, matches_work_type
 from scheduler.describe import DescriptionStep, build_gate, extra_workday_queries
 from scheduler.heartbeat import ping_failure, ping_success
-from scheduler.notify import notify_health_alerts, notify_new_postings
+from scheduler.notify import alert_link, notify_health_alerts, notify_new_postings, tracking_allowed
 
 # The schedule is every ~15 min (external cron); a gap past this means runs
 # were missed - cron-job.org down, GitHub dispatch delayed, or the job failing early.
@@ -319,10 +320,13 @@ def _run(health_alerts):
                 bucket = new_postings_by_user.setdefault(
                     user["id"], {"ntfy_topic": user["ntfy_topic"], "postings": []}
                 )
-                bucket["postings"].append(
-                    {"company": company["name"], "title": posting["title"], "url": posting["url"]}
-                )
                 mark_notified(conn, user["id"], posting_id)
+                alert = {"company": company["name"], "title": posting["title"], "url": posting["url"]}
+                if tracking_allowed():
+                    token = ensure_alert_token(conn, user["id"], posting_id)  # None if it can't be made: direct link
+                    if token:
+                        alert["open_url"] = alert_link(token)
+                bucket["postings"].append(alert)
 
         # ---- core companies: every role stored, full fetch -------------------------------
         t_core = time.time()

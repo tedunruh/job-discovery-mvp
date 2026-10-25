@@ -6,6 +6,12 @@ import requests
 
 NTFY_URL = "https://ntfy.sh"
 
+# SC-55: alert links go through Scout so a tap can be counted. Scout's site sleeps overnight on the free plan
+# (scripts/keep_awake.sh keeps it awake from 6 AM to midnight Central), and a sleeping site would make the first tap
+# wait about a minute, so outside those hours alerts keep the job's own link and those opens are not counted.
+DASHBOARD_URL = os.environ.get("DASHBOARD_URL", "https://job-discovery-dashboard.onrender.com").rstrip("/")
+TRACKED_FROM_HOUR = int(os.environ.get("KEEP_AWAKE_FROM_HOUR", "6"))
+
 # For the "Discovered" label in notifications only - purely display, doesn't
 # affect anything stored (all timestamps in the DB stay UTC). cron-job.org's
 # schedule is configured in this zone, so it's a reasonable stand-in for
@@ -15,6 +21,15 @@ LOCAL_TZ = ZoneInfo("America/Chicago")
 
 def _format_discovered_at(dt):
     return dt.astimezone(LOCAL_TZ).strftime("%b %-d, %-I:%M %p %Z")
+
+
+def tracking_allowed(now=None):
+    """Is Scout's site awake right now, so an alert can link through it? (Same hours as keep_awake.sh.)"""
+    return (now or datetime.now(timezone.utc)).astimezone(LOCAL_TZ).hour >= TRACKED_FROM_HOUR
+
+
+def alert_link(token):
+    return f"{DASHBOARD_URL}/a/{token}"
 
 
 def _post(payload, label):
@@ -37,7 +52,8 @@ def notify_new_postings(new_postings, ntfy_topic, discovered_at=None):
     one user's own topic - each user has their own ntfy_topic (users table),
     so this is called once per user with their matching subset of postings.
 
-    new_postings: list of {"company": str, "title": str, "url": str}
+    new_postings: list of {"company": str, "title": str, "url": str, "open_url": str (optional)}.
+    open_url is Scout's own link for this alert (SC-55); the tap goes there, and on to url, when it is given.
 
     Includes an explicit "Discovered <time>" line in the message itself -
     this is when *we* found it, which can differ by hours from the ATS's own
@@ -54,7 +70,7 @@ def notify_new_postings(new_postings, ntfy_topic, discovered_at=None):
         p = new_postings[0]
         title = f"New: {p['company']}"
         message = f"{p['title']}\nDiscovered {discovered_label}"
-        click = p["url"]
+        click = p.get("open_url") or p["url"]
     else:
         title = f"{len(new_postings)} new design roles"
         lines = [f"{p['company']}: {p['title']}" for p in new_postings[:10]]

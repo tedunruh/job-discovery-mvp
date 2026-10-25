@@ -561,6 +561,36 @@ def _optional(conn, run, default):
         return default
 
 
+def ensure_alert_token(conn, user_id, posting_id):
+    """The private token behind this person's alert link for this job (SC-55): created if there is none yet, the same
+    one on every call. None if it cannot be made (the column is missing), in which case the alert keeps the job's own
+    link. The user_postings row must exist (mark_notified makes it). Caller commits."""
+    def run():
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE user_postings SET alert_token = COALESCE(alert_token, %s) "
+                "WHERE user_id = %s AND posting_id = %s RETURNING alert_token",
+                (secrets.token_urlsafe(16), user_id, posting_id),
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
+    return _optional(conn, run, None)
+
+
+def get_alert_target(conn, token):
+    """(user_id, posting_id, url) for an alert link's token, or None if there is no such token."""
+    if not token:
+        return None
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT up.user_id, up.posting_id, p.url FROM user_postings up JOIN postings p ON p.id = up.posting_id "
+            "WHERE up.alert_token = %s",
+            (token,),
+        )
+        row = cur.fetchone()
+        return tuple(row) if row else None
+
+
 def get_user_skill_cutoff(conn, user_id):
     """How many of their skills a role must mention to be shown (SC-51 slice 4), or None for no minimum."""
     def run():
