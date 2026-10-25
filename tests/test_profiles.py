@@ -128,9 +128,26 @@ class ConversionKeepsTheSameRoles(unittest.TestCase):
         self.check({"product_design"}, ["data analyst"])
         self.check({"design_management", "product_design"}, ["product manager", "recruiter"])
 
-    def test_no_categories_means_every_design_role(self):
-        self.check(set(), [])
-        self.check(set(), ["data analyst"])
+    # What the short pre-filled list (DEFAULT_DESIGN_TITLES) does not cover: real design roles a person who picked
+    # nothing used to be shown, that need their own target title to match. Listed so the loss is a decision.
+    NOT_COVERED_BY_THE_DEFAULTS = {"VP of Design", "UX Engineer", "Design Technologist", "Experience Designer"}
+
+    def test_no_categories_means_every_real_design_role_the_defaults_name(self):
+        titles = profile_from_legacy(set(), [])
+        for title in SAMPLE_TITLES:
+            old = matches_profile(title, is_design_role(title), set(), [])
+            new = matches_profile_titles(title, titles)
+            self.assertFalse(new and not old, f"{title!r} would be shown by the defaults but not by the strict rule")
+            if old and not new:
+                self.assertIn(title, self.NOT_COVERED_BY_THE_DEFAULTS, f"{title!r} lost without being listed")
+        # ...and nothing listed as lost is actually matched
+        for title in self.NOT_COVERED_BY_THE_DEFAULTS & set(SAMPLE_TITLES):
+            self.assertFalse(matches_profile_titles(title, titles), title)
+
+    def test_keywords_are_added_to_the_defaults(self):
+        titles = profile_from_legacy(set(), ["data analyst"])
+        self.assertEqual(titles[-1], "data analyst")
+        self.assertIn("product designer", titles)
 
     def test_researcher_is_no_longer_gated_on_design(self):
         # The old UX research category matched "researcher" only in titles that also pass the design

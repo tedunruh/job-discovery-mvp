@@ -885,3 +885,35 @@ unread roles shown, not hidden.
       minimum adds about 120 ms to a load that takes 1.8 s on that path (1810 ms to 1927 ms).
 - [x] A page change that adds a column must read it through a guarded helper if the page or the collector
       would otherwise break without it (`db._optional`); the column was also applied to production first.
+
+### 2026-10-24 — SC-53: best matches first, and a strict reading of "a design role"
+**Shipped:** (1) **Ranking.** The roles a person's titles match are listed closest-first: a title that names a
+seniority they wrote ("Principal Product Designer") first, then exact titles, then longer phrases over shorter,
+then generic matches ("product designer" anywhere in a title); newest first among equals. Same roles, same
+count, only the order: nothing is hidden by it. One saved profile exists (687 matching roles): 21 exact
+seniority titles come first, 11 more that contain a seniority title, 86 exact generic ones, then 569 generic.
+(2) **Strict design check** (`collectors/filters.is_strict_design_role`) for anyone who picked no role
+categories and has no profile: of 11,989 stored roles that pass the loose gate only 4,555 are real design
+roles; the rest were engineering and hardware with "design" in the title ("Analog IC Design Engineer"), plus
+interior, apparel and instructional design. The pre-filled Role preferences for such a person are now 16 real
+design titles instead of six loose words, so what they see in Role preferences is what they are matched on.
+**Reality check:** all four people without a profile had already picked role categories, so (2) changes
+nothing for anyone today; it protects the next person who picks nothing. (1) is what changes what the one
+profile user sees. The dashboard orders the list, alerts are unaffected.
+**Rework count:** 3 on the classifier before it was right: a deny-list alone kept noise ("Cafe Assistant
+Manager (Design District)"), an allow-list alone lost real roles, and a team name ("Lead Product Designer |
+Platform Engineering") dropped a real designer. Each was found by reading random kept and dropped titles from
+the real data, not by tests.
+**Root cause:** *a one-line request ("show the best matches") has several readings.* The first reading (the
+design gate board note) turned out to affect nobody; asking what "best" meant, with their own numbers on the
+table, found the real one. Measure who a change touches before building it.
+**Standing checks added:**
+- [x] Automated: 40 real design titles that must pass and 40 non-design titles that must not (engineering,
+      hardware, interior, apparel, instructional, "ux" in other work); the ranking order, ties, whole-phrase
+      matching, the dashboard order, and that a person without a profile keeps newest first. 18 mutation
+      checks on a copy of the repo all fail when the code is broken.
+- [x] Any change to the classifier or the default titles: re-read 45 random kept and 40 random dropped titles
+      from `postings` (read-only) before trusting it; and rerun the before-and-after count per user.
+- [x] The old-vs-new conversion test now names the real design roles the 16 default titles do not cover
+      (VP of Design, UX Engineer, Design Technologist, Experience Designer) so the loss is a decision.
+- [ ] `scripts/quality_check.py` was not re-run: no template, CSS or script changed, only the order of rows.

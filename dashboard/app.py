@@ -39,6 +39,7 @@ from dashboard.skill_filter import apply_skill_cutoff
 from dashboard.profile import register as register_profile_screens
 from dashboard.resume import register as register_resume
 from role_categories import (
+    best_matches_first,
     matches_city,
     matches_profile,
     matches_profile_titles,
@@ -322,6 +323,8 @@ def index():
             if matches_profile_titles(p["title"], profile["titles"], profile["level"], profile["one_level_up"])
             and matches_city(work_type(p["location"], p["remote_type"]), p["location"], profile["city"])
         ]
+        # SC-53: the roles closest to what they wrote in Role preferences first, newest first among equals.
+        postings = best_matches_first(postings, profile["titles"])
     else:
         postings = [
             p for p in postings

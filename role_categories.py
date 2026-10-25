@@ -85,13 +85,20 @@ def matches_keywords(title: str, keywords) -> bool:
 def matches_profile(title: str, is_design: bool, categories, keywords) -> bool:
     """Whether a posting belongs in this user's dashboard and alerts.
 
-    - A design role shows per their categories (no categories = all design roles,
-      today's behavior).
+    - A design role shows per their categories. With no categories picked, a design role
+      shows only if it is a real one (collectors.filters.is_strict_design_role, SC-53): the loose
+      gate that decides what is stored let through engineering and hardware roles with "design"
+      in the title.
     - Any role shows if its title matches one of their keywords, which is how a
       user opts into non-design roles.
     - A non-design role that matches no keyword never shows."""
-    if is_design and matches_categories(title, categories):
-        return True
+    if is_design:
+        from collectors.filters import is_strict_design_role
+
+        if categories and matches_categories(title, categories):
+            return True
+        if not categories and is_strict_design_role(title):
+            return True
     return matches_keywords(title, keywords)
 
 
@@ -162,11 +169,21 @@ def alerts_active(profile) -> bool:
     return bool(profile.get("alerts_started_at")) and not profile.get("alerts_paused_at")
 
 
+# What "every design role" stands for as target titles, for someone who never picked a role category (SC-53).
+# They are real roles a designer would want, so the pre-filled Role preferences say what the person is matched on.
+DEFAULT_DESIGN_TITLES = [
+    "product designer", "product design", "ux designer", "ui designer", "ux/ui designer", "ui/ux designer",
+    "visual designer", "brand designer", "graphic designer", "interaction designer", "design lead",
+    "design manager", "design director", "head of design", "ux researcher", "user research",
+]
+
+
 def profile_from_legacy(categories, keywords):
     """Target titles equivalent to a person's role categories and keywords, for converting them
     to a profile. Each category stands for its own keywords. No categories used to mean every
-    design role, which is exactly what the design title gate matches, so those words stand in."""
-    from collectors.filters import KEYWORDS as DESIGN_WORDS
+    design role, so DEFAULT_DESIGN_TITLES stand in (the old loose design words matched engineering
+    and hardware roles too)."""
+    DESIGN_WORDS = DEFAULT_DESIGN_TITLES
 
     titles = []
     chosen = [key for key in ROLE_CATEGORIES if key in (categories or ())]
@@ -309,3 +326,38 @@ def skill_status(matched_count, cutoff, has_text) -> str:
     if cutoff is not None and matched_count < cutoff:
         return "hidden"
     return "shown"
+
+
+# --- SC-53: which of the roles a person's titles match are the best ones --------------------------------------
+# Matching a title is yes or no (matches_profile_titles). Ranking orders the "yes" roles: the closer a role's
+# title is to something the person wrote in Role preferences, the earlier it goes. Nothing is hidden by it.
+
+def _squash(text):
+    return " ".join(re.sub(r"[^a-z0-9/&+#. ]+", " ", (text or "").lower()).split())
+
+
+def title_match_rank(title: str, titles):
+    """How closely a posting's title matches the person's own target titles, as a tuple that sorts higher for a
+    closer match: (names a seniority, exact, word count) of the best title it contains.
+
+    - names a seniority: the title it contains has a level word in it ("Principal Product Designer"). Those
+      words are where a person says what level they are after, so they come first.
+    - exact: the posting's title is one of their titles, word for word ("Staff UX Designer").
+    - word count: a longer phrase says more than a shorter one ("design systems lead" over "design").
+    (0, 0, 0) when no title matches."""
+    squashed = _squash(title)
+    best = (0, 0, 0)
+    for target in titles or ():
+        phrase = _squash(target)
+        if not phrase or not re.search(r"(?<![a-z0-9])" + re.escape(phrase) + r"(?![a-z0-9])", squashed):
+            continue
+        rank = (1 if title_level(phrase) else 0, 1 if squashed == phrase else 0, len(phrase.split()))
+        if rank > best:
+            best = rank
+    return best
+
+
+def best_matches_first(postings, titles):
+    """The same postings, closest title matches first; roles that match equally keep the order they came in
+    (the dashboard hands them over newest first, so newest stays first within each group)."""
+    return sorted(postings, key=lambda p: tuple(-n for n in title_match_rank(p["title"], titles)))
