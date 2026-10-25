@@ -917,3 +917,18 @@ table, found the real one. Measure who a change touches before building it.
 - [x] The old-vs-new conversion test now names the real design roles the 16 default titles do not cover
       (VP of Design, UX Engineer, Design Technologist, Experience Designer) so the loss is a decision.
 - [ ] `scripts/quality_check.py` was not re-run: no template, CSS or script changed, only the order of rows.
+
+### 2026-10-24 — SC-53: the ranking was taken out again
+**What happened:** the dashboard briefly listed matches "closest first". Ted had not asked for ranking: the request
+was "what is set in Role preferences should show the best job matches", and the options I offered were my
+guesses at it; the one he clicked was the nearest, not what he wanted. He wanted the plain rule: a job that matches
+what he set is shown when it is posted, newest first as before. Removed the same day; the strict design check
+(for people who picked no role categories) stays.
+**Rework count:** 1 (the whole ranking feature).
+**Root cause:** *I offered a menu of my own ideas instead of repeating the request back in plain words.* The
+answer I should have asked for first was "show me how it works today, and what would you change?".
+**Standing checks added:**
+- [x] When a request is one line and could mean several things, say back what happens today in two sentences
+      and ask what is wrong with it, before offering options. Options I invented are not the user's answer.
+- [x] Do not add ordering, scoring or ranking to a list that is already "newest first" unless it was asked for
+      by name.
