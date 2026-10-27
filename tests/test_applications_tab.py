@@ -53,7 +53,7 @@ class Base(unittest.TestCase):
         return re.sub(r"<template.*?</template>", "", r.get_data(as_text=True), flags=re.S)
 
     def titles(self, html):
-        return re.findall(r'<a class="posting-link"[^>]*>([^<]+)</a>', html)
+        return re.findall(r'<a class="fg-job-link"[^>]*>([^<]+)</a>', html)
 
 
 class Tabs(Base):
@@ -103,13 +103,13 @@ class Applications(Base):
         html = self.get("/?tab=applications")
         self.assertEqual(self.titles(html), ["Design Lead", "Staff Designer", "Old role"])
         self.assertIn("Applied 1 day ago", html)
-        self.assertRegex(html, r'<p class="posting-state">Applied</p>')      # applied before the time was kept: no invented time
+        self.assertRegex(html, r'<p class="fg-job-state" data-state>Applied</p>')      # applied before the time was kept: no invented time
         self.assertIn("Newest first", html)
         self.assertIn("3 applications", html)
 
     def test_a_row_has_nothing_to_click_but_the_job(self):
         self.applications = [application(9, "Design Lead", 1)]
-        li = re.search(r'<li class="posting" id="posting-9">.*?</li>', self.get("/?tab=applications"), re.S).group(0)
+        li = re.search(r'<li class="fg-job" id="posting-9">.*?</li>', self.get("/?tab=applications"), re.S).group(0)
         for gone in ("<button", "<form", "data-apply", "Did you apply", "data-action"):
             self.assertNotIn(gone, li)
         self.assertIn('href="/open/9"', li)

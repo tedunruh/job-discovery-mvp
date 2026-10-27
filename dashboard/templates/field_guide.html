@@ -609,6 +609,20 @@
     </div>
   </section>
 
+  <section class="spec" data-component="job">
+    <div>
+      <h3>Job card</h3>
+      <p class="spec-use">Use for one job in a list. The job on the left, its state line and one action on the right. The whole card opens the posting; the action sits above that. The action is Apply, or the question that replaces it when you come back from the job. In a list of jobs you've applied to there is no action. Don't add menus or a second button.</p>
+      <code class="spec-code">{% raw %}{% call fg.job(id, title, href, company, location, source, state) %}action{% endcall %}{% endraw %} · .fg-job-list .fg-job</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Open role: discovered, with Apply</span><ul class="fg-job-list">{% call fg.job("g-job-1", "Senior Product Designer", "#layout", "Northwind Health", "Remote", "Greenhouse", "Discovered 45 minutes ago") %}<a class="fg-button fg-button--secondary" href="#layout">Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a>{% endcall %}</ul></div>
+      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Open role: viewed, with skills line</span><ul class="fg-job-list">{% call fg.job("g-job-2", "Staff Product Designer, Design Systems", "#layout", "Juniper Labs", "Hybrid, Denver, CO", "Ashby", "Viewed 12 minutes ago", "Matches 4 of your skills: Figma, Prototyping, Accessibility, Research") %}<a class="fg-button fg-button--secondary" href="#layout">Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a>{% endcall %}</ul></div>
+      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Open role: back from the job, asking</span><ul class="fg-job-list">{% call fg.job("g-job-3", "Senior UX Designer", "#layout", "Fieldstone", "Remote", "Lever", "Viewed 1 minute ago") %}<p class="fg-voice fg-job-question">Did you apply?</p><button class="fg-button fg-button--secondary" type="button">Yes</button><button class="fg-button fg-button--secondary" type="button">Not yet</button>{% endcall %}</ul></div>
+      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Application: no action</span><ul class="fg-job-list">{{ fg.job("g-job-4", "Design Lead, Platform", "#layout", "Larkspur", "Remote", "Ashby", "Applied 3 days ago") }}</ul></div>
+    </div>
+  </section>
+
   <section class="spec" data-component="tabs">
     <div>
       <h3>Tabs</h3>

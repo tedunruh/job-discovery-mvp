@@ -1173,3 +1173,33 @@ opened job ever asks (after Not yet the next-older one does not step in); a job 
       on a throwaway database branch (deleted afterwards).
 - [ ] Not done: Figma mirrors of Tabs, Toast and the new row (code is the source of truth); SC-64 (alerts) and the
       Applications pipeline are not part of this.
+
+### 2026-10-27 — Field Guide mirrored into Figma: Tabs, Toast, Switch, Progress, Button working
+**Shipped (Figma file `w7hKbZWJIgb74guqh5uGUF`, Components page):** `Tab` (State=Default/Selected) and `Tabs` (two tabs on a
+hairline), `Toast` (Actions=Two/One), `Switch` (On x Disabled, state in words under the label), `Progress` (Fill=0/50/100%),
+and `Working` added to Button's three styles (spinner plus busy label). Fills, strokes, spacing, radii and minimum heights
+are bound to the Semantic variables (the Toast's Ink fill to the `color/ink` primitive, as in the CSS); text is Albert
+Sans; each has a description naming its code class or macro. The gallery page has a new "Navigation & feedback" section
+with a spec row for each, built from instances. README updated. Nothing in the code changed.
+**Rework count:** 0 reached Ted; 3 in my own build: cloned variants land on the page, not in the set (moved in by hand); the
+first spinner was a pie wedge, not an open arc; instances cloned from the Toggle row came out squashed until the fixed-width
+ones (Toast, Progress, Tabs) were sized to their components. **Root cause:** *assuming an API call put a node where the
+editor would.* Each was caught by a screenshot of the result, not by the script's own return value.
+**Not done (follow-ups):** Variant order inside the Button set is not grouped by style (the editor ignored the x positions
+for the new variants). The job card (Open roles and Applications rows) is page-local CSS in `index.html`, not a Field Guide
+component, so it is not mirrored. The Figma gallery still stops after Messages (Chips, Layout, Content not mirrored).
+
+### 2026-10-27 — The job card is a Field Guide component (and in Figma)
+**Why:** the Open roles and Applications rows were page-local CSS in `index.html` (`.posting*`), so they were neither in the
+gallery nor in Figma, against the house rule that a new component goes into Field Guide first. **Shipped:** `.fg-job-list` and
+`.fg-job` (+ `-lead`, `-title`, `-link`, `-subline`, `-source`, `-skills`, `-second`, `-state`, `-action`, `-question`) in
+`components.css`, the `fg.job(id, title, href, company, location, source, state, skills)` macro with the action spot as its
+call block, a gallery row with four states (discovered, viewed with skills line, back from the job asking, application), and the
+dashboard now draws every row through the macro. No behaviour change: the browser checks, tests and screenshots are the same
+as before the move. Figma: `Job card` (Action=Apply / Question / None) built from the Button instances, and a gallery row
+below Progress. **Rework count:** 1 in my own checks (the gallery cards were each squeezed into half a row and the Figma
+row clipped 960px cards in a 776px column); both found from screenshots, fixed by giving the states full rows.
+**Root cause:** *a specimen laid out at the width of the specimen before it.* **Standing checks:** the existing 426 tests
+and 314 browser checks were renamed to the new classes, and the "gallery shows every Field Guide class" check now covers
+the job card's eleven.
+- [ ] Not done: the Figma gallery still stops after Messages apart from the "Navigation & feedback" section.

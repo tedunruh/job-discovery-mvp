@@ -32,7 +32,7 @@ class Order(unittest.TestCase):
              mock.patch.object(dapp, "get_user_work_types", lambda c, u: []), \
              mock.patch.object(dapp, "get_open_postings", lambda c, u, since=None, keywords=(): [dict(r) for r in rows]):
             html = client.get("/").get_data(as_text=True)
-        self.assertEqual(re.findall(r'class="posting-link"[^>]*>([^<]+)</a>', html),
+        self.assertEqual(re.findall(r'class="fg-job-link"[^>]*>([^<]+)</a>', html),
                          ["Associate Product Designer, Payments", "Product Designer", "Senior UX Designer"])
 
 
