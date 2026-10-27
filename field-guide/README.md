@@ -56,11 +56,13 @@ mirrors it so designs can be made by hand with the same tokens.
   SC-46: Chip, Add chip, Select, Segment, Segmented control, Checkbox group, Add row,
   Group label, Page header, Page intro, Card (Style × Header, Content is an instance
   swap of "Card content"), Suggestion, Status strip, Action bar, File row, Dropzone,
-  List row, List empty, Stat, Before and after. Controls have a 44px minimum height.
+  List row, List empty, Stat, Before and after; and from SC-62 and SC-63 (synced 2026-10-27): Button's Working
+  state, Switch, Progress, Tab and Tabs, Toast. Controls have a 44px minimum height.
   Each description names its code class or macro. Text is Albert Sans.
 - **Field Guide gallery page:** the `/field-guide` page laid out in Figma from
   instances of those components, same sections and "use this when" notes.
-  A visual mirror, not wired: there's no Code Connect link yet, so a change in
+  The gallery mirror stops after Messages and then adds one "Navigation & feedback" section for the newer components;
+  Chips, Layout and Content are not mirrored there yet. A visual mirror, not wired: there's no Code Connect link yet, so a change in
   code needs a resync (variables) or a rebuild request (components).
 - **Not mirrored:** line height and letter spacing (unitless / em values have no
   clean Figma variable type).
