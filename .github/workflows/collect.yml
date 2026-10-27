@@ -10,6 +10,12 @@ on:
     - cron: "0 */6 * * *"
   workflow_dispatch: {}
 
+# The collector reads this workflow's own recent runs (scheduler/crash_alerts.py) so a stretch of crashes sends one
+# alert, not one per run. That needs read access to Actions; nothing here can write.
+permissions:
+  contents: read
+  actions: read
+
 # One collector run at a time: scanning thousands of boards makes a run longer, and an
 # overlapping run would double-fetch and race on the same rows. A newer dispatch waits for
 # the current run instead of cancelling it (it would be killed mid-write otherwise).
@@ -42,6 +48,7 @@ jobs:
           # The ping URL is a capability (anyone holding it can mark the job healthy), and this repo
           # is public: store it as a secret. A plain variable still works as a fallback.
           HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL || vars.HEALTHCHECK_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Keep dashboard awake (end of run)
         if: always()
         run: bash scripts/keep_awake.sh

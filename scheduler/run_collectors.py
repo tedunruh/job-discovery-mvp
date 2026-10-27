@@ -41,6 +41,7 @@ from db.db import (
     upsert_postings,
 )
 from role_categories import alerts_active, matches_city, matches_profile, matches_profile_titles, matches_work_type
+from scheduler.crash_alerts import crash_message, previous_streak, recovered_message, should_alert_crash
 from scheduler.describe import DescriptionStep, build_gate, extra_workday_queries
 from scheduler.heartbeat import ping_failure, ping_success
 from scheduler.notify import alert_link, notify_health_alerts, notify_new_postings, tracking_allowed
@@ -120,14 +121,21 @@ def run():
     except Exception as e:
         # Anything that escapes (DB down, a bug) used to surface only in the
         # GitHub Actions log. Push it to the health channel, then re-raise so
-        # the workflow still fails visibly.
-        health_alerts.append(f"Collector run crashed: {type(e).__name__}: {e}")
-        notify_health_alerts(health_alerts)
+        # the workflow still fails visibly. SC-65: only the first crash of a streak (and a reminder every couple of
+        # hours) is pushed; the rest stay quiet, and the error text carries no database address.
+        streak = previous_streak()
+        if should_alert_crash(streak):
+            notify_health_alerts(health_alerts + [crash_message(e, streak)])
+        else:
+            print(f"Crash alert skipped: {streak.crashed + 1} crashed runs in a row, already alerted.")
         ping_failure()
         raise
     if health_alerts:
         print(f"{len(health_alerts)} health alert(s) — sending")
         notify_health_alerts(health_alerts)
+    streak = previous_streak()  # the run before this one: did it crash? then say we are back, once
+    if streak and streak.crashed:
+        notify_health_alerts([recovered_message(streak)])
     # Only a run that completed counts as "alive" for the external monitor.
     ping_success()
 

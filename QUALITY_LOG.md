@@ -1081,3 +1081,27 @@ its templates; the focus check is taken after the click and before the return.
       phone fits it. The job's outside page is stubbed, so nothing leaves the machine. 6 deliberate breakages of the script
       each fail a check.
 - [ ] Not done: the Figma mirror of the Viewed line and the asking row (code is the source of truth).
+
+### 2026-10-27 — SC-65: a crash that keeps happening sends one alert, not one per run
+**Why:** when the database went over its quota, every run crashed and every crash pushed its own alert, a new one every
+15 minutes for a day, each with the database's host name in the text. **Shipped:** when a run crashes it asks GitHub
+whether the runs just before it crashed too. The first crash alerts at once; while it continues the next alert comes
+only when a new two-hour stretch of the clock begins (about one reminder per two hours, "Collector has now crashed 9
+runs in a row"); the first run that succeeds after crashes says once, "Collector is back". If GitHub cannot be asked
+the alert is sent anyway (a duplicate beats silence). Alert text no longer carries the database address, IP numbers or
+connection URL. The external watchdog (healthchecks.io) is untouched and still hears every failure. The workflow now
+declares `permissions: contents: read, actions: read` and passes its own `GITHUB_TOKEN` to the collector: no new secret.
+The same step also lowered the database to a fixed 0.25 compute unit (SC-65 item 2), logged on the board card.
+**Rework count:** 1, caught by my own test rewrite before it left my machine. **Root cause:** *a counter used as the
+timer.* The first version reminded every 8th crashed run, but GitHub returns a bounded list of runs, so in a day-long
+outage the count would stop growing and the reminders would stop with it. Reminders now follow the clock; the count is
+only used in the wording ("100+" when it hits the limit), and a test runs 30 hours of runs and counts 15 reminders.
+**Standing checks added:**
+- [x] Automated (`tests/test_crash_alerts.py`, 30 tests): the streak read (current run left out, cancelled runs ignored,
+      timed-out counts as a crash, GitHub down / no token / odd answer means "unknown" and never raises), when to
+      alert, the wording, nothing database-shaped in any alert, what `run()` really sends in each case (first crash,
+      repeat, unknown, recovery, ordinary success; other health alerts ride with the crash; the failure ping still goes
+      out when the alert is quiet), and the workflow text (read-only permission, token passed to the collect step).
+      30 mutation checks on a copy of the repo, all caught (4 were first missed and led to the wiring and workflow tests).
+- [ ] Not done: a real crash streak on GitHub has not been seen yet, so the first live check is the next time a run
+      fails. The streak read is checked against GitHub's real answer shape in the tests, not against a live run.
