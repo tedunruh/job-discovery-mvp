@@ -1105,3 +1105,21 @@ only used in the wording ("100+" when it hits the limit), and a test runs 30 hou
       30 mutation checks on a copy of the repo, all caught (4 were first missed and led to the wiring and workflow tests).
 - [ ] Not done: a real crash streak on GitHub has not been seen yet, so the first live check is the next time a run
       fails. The streak read is checked against GitHub's real answer shape in the tests, not against a live run.
+
+### 2026-10-27 — SC-65: a warning before the Neon plan runs out
+**Shipped:** each run asks Neon (with the `NEON_API_KEY` GitHub secret, read-only use) how much of the month's compute
+hours, storage and network transfer is used, and writes the numbers to the run log. Once a day (the 14:00 UTC hour, 9 AM
+Central) it adds a health alert if any of the three is at 80% or more of the $10 plan ("Neon compute is at 82% of this
+month's allowance (205.0 of 250 hours)"). If Neon reports no usage at all in a month that is more than two days old it
+says so ("Neon usage warning is blind") instead of staying quiet, so a silent API change cannot turn the warning off
+unnoticed. No key, Neon unreachable, or an odd answer: nothing happens and the run goes on.
+**Rework count:** 0 so far. **Not yet verified against Neon:** the key was added by Ted and could not be tried here,
+and the project record Neon showed in the console tool had its usage fields at 0, so the first run after this ships
+decides it: the log line "Neon usage this month: ..." shows real numbers, or the daily "blind" alert fires and the
+source of the figures gets changed.
+**Standing checks added:**
+- [x] Automated (`tests/test_quota_warning.py`, 17 tests): the 80% line for each of the three allowances, just under,
+      several at once, no usage in an old vs a brand-new month, odd records, only in the alert hour, no key means no
+      request, several projects, a named project, Neon down, the numbers logged, and the workflow passing the key.
+      21 mutation checks on a copy of the repo, all caught (one, the missing request timeout, was first missed).
+- [ ] Not done: a live read of Neon's usage (see above).

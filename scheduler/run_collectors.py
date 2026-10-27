@@ -45,6 +45,7 @@ from scheduler.crash_alerts import crash_message, previous_streak, recovered_mes
 from scheduler.describe import DescriptionStep, build_gate, extra_workday_queries
 from scheduler.heartbeat import ping_failure, ping_success
 from scheduler.notify import alert_link, notify_health_alerts, notify_new_postings, tracking_allowed
+from scheduler.quota_warning import check as check_neon_quota
 
 # The schedule is every ~15 min (external cron); a gap past this means runs
 # were missed - cron-job.org down, GitHub dispatch delayed, or the job failing early.
@@ -117,6 +118,7 @@ def _note_rate_limit(ats, error):
 def run():
     health_alerts = []
     try:
+        health_alerts.extend(check_neon_quota())  # SC-65: warns before the plan runs out
         _run(health_alerts)
     except Exception as e:
         # Anything that escapes (DB down, a bug) used to surface only in the

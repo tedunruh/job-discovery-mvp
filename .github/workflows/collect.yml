@@ -49,6 +49,7 @@ jobs:
           # is public: store it as a secret. A plain variable still works as a fallback.
           HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL || vars.HEALTHCHECK_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
       - name: Keep dashboard awake (end of run)
         if: always()
         run: bash scripts/keep_awake.sh
