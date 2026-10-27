@@ -94,7 +94,7 @@ class Base(unittest.TestCase):
         return re.sub(r"<template.*?</template>", "", self.page(), flags=re.S)
 
     def row_html(self, html, pid):
-        return re.search(rf'<li class="posting" id="posting-{pid}">.*?</li>', html, re.S).group(0)
+        return re.search(rf'<li class="fg-job" id="posting-{pid}">.*?</li>', html, re.S).group(0)
 
 
 class Page(Base):
@@ -102,7 +102,7 @@ class Page(Base):
         html = self.live()
         for pid in (1, 2, 3):
             r = self.row_html(html, pid)
-            self.assertRegex(r, r'<p class="posting-state" data-state>Discovered \d+ hours? ago</p>')
+            self.assertRegex(r, r'<p class="fg-job-state" data-state>Discovered \d+ hours? ago</p>')
             self.assertIn(f'href="/open/{pid}" target="_blank" rel="noopener" data-apply>Apply', r)
             self.assertNotIn("Did you apply?", r)
 
@@ -174,7 +174,7 @@ class Page(Base):
 
     def test_the_templates_the_script_copies_are_in_the_page(self):
         html = self.page()
-        self.assertRegex(html, r'<template id="return-ask-template">\s*<p class="fg-voice row-q">Did you apply\?</p>')
+        self.assertRegex(html, r'<template id="return-ask-template">\s*<p class="fg-voice fg-job-question">Did you apply\?</p>')
         self.assertIn('action="/ask/dismiss/__id__"', html)
         self.assertIn('action="/set_applied/__id__"', html)
         self.assertRegex(html, r'<template id="return-apply-template">\s*<a class="fg-button fg-button--secondary" href="/open/__id__"')

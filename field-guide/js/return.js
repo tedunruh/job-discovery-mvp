@@ -61,7 +61,7 @@
   }
 
   function showAsk(ask) {
-    Array.prototype.forEach.call(document.querySelectorAll(".posting"), function (row) {
+    Array.prototype.forEach.call(document.querySelectorAll(".fg-job"), function (row) {
       if (isAsking(row) && (!ask || row.id !== "posting-" + ask.id)) showApply(row);
     });
     if (!ask) return;
@@ -69,7 +69,7 @@
     if (!row || row.hidden || isAsking(row)) return;
     setAction(row, askTemplate);
     if (live) {
-      var title = row.querySelector(".posting-title");
+      var title = row.querySelector(".fg-job-title");
       live.textContent = "Did you apply for " + (title ? title.textContent.trim() : "this one") + "?";
     }
   }
@@ -115,7 +115,7 @@
 
   board.addEventListener("submit", function (event) {
     var form = event.target;
-    var row = form.closest(".posting");
+    var row = form.closest(".fg-job");
     if (!row) return;
 
     /* "Not yet": Apply comes back now; tell the server in the background. */

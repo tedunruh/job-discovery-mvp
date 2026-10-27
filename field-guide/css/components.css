@@ -1182,3 +1182,78 @@ button.fg-link {
 @media (max-width: 680px) {
   .fg-toast-region { bottom: var(--fg-space-4); }
 }
+
+/* ---------- Job card (SC-63) ---------- */
+/* One job as its own bordered card: the job on the left (42%), its state line and one action spot on the right (58%).
+   Fractions, not content, set the columns, so the state line stays aligned down a list even though each card is its
+   own grid. The whole card opens the posting (the title link's ::after covers it); the action spot sits above that.
+   The action is Apply, or the question that replaces it when you come back from the job. Open roles and
+   Applications use the same card; Applications has no action spot. */
+.fg-job-list {
+  list-style: none;
+  margin: var(--fg-space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-2);
+}
+.fg-job {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: center;
+  column-gap: var(--fg-space-6);
+  row-gap: var(--fg-space-3);
+  padding: var(--fg-space-4);
+  background: var(--fg-color-surface-card);
+  border: 1px solid var(--fg-color-border-subtle);
+  border-radius: var(--fg-radius-sm);
+}
+.fg-job[hidden] { display: none; }
+.fg-job:hover { background: var(--fg-color-surface-hover); }
+.fg-job:has(.fg-job-link:focus-visible) {
+  outline: 3px solid var(--fg-color-action-focus-ring);
+  outline-offset: -3px;
+}
+.fg-job p {
+  margin: 0;
+  font-weight: var(--fg-font-weight-medium);
+  line-height: var(--fg-font-line-height-snug);
+}
+.fg-job-lead { min-width: 0; }
+.fg-job-title { font-size: var(--fg-font-size-lg); max-width: 500px; }
+.fg-job-link { color: inherit; text-decoration: none; outline: none; }
+.fg-job-link::after { content: ""; position: absolute; inset: 0; }
+.fg-job-subline { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
+.fg-job-source { font-size: var(--fg-font-size-xs); color: var(--fg-color-text-secondary); }
+.fg-job-skills { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
+.fg-job-second {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fg-space-4);
+  min-width: 0;
+}
+.fg-job-state { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
+.fg-job-action {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--fg-space-2);
+}
+.fg-job-action form { display: contents; }
+.fg-job-question { font-size: var(--fg-font-size-lg); margin-right: var(--fg-space-1); }
+@media (max-width: 680px) {
+  .fg-job {
+    padding: var(--fg-space-3);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "lead" "state" "action";
+  }
+  .fg-job-lead { grid-area: lead; }
+  .fg-job-second { display: contents; }
+  .fg-job-state { grid-area: state; }
+  .fg-job-action { grid-area: action; justify-content: flex-start; }
+}

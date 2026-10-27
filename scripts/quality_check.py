@@ -218,7 +218,7 @@ def check_row_action(page, w):
     action sits under the state line, not beside the title."""
     rows = page.evaluate(
         """
-        () => [...document.querySelectorAll('li.posting')].slice(0, 5).map(li => {
+        () => [...document.querySelectorAll('li.fg-job')].slice(0, 5).map(li => {
           const c = li.getBoundingClientRect(), a = li.querySelector('[data-action] .fg-button').getBoundingClientRect();
           const s = li.querySelector('[data-state]').getBoundingClientRect();
           return { inside: a.left >= c.left && a.right <= c.right && s.left >= c.left && s.right <= c.right,
@@ -465,7 +465,7 @@ def check_return_ask(browser, base, token):
           "Applications starts empty and says what will happen", page.locator("[role=tabpanel]").inner_text()[:120])
     check(page.locator(".toolbar .fg-filter-pill").count() == 0, "Applications has no Work type or Posted filters")
     page.goto(base + "/", wait_until="load")
-    ids = page.evaluate("[...document.querySelectorAll('li.posting')].slice(0, 3).map(li => li.id.replace('posting-', ''))")
+    ids = page.evaluate("[...document.querySelectorAll('li.fg-job')].slice(0, 3).map(li => li.id.replace('posting-', ''))")
     check(len(ids) == 3, "the dashboard has jobs to open for the coming-back check", f"{ids}")
     if len(ids) < 3:
         ctx.close()
@@ -476,7 +476,7 @@ def check_return_ask(browser, base, token):
 
     def open_in_new_tab(job):
         with ctx.expect_page() as popup:
-            page.locator(f"#posting-{job} a.posting-link").click()
+            page.locator(f"#posting-{job} a.fg-job-link").click()
         popup.value.wait_for_load_state("load")
         popup.value.close()
 
@@ -485,7 +485,7 @@ def check_return_ask(browser, base, token):
         page.evaluate("window.dispatchEvent(new Event('focus'))")
 
     def asking():
-        return page.evaluate("[...document.querySelectorAll('li.posting')].filter(li => li.querySelector('[data-ask-yes]')).map(li => li.id.replace('posting-', ''))")
+        return page.evaluate("[...document.querySelectorAll('li.fg-job')].filter(li => li.querySelector('[data-ask-yes]')).map(li => li.id.replace('posting-', ''))")
 
     def counts():
         return page.evaluate("[...document.querySelectorAll('[data-tab-count]')].map(e => e.textContent.trim())")
@@ -607,10 +607,10 @@ def check_return_ask(browser, base, token):
     page.wait_for_load_state("load")
     apps = page.locator("[role=tabpanel]")
     check(page.locator(".fg-tab[aria-selected=true]").inner_text().startswith("Applications")
-          and page.locator(f"#posting-{ids[0]}").count() == 1 and "Applied" in page.locator(f"#posting-{ids[0]} .posting-state").inner_text(),
+          and page.locator(f"#posting-{ids[0]}").count() == 1 and "Applied" in page.locator(f"#posting-{ids[0]} .fg-job-state").inner_text(),
           "View lands on Applications with the job there, saying when", apps.inner_text()[:160])
-    check(page.locator("li.posting button, li.posting form").count() == 0, "...and its rows have nothing to click but the job")
-    first_title = page.locator("li.posting").first.get_attribute("id")
+    check(page.locator("li.fg-job button, li.fg-job form").count() == 0, "...and its rows have nothing to click but the job")
+    first_title = page.locator("li.fg-job").first.get_attribute("id")
     check(first_title == f"posting-{ids[0]}", "...and the newest application is first", f"{first_title}")
     ctx.close()
 
@@ -620,9 +620,9 @@ def check_return_ask(browser, base, token):
     mctx.route(re.compile(r"^https?://(?!127\.0\.0\.1)"), lambda route: route.fulfill(status=200, body="the job's own page"))
     mp = mctx.new_page()
     mp.goto(base + "/", wait_until="load")
-    other = mp.evaluate("[...document.querySelectorAll('li.posting')].map(li => li.id.replace('posting-', '')).find(id => id !== %s && id !== %s)" % (ids[0], ids[1]))
+    other = mp.evaluate("[...document.querySelectorAll('li.fg-job')].map(li => li.id.replace('posting-', '')).find(id => id !== %s && id !== %s)" % (ids[0], ids[1]))
     with mctx.expect_page() as popup:
-        mp.locator(f"#posting-{other} a.posting-link").click()
+        mp.locator(f"#posting-{other} a.fg-job-link").click()
     popup.value.wait_for_load_state("load")
     popup.value.close()
     mp.bring_to_front()

@@ -57,7 +57,7 @@ mirrors it so designs can be made by hand with the same tokens.
   Group label, Page header, Page intro, Card (Style × Header, Content is an instance
   swap of "Card content"), Suggestion, Status strip, Action bar, File row, Dropzone,
   List row, List empty, Stat, Before and after; and from SC-62 and SC-63 (synced 2026-10-27): Button's Working
-  state, Switch, Progress, Tab and Tabs, Toast. Controls have a 44px minimum height.
+  state, Switch, Progress, Tab and Tabs, Toast, Job card. Controls have a 44px minimum height.
   Each description names its code class or macro. Text is Albert Sans.
 - **Field Guide gallery page:** the `/field-guide` page laid out in Figma from
   instances of those components, same sections and "use this when" notes.

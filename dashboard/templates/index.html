@@ -6,7 +6,7 @@
 <a class="fg-button fg-button--secondary" href="/open/{{ id }}" target="_blank" rel="noopener" data-apply>Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a>
 {%- endmacro %}
 {% macro ask_actions(id) -%}
-<p class="fg-voice row-q">Did you apply?</p>
+<p class="fg-voice fg-job-question">Did you apply?</p>
 <form method="post" action="/set_applied/{{ id }}" data-ask-yes><input type="hidden" name="applied" value="true"><button class="fg-button fg-button--secondary" type="submit">Yes</button></form>
 <form method="post" action="/ask/dismiss/{{ id }}" data-ask-dismiss><button class="fg-button fg-button--secondary" type="submit">Not yet</button></form>
 {%- endmacro %}
@@ -100,82 +100,9 @@
     .empty-title { font-size: var(--fg-font-size-xl); }
     .empty .fg-card-help { margin: 0; }
 
-    ul.postings {
-      list-style: none;
-      margin: var(--fg-space-2) 0 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: var(--fg-space-2);
-    }
-
-    /* The job on the left (42%), its state and one action spot on the right (58%). Fractions keep the state line
-       aligned across rows even though each <li> is its own grid. The whole row opens the posting: the title link's
-       ::after covers the row, and the action spot sits above it. */
-    .posting {
-      position: relative;
-      display: grid;
-      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-      align-items: center;
-      column-gap: var(--fg-space-6);
-      row-gap: var(--fg-space-3);
-      padding: var(--fg-space-4);
-      background: var(--fg-color-surface-card);
-      border: 1px solid var(--fg-color-border-subtle);
-      border-radius: var(--fg-radius-sm);
-    }
-    .posting[hidden] { display: none; }
-    .posting:hover { background: var(--fg-color-surface-hover); }
-    .posting:has(.posting-link:focus-visible) {
-      outline: 3px solid var(--fg-color-action-focus-ring);
-      outline-offset: -3px;
-    }
-    .posting p {
-      margin: 0;
-      font-weight: var(--fg-font-weight-medium);
-      line-height: var(--fg-font-line-height-snug);
-    }
-    .posting-lead { min-width: 0; }
-    .posting-title { font-size: var(--fg-font-size-lg); max-width: 500px; }
-    .posting-link { color: inherit; text-decoration: none; outline: none; }
-    .posting-link::after { content: ""; position: absolute; inset: 0; }
-    .posting-subline { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
-    .posting-source { font-size: var(--fg-font-size-xs); color: var(--fg-color-text-secondary); }
-    .posting-skills { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
-
-    .posting-second {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--fg-space-4);
-      min-width: 0;
-    }
-    .posting-state { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
-    /* Apply, or the question that replaces it when you come back from the job. */
-    .row-action {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: flex-end;
-      gap: var(--fg-space-2);
-    }
-    .row-action form { display: contents; }
-    .row-q { font-size: var(--fg-font-size-lg); margin-right: var(--fg-space-1); }
-
     @media (max-width: 680px) {
       body > .fg-header { padding-inline: 0; }
       .board { margin-top: var(--fg-space-4); padding: var(--fg-space-1) var(--fg-space-3) var(--fg-space-3); }
-      .posting {
-        padding: var(--fg-space-3);
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-areas: "lead" "state" "action";
-      }
-      .posting-lead { grid-area: lead; }
-      .posting-second { display: contents; }
-      .posting-state { grid-area: state; }
-      .row-action { grid-area: action; justify-content: flex-start; }
       .more { margin-left: var(--fg-space-3); }
     }
   </style>
@@ -245,25 +172,11 @@
     </p>
     {% endif %}
 
-    <ul class="postings">
+    <ul class="fg-job-list">
       {% for p in postings %}
-      <li class="posting" id="posting-{{ p.id }}">
-        <div class="posting-lead">
-          <p class="posting-title"><a class="posting-link" href="/open/{{ p.id }}" target="_blank" rel="noopener">{{ p.title }}</a></p>
-          <p class="posting-subline">{{ p.company_name }}{% if p.location %} • {{ p.location }}{% endif %}</p>
-          <p class="posting-source">Found on {{ p.ats_type|capitalize }}</p>
-          {%- if p.skill_line %}
-          <p class="posting-skills">{{ p.skill_line }}</p>
-          {%- endif %}
-        </div>
-        <div class="posting-second">
-          {# LinkedIn line ("Not seen on LinkedIn" / "Seen on LinkedIn 3 hours ago") goes here once LinkedIn sightings are recorded. #}
-          <p class="posting-state" data-state>{% if p.viewed_ago %}Viewed {{ p.viewed_ago }}{% else %}Discovered {{ p.first_seen_at|humanize }}{% endif %}</p>
-          <div class="row-action" data-action>
-            {%- if p.asking %}{{ ask_actions(p.id) }}{% else %}{{ apply_button(p.id) }}{% endif %}
-          </div>
-        </div>
-      </li>
+      {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.location, p.ats_type|capitalize, ("Viewed " ~ p.viewed_ago) if p.viewed_ago else ("Discovered " ~ (p.first_seen_at|humanize)), p.skill_line) %}
+        {%- if p.asking %}{{ ask_actions(p.id) }}{% else %}{{ apply_button(p.id) }}{% endif %}
+      {% endcall %}
       {% endfor %}
     </ul>
 
@@ -285,18 +198,9 @@
       <p class="fg-card-help">When you apply to a role from Open roles, it moves here.</p>
     </div>
     {% endif %}
-    <ul class="postings">
+    <ul class="fg-job-list">
       {% for p in applications %}
-      <li class="posting" id="posting-{{ p.id }}">
-        <div class="posting-lead">
-          <p class="posting-title"><a class="posting-link" href="/open/{{ p.id }}" target="_blank" rel="noopener">{{ p.title }}</a></p>
-          <p class="posting-subline">{{ p.company_name }}{% if p.location %} • {{ p.location }}{% endif %}</p>
-          <p class="posting-source">Found on {{ p.ats_type|capitalize }}</p>
-        </div>
-        <div class="posting-second">
-          <p class="posting-state">Applied{% if p.applied_ago %} {{ p.applied_ago }}{% endif %}</p>
-        </div>
-      </li>
+      {{ fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.location, p.ats_type|capitalize, "Applied" ~ ((" " ~ p.applied_ago) if p.applied_ago else "")) }}
       {% endfor %}
     </ul>
     {% endif %}

@@ -258,6 +258,30 @@
 </div>
 {%- endmacro %}
 
+{#- Job card: one job in a list (use inside <ul class="fg-job-list">). id = the card's own DOM id. state = the one state
+    line ("Discovered 45 minutes ago", "Viewed 12 minutes ago", "Applied 3 days ago"). The call block is the one action
+    spot on the right (Apply, or the question "Did you apply?"); leave it out and the card has no action.
+        {% call fg.job("posting-7", title, href, company, location, source, state) %}<a class="fg-button ...">Apply</a>{% endcall %}
+    Constraint: one action spot, no menus; the card itself opens the posting. -#}
+{% macro job(id, title, href, company, location, source, state, skills="") -%}
+<li class="fg-job" id="{{ id }}">
+  <div class="fg-job-lead">
+    <p class="fg-job-title"><a class="fg-job-link" href="{{ href }}" target="_blank" rel="noopener">{{ title }}</a></p>
+    <p class="fg-job-subline">{{ company }}{% if location %} • {{ location }}{% endif %}</p>
+    <p class="fg-job-source">Found on {{ source }}</p>
+    {%- if skills %}
+    <p class="fg-job-skills">{{ skills }}</p>
+    {%- endif %}
+  </div>
+  <div class="fg-job-second">
+    <p class="fg-job-state" data-state>{{ state }}</p>
+    {%- if caller is defined %}
+    <div class="fg-job-action" data-action>{{ caller() }}</div>
+    {%- endif %}
+  </div>
+</li>
+{%- endmacro %}
+
 {#- File row: icon, name, meta; call block = actions (View, Replace). -#}
 {% macro file_row(name, meta="") -%}
 <div class="fg-file-row">
