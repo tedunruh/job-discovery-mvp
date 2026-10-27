@@ -213,22 +213,23 @@ def check_ui_font(page, w):
     check(not bad, f"UI font (Albert Sans) loads  [@{w}]", "failed weights: " + ", ".join(bad))
 
 
-def check_applied_alignment(page, w):
-    """At phone widths the Applied toggle sits beside the job title: its icon must
-    be centered on the title's first line (not on the Discovered line below)."""
+def check_row_action(page, w):
+    """Each job card keeps its state line and its one action (Apply) inside the card, at every width; on a phone the
+    action sits under the state line, not beside the title."""
     rows = page.evaluate(
         """
-        () => [...document.querySelectorAll('.posting')].slice(0, 5).map(li => {
-          const t = li.querySelector('.posting-title'), i = li.querySelector('.applied-toggle svg');
-          const tr = t.getBoundingClientRect(), ir = i.getBoundingClientRect();
-          const lh = parseFloat(getComputedStyle(t).lineHeight);
-          return { title: tr.top + lh / 2, icon: ir.top + ir.height / 2 };
+        () => [...document.querySelectorAll('li.posting')].slice(0, 5).map(li => {
+          const c = li.getBoundingClientRect(), a = li.querySelector('[data-action] .fg-button').getBoundingClientRect();
+          const s = li.querySelector('[data-state]').getBoundingClientRect();
+          return { inside: a.left >= c.left && a.right <= c.right && s.left >= c.left && s.right <= c.right,
+                   below: a.top >= s.bottom - 1, h: a.height };
         })
         """
     )
-    off = [abs(r["title"] - r["icon"]) for r in rows]
-    check(rows and max(off) <= ALIGN_TOLERANCE_PX, f"Applied toggle centered on title line  [@{w}]",
-          f"worst offset {max(off):.2f}px" if rows else "no rows")
+    check(rows and all(r["inside"] for r in rows), f"Apply and the state line stay inside the job card  [@{w}]", str(rows[:1]))
+    check(rows and all(r["h"] >= 44 - 0.5 for r in rows), f"Apply is at least 44px tall  [@{w}]", str(rows[:1]))
+    if w <= 680:
+        check(rows and all(r["below"] for r in rows), f"on a phone Apply sits under the state line  [@{w}]", str(rows[:1]))
 
 
 ALLOWED_FONTS = {"fraunces", "albert sans"}
@@ -447,21 +448,31 @@ def check_signin_states(browser, base):
 
 
 def check_return_ask(browser, base, token):
-    """Coming back from a job (SC-63): open a job in another tab, return, and the job's own row asks "Did you apply for
-    this one?" without a reload and without taking focus; the latest job opened is the one asked about and the others
-    say Viewed; "Not yet" closes it for good (until the job is opened again); a reload shows it with no script; and a
-    phone fits it. The job's outside page is stubbed, so nothing leaves the machine."""
+    """Open roles and Applications (SC-63). Open a job in another tab, return, and the job's own row swaps Apply for
+    "Did you apply?" with Yes and Not yet, without a reload and without taking focus; the latest job opened is the one
+    asked about and the others say Viewed; Not yet puts Apply back for good (until the job is opened again). Yes sends
+    the row out of Open roles at once, moves the counts and shows a toast with View and Undo that never takes focus,
+    stays while pointed at, and goes by itself; Undo puts the row back; View lands on Applications with the job
+    there. A phone fits all of it. The job's outside page is stubbed, so nothing leaves the machine."""
     ctx = browser.new_context(viewport={"width": 1280, "height": 900})
     ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
     ctx.route(re.compile(r"^https?://(?!127\.0\.0\.1)"), lambda route: route.fulfill(status=200, body="the job's own page"))
     page = ctx.new_page()
     page.goto(base + "/?range=all", wait_until="load")
+    page.goto(base + "/?tab=applications", wait_until="load")
+    check("No applications yet." in page.locator("[role=tabpanel]").inner_text()
+          and "When you apply to a role from Open roles, it moves here." in page.locator("[role=tabpanel]").inner_text(),
+          "Applications starts empty and says what will happen", page.locator("[role=tabpanel]").inner_text()[:120])
+    check(page.locator(".toolbar .fg-filter-pill").count() == 0, "Applications has no Work type or Posted filters")
     page.goto(base + "/", wait_until="load")
     ids = page.evaluate("[...document.querySelectorAll('li.posting')].slice(0, 3).map(li => li.id.replace('posting-', ''))")
     check(len(ids) == 3, "the dashboard has jobs to open for the coming-back check", f"{ids}")
     if len(ids) < 3:
         ctx.close()
         return
+    check(page.locator(".fg-tab[aria-selected=true]").inner_text().startswith("Open roles")
+          and page.locator(".fg-tab").count() == 2 and page.locator("#filter-status").count() == 0,
+          "Open roles is the selected tab, there are two, and the Status filter is gone")
 
     def open_in_new_tab(job):
         with ctx.expect_page() as popup:
@@ -474,40 +485,45 @@ def check_return_ask(browser, base, token):
         page.evaluate("window.dispatchEvent(new Event('focus'))")
 
     def asking():
-        return page.evaluate("[...document.querySelectorAll('.posting--asking')].map(li => li.id.replace('posting-', ''))")
+        return page.evaluate("[...document.querySelectorAll('li.posting')].filter(li => li.querySelector('[data-ask-yes]')).map(li => li.id.replace('posting-', ''))")
+
+    def counts():
+        return page.evaluate("[...document.querySelectorAll('[data-tab-count]')].map(e => e.textContent.trim())")
 
     check(asking() == [], "nothing is asked before a job has been opened", f"{asking()}")
     open_in_new_tab(ids[0])
     focus_before = page.evaluate("document.activeElement.outerHTML.slice(0, 80)")   # after our own click on the link
     come_back()
-    page.wait_for_selector(f"#posting-{ids[0]} [data-ask]", timeout=8000)
+    page.wait_for_selector(f"#posting-{ids[0]} [data-ask-yes]", timeout=8000)
     row = page.locator(f"#posting-{ids[0]}")
-    check(asking() == [ids[0]] and "Did you apply for this one?" in row.inner_text() and "You opened it" in row.inner_text(),
-          "back from a job, its own row asks 'Did you apply for this one?' (no reload)", row.inner_text()[:140])
-    check("Viewed" in row.inner_text(), "...and says Viewed", row.inner_text()[:140])
+    check(asking() == [ids[0]] and "Did you apply?" in row.inner_text() and row.locator("button", has_text="Yes").is_visible()
+          and row.locator("button", has_text="Not yet").is_visible(),
+          "back from a job, its own row asks 'Did you apply?' with Yes and Not yet (no reload)", row.inner_text()[:140])
+    check("Viewed" in row.locator("[data-state]").inner_text() and row.locator("[data-apply]").count() == 0,
+          "...the state line says Viewed and the question has taken Apply's place", row.inner_text()[:140])
     focus_after = page.evaluate("document.activeElement.outerHTML.slice(0, 80)")
     check(focus_after == focus_before, "...without taking focus", f"{focus_before!r} -> {focus_after!r}")
-    check(page.locator("#return-live").inner_text().startswith("Welcome back. Did you apply for"), "...and announces it to screen readers", page.locator("#return-live").inner_text())
-    check(page.locator(f"#posting-{ids[0]} button.fg-toggle").is_visible(), "...and yes is the row's own Applied toggle")
+    check(page.locator("#return-live").inner_text().startswith("Did you apply for"), "...and announces it to screen readers", page.locator("#return-live").inner_text())
 
-    # a second job: only the latest asks, the first just says Viewed
+    # a second job: only the latest asks, the first goes back to Apply and says Viewed
     open_in_new_tab(ids[1])
     page.wait_for_timeout(2200)       # the script waits a moment between asks
     come_back()
-    page.wait_for_selector(f"#posting-{ids[1]} [data-ask]", timeout=8000)
+    page.wait_for_selector(f"#posting-{ids[1]} [data-ask-yes]", timeout=8000)
     first = page.locator(f"#posting-{ids[0]}")
-    check(asking() == [ids[1]] and "Welcome back" not in first.inner_text() and "Viewed" in first.inner_text(),
-          "after a second job only the latest asks and the first says Viewed", f"{asking()} | {first.inner_text()[:100]}")
-    check("You also looked at 1 other role" in page.locator(f"#posting-{ids[1]}").inner_text(), "...and the question mentions the other one")
+    check(asking() == [ids[1]] and first.locator("[data-apply]").count() == 1 and "Viewed" in first.locator("[data-state]").inner_text(),
+          "after a second job only the latest asks; the first has Apply back and says Viewed", f"{asking()} | {first.inner_text()[:100]}")
 
     # a reload shows it with no script: the server draws it
     page.reload(wait_until="load")
     check(asking() == [ids[1]], "after a reload the question is still on the latest job", f"{asking()}")
 
-    # Not yet: closed now and after a reload
-    page.locator(f"#posting-{ids[1]} [data-ask-dismiss]").click()
+    # Not yet: Apply comes back now and after a reload, the row still says Viewed
+    page.locator(f"#posting-{ids[1]} [data-ask-dismiss] button").click()
     page.wait_for_timeout(500)
-    check(asking() == [], "'Not yet' closes the question", f"{asking()}")
+    second = page.locator(f"#posting-{ids[1]}")
+    check(asking() == [] and second.locator("[data-apply]").count() == 1 and "Viewed" in second.locator("[data-state]").inner_text(),
+          "'Not yet' brings Apply back and the row still says Viewed", f"{asking()} | {second.inner_text()[:100]}")
     page.reload(wait_until="load")
     check(asking() == [], "...and it stays closed after a reload (until that job is opened again)", f"{asking()}")
 
@@ -515,33 +531,114 @@ def check_return_ask(browser, base, token):
     page.wait_for_timeout(2200)
     open_in_new_tab(ids[1])
     come_back()
-    page.wait_for_selector(f"#posting-{ids[1]} [data-ask]", timeout=8000)
+    page.wait_for_selector(f"#posting-{ids[1]} [data-ask-yes]", timeout=8000)
     check(asking() == [ids[1]], "opening the job again asks again", f"{asking()}")
 
-    # yes: the Applied toggle; the question is gone and the row confirms
-    page.locator(f"#posting-{ids[1]} button.fg-toggle").click()
+    # Yes while the server is failing: nothing is claimed. The row stays, still asking, and there is no toast.
+    page.route("**/set_applied/*", lambda route: route.fulfill(status=500, body="no"))
+    page.locator(f"#posting-{ids[1]} [data-ask-yes] button").click()
+    page.wait_for_timeout(1200)
+    check(page.locator(f"#posting-{ids[1]}").is_visible() and asking() == [ids[1]] and page.locator(".fg-toast").count() == 0,
+          "if the server fails, Yes claims nothing: the row stays, still asking, no toast", f"{asking()}")
+    page.unroute("**/set_applied/*")
+
+    # Yes: the row leaves at once, the counts move, a toast says where it went
+    before = counts()
+    page.locator(f"#posting-{ids[1]} [data-ask-yes] button").click()
+    page.wait_for_selector(".fg-toast", timeout=8000)
+    after = counts()
+    check(not page.locator(f"#posting-{ids[1]}").is_visible(), "Yes sends the row out of Open roles at once")
+    check(int(after[0]) == int(before[0]) - 1 and int(after[1]) == int(before[1]) + 1,
+          "...and the counts move (Open roles down one, Applications up one)", f"{before} -> {after}")
+    toast = page.locator(".fg-toast")
+    check("You've applied to this role. You can find it in Applications." in toast.inner_text()
+          and toast.locator("a", has_text="View").is_visible() and toast.locator("button", has_text="Undo").is_visible(),
+          "...a toast says where it went, with View and Undo", toast.inner_text()[:120])
+    check(page.evaluate("!document.querySelector('.fg-toast').contains(document.activeElement)"), "...and the toast does not take focus")
+    check(page.evaluate("document.querySelector('#toast-region').getAttribute('aria-live')") == "polite", "...and is announced politely")
+    check(page.evaluate("getComputedStyle(document.querySelector('.fg-toast-text')).textAlign") in ("start", "left"), "...and its text is left-aligned")
+
+    # nobody points at it: it goes by itself after about eight seconds
+    page.wait_for_timeout(7000)
+    check(page.locator(".fg-toast").count() == 1, "the toast is still there at seven seconds")
+    page.wait_for_function("document.querySelectorAll('.fg-toast').length === 0", timeout=4000)
+    check(True, "...and goes by itself by about eight")
+
+    page.reload(wait_until="load")
+    check(page.locator(f"#posting-{ids[1]}").count() == 0, "after the toast has gone the job stays in Applications (not in Open roles)")
+
+    # it stays while pointed at, then goes soon after the pointer leaves
+    open_in_new_tab(ids[2])
+    page.wait_for_timeout(2200)
+    come_back()
+    page.wait_for_selector(f"#posting-{ids[2]} [data-ask-yes]", timeout=8000)
+    page.locator(f"#posting-{ids[2]} [data-ask-yes] button").click()
+    page.wait_for_selector(".fg-toast", timeout=8000)
+    page.hover(".fg-toast")
+    page.wait_for_timeout(9000)
+    check(page.locator(".fg-toast").count() == 1, "the toast stays past eight seconds while it is pointed at")
+    page.mouse.move(5, 5)
+    page.wait_for_timeout(4800)
+    check(page.locator(".fg-toast").count() == 0, "...and goes by itself soon after the pointer leaves")
+
+    # Undo: put it back. Then Yes again and View.
+    open_in_new_tab(ids[0])
+    page.wait_for_timeout(2200)
+    come_back()
+    page.wait_for_selector(f"#posting-{ids[0]} [data-ask-yes]", timeout=8000)
+    before = counts()
+    page.locator(f"#posting-{ids[0]} [data-ask-yes] button").click()
+    page.wait_for_selector(".fg-toast", timeout=8000)
+    page.locator(".fg-toast button", has_text="Undo").click()
+    page.wait_for_function("document.querySelectorAll('.fg-toast').length === 0", timeout=8000)
+    check(page.locator(f"#posting-{ids[0]}").is_visible() and page.locator(f"#posting-{ids[0]} [data-apply]").count() == 1
+          and counts() == before and page.locator(".fg-toast").count() == 0,
+          "Undo puts the row back with Apply, restores the counts and clears the toast", f"{counts()} vs {before}")
+    page.reload(wait_until="load")
+    check(page.locator(f"#posting-{ids[0]}").count() == 1, "...and after a reload it is still in Open roles")
+
+    open_in_new_tab(ids[0])
+    page.wait_for_timeout(2200)
+    come_back()
+    page.wait_for_selector(f"#posting-{ids[0]} [data-ask-yes]", timeout=8000)
+    page.locator(f"#posting-{ids[0]} [data-ask-yes] button").click()
+    page.wait_for_selector(".fg-toast", timeout=8000)
+    page.locator(".fg-toast a", has_text="View").click()
     page.wait_for_load_state("load")
-    check(asking() == [] and "Applied just now" in page.locator(f"#posting-{ids[1]}").inner_text(),
-          "marking it Applied answers the question and the row says so", page.locator(f"#posting-{ids[1]}").inner_text()[:100])
+    apps = page.locator("[role=tabpanel]")
+    check(page.locator(".fg-tab[aria-selected=true]").inner_text().startswith("Applications")
+          and page.locator(f"#posting-{ids[0]}").count() == 1 and "Applied" in page.locator(f"#posting-{ids[0]} .posting-state").inner_text(),
+          "View lands on Applications with the job there, saying when", apps.inner_text()[:160])
+    check(page.locator("li.posting button, li.posting form").count() == 0, "...and its rows have nothing to click but the job")
+    first_title = page.locator("li.posting").first.get_attribute("id")
+    check(first_title == f"posting-{ids[0]}", "...and the newest application is first", f"{first_title}")
     ctx.close()
 
-    # a phone: the question fits
+    # a phone: the question and the toast fit
     mctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
     mctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
     mctx.route(re.compile(r"^https?://(?!127\.0\.0\.1)"), lambda route: route.fulfill(status=200, body="the job's own page"))
     mp = mctx.new_page()
     mp.goto(base + "/", wait_until="load")
-    other = mp.evaluate("[...document.querySelectorAll('li.posting')].map(li => li.id.replace('posting-', '')).find(id => id !== %s)" % ids[1])
+    other = mp.evaluate("[...document.querySelectorAll('li.posting')].map(li => li.id.replace('posting-', '')).find(id => id !== %s && id !== %s)" % (ids[0], ids[1]))
     with mctx.expect_page() as popup:
         mp.locator(f"#posting-{other} a.posting-link").click()
     popup.value.wait_for_load_state("load")
     popup.value.close()
     mp.bring_to_front()
     mp.evaluate("window.dispatchEvent(new Event('focus'))")
-    mp.wait_for_selector(f"#posting-{other} [data-ask]", timeout=8000)
-    geo = mp.evaluate("""(id) => { const r = document.querySelector('#posting-' + id + ' [data-ask]').getBoundingClientRect();
-        return {left: r.left, right: r.right, vw: window.innerWidth, sw: document.documentElement.scrollWidth} }""", other)
-    check(geo["left"] >= 0 and geo["right"] <= geo["vw"] and geo["sw"] <= geo["vw"], "on a phone the question fits the screen with no sideways scroll", str(geo))
+    mp.wait_for_selector(f"#posting-{other} [data-ask-yes]", timeout=8000)
+    geo = mp.evaluate("""(id) => { const r = document.querySelector('#posting-' + id + ' [data-action]').getBoundingClientRect();
+        const c = document.querySelector('#posting-' + id).getBoundingClientRect();
+        return {left: r.left, right: r.right, cl: c.left, cr: c.right, vw: window.innerWidth, sw: document.documentElement.scrollWidth} }""", other)
+    check(geo["left"] >= geo["cl"] - 0.5 and geo["right"] <= geo["cr"] + 0.5 and geo["sw"] <= geo["vw"],
+          "on a phone the question fits its card with no sideways scroll", str(geo))
+    mp.locator(f"#posting-{other} [data-ask-yes] button").click()
+    mp.wait_for_selector(".fg-toast", timeout=8000)
+    geo = mp.evaluate("""() => { const r = document.querySelector('.fg-toast').getBoundingClientRect();
+        return {left: r.left, right: r.right, top: r.top, bottom: r.bottom, vw: window.innerWidth, vh: window.innerHeight, sw: document.documentElement.scrollWidth} }""")
+    check(geo["left"] >= 0 and geo["right"] <= geo["vw"] and geo["bottom"] <= geo["vh"] and geo["top"] >= 0 and geo["sw"] <= geo["vw"],
+          "on a phone the toast fits the screen", str(geo))
     mctx.close()
 
 
@@ -746,7 +843,7 @@ def main():
                         check_filter_menus(page, w)
                         check_ui_font(page, w)
                         if w <= 680:
-                            check_applied_alignment(page, w)
+                            check_row_action(page, w)
                         snapshots[str(w)] = snapshot_styles(page)
                     # QC_SHOTS=<dir>: save a screenshot of each page/width for a
                     # side-by-side with the Figma frame.

@@ -1130,3 +1130,46 @@ early in a period is not the same as a field that is never filled.
       (key, the right project's record, timeouts), the numbers and failure reason logged, and the workflow passing the
       key. 27 mutation checks on a copy of the repo, all caught.
 - [ ] Not done: a real warning at 80% (see above).
+
+### 2026-10-27 — SC-63: Open roles and Applications tabs, with "Did you apply?" and a toast
+**Shipped:** the dashboard has two tabs, **Open roles** (default) and **Applications**, each with a count. An open role's row
+shows one state line ("Discovered 45 minutes ago", or "Viewed 12 minutes ago" once opened) and one action spot: **Apply**
+(opens the posting), which becomes **"Did you apply?" with Yes and Not yet** when you come back from that job. Not yet puts
+Apply back. Yes sends the row out of Open roles at once, moves both counts, and shows a toast ("You've applied to this
+role. You can find it in Applications.") with **View** (the Applications tab) and **Undo** (puts the row back). The toast
+never takes focus, is announced politely, stays eight seconds and longer while pointed at or focused. Applications lists
+every job applied to, newest first, as "Applied 3 days ago", with nothing to click but the job; empty, it says "No
+applications yet." Removed: the Status filter, the Applied toggle on rows, the "Welcome back" sentence, help line and
+outline, and the Viewed icon. New in Field Guide with gallery rows: **Tabs** and **Toast** (plus its live region).
+**No schema change.** "When" for Applications is the time of the job's latest `applied` event; a job marked applied before
+events were kept says just "Applied". Applications includes jobs that have since closed (you still applied to them).
+**Rules kept from SC-63's first build (check with Ted):** asked about only if opened in the last 24 hours; only the latest-
+opened job ever asks (after Not yet the next-older one does not step in); a job not on the current page cannot ask.
+**Rework count:** 3 in my own checks, none reached a person. **Root causes:**
+- *a page rule that outranks a component's own position.* The toast was drawn at the bottom of a 9,000-pixel page, not at
+  the bottom of the screen, because the dashboard's `body > :not(.band) { position: relative }` beat the toast region's
+  `position: fixed`. The phone check ("the toast fits the screen") caught it; the desktop screenshot hid it.
+- *a fixed wait standing in for an answer.* An Undo check waited 600 ms for a database round trip; it now waits for the
+  toast to go.
+- *checks that cannot fail in the way that matters.* Two deliberate breakages slipped through at first ("Yes hides the row
+  even if the server failed", "the toast never goes"), because no check made the server fail and the hover check never
+  let the toast time out on its own. Both now have a check, and both breakages are caught.
+**Standing checks added:**
+- [x] Automated, the rule (`dashboard/return_ask.py`): nothing opened, the latest only, the 24-hour edge, an old latest does not
+      let an older one step in, applied, "Not yet" then opened again, and the next-older job not stepping in.
+- [x] Automated, server (`tests/test_applications_tab.py`, `tests/test_return_ask.py`): the tabs and counts, the default and an
+      unknown tab, applied jobs out of Open roles, the Status filter and toggle gone, filters on Open roles only,
+      Applications' order, wording, empty state and no controls in its rows, marking and undoing (quiet answer for the
+      script, redirects without it, no new event on undo), the toast and its live region, the Apply and question markup,
+      `/return.json`, and the Applications query (applied flag, newest event first, closed jobs kept). 29 mutation checks
+      on a copy of the repo (one equivalent: the page cannot tell whether "applied" is read before or after filtering).
+- [x] Automated, in a real browser (`scripts/quality_check.py`, 314 checks): open a job in another tab, return, and Apply
+      becomes the question with no reload and no change of focus; only the latest asks; reload keeps it; Not yet restores
+      Apply and stays closed after a reload; opening again asks again; a failing server makes Yes claim nothing; Yes moves
+      the row, the counts and shows the toast; the toast does not take focus, is polite, left-aligned, goes by itself near
+      eight seconds, and waits while pointed at; Undo restores row, counts and toast; View lands on Applications with the
+      job first; Apply stays inside its card at every width and sits under the state line on a phone; the question and the
+      toast fit a phone. The job's outside page is stubbed. 22 deliberate breakages of the scripts and template, all caught
+      on a throwaway database branch (deleted afterwards).
+- [ ] Not done: Figma mirrors of Tabs, Toast and the new row (code is the source of truth); SC-64 (alerts) and the
+      Applications pipeline are not part of this.

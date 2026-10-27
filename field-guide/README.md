@@ -21,6 +21,7 @@ field-guide/
 ├── css/fonts.css      @font-face for Albert Sans (UI), weights 500 and 600
 ├── fonts/             self-hosted Albert Sans woff2 + license
 ├── js/filter.js       closes .fg-filter menus on outside click / Escape
+├── js/toast.js        shows and hides the one .fg-toast in #toast-region (8 seconds, longer while pointed at)
 └── css/components.css hand-written components (.fg-*), semantic tokens only
 ```
 

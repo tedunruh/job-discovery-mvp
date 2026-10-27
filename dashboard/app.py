@@ -20,6 +20,7 @@ from db.db import (
     create_session,
     delete_session,
     get_conn,
+    get_applications,
     get_applied_among,
     get_open_postings,
     get_posting_url,
@@ -38,7 +39,7 @@ from db.db import (
     set_user_work_types,
 )
 from dashboard.profile import ask_for_catch_up
-from dashboard.return_ask import choose_ask, help_text
+from dashboard.return_ask import choose_ask
 from dashboard.skill_filter import apply_skill_cutoff
 from dashboard.profile import register as register_profile_screens
 from dashboard.resume import register as register_resume
@@ -89,11 +90,6 @@ DEFAULT_ONBOARDING_CATEGORIES = {"product_design"}
 # every role at every tracked company, so an unbounded list is thousands of rows.
 PAGE_SIZE = 50
 MAX_SHOWN = 1000
-
-# SC-58: which of a person's roles the list shows. Roles they marked applied leave the main list; the Status filter
-# brings them back. Remembered for the session, like the Posted filter.
-STATUSES = {"open": "Not applied yet", "applied": "Applied", "all": "All"}
-DEFAULT_STATUS = "open"
 
 FIELD_GUIDE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "field-guide")
 
@@ -271,13 +267,10 @@ def index():
     # URL once a sleeping free-tier service is up. A POST-only filter lands on a 405.
     # work_set marks a Work type submit, since unchecking every box sends no "work".
     # remote_us_only is the old toggle's parameter, still honored for saved links.
-    if {"range", "work_set", "remote_us_only", "status"} & request.args.keys():
+    if {"range", "work_set", "remote_us_only"} & request.args.keys():
         session.permanent = True
-        session.pop("just_applied", None)  # changing a filter settles the row that was kept in place (SC-58)
         if request.args.get("range") in RANGES:
             session["posted_range"] = request.args["range"]
-        if request.args.get("status") in STATUSES:
-            session["status"] = request.args["status"]
         chosen = None
         if "work_set" in request.args:
             chosen = [w for w in WORK_TYPES if w in request.args.getlist("work")]
@@ -323,6 +316,7 @@ def index():
             conn.commit()
         postings = get_open_postings(conn, user_id, since=cutoff, keywords=keywords)
         opens, dismissals = get_return_events(conn, user_id)  # SC-63: what they opened, and what they said "Not yet" to
+        applications = get_applications(conn, user_id)
     finally:
         conn.close()
 
@@ -353,42 +347,28 @@ def index():
         finally:
             conn.close()
 
-    # SC-58: Not applied yet (the default), Applied, or All. The job the person has just marked applied stays in
-    # place for one more page load, checked and saying so, so the click can be undone; it leaves on the next refresh.
-    status = session.get("status", DEFAULT_STATUS)
-    if status not in STATUSES:
-        status = DEFAULT_STATUS
-    just_applied = session.pop("just_applied", None)
-    wanted = [p for p in postings if status == "all" or bool(p["applied"]) == (status == "applied")]
-    wanted_ids = {p["id"] for p in wanted}
-    visible = [p for p in postings if p["id"] in wanted_ids or (status == "open" and p["id"] == just_applied and p["applied"])]
-    for p in visible:
-        p["just_applied"] = status == "open" and p["id"] == just_applied and bool(p["applied"])
-    postings = visible
+    # SC-63: roles they marked applied are not "open" to them any more; they live in the Applications tab.
+    applied_ids = {p["id"] for p in postings if p["applied"]}
+    postings = [p for p in postings if not p["applied"]]
 
-    total = len(wanted)
+    total = len(postings)
     limit = min(max(request.args.get("n", PAGE_SIZE, type=int), PAGE_SIZE), MAX_SHOWN)
-    # the kept row is a confirmation, not one of the roles: it must not use up a place in the list
-    shown, real = [], 0
-    for p in postings:
-        if not p.get("just_applied"):
-            if real == limit:
-                break
-            real += 1
-        shown.append(p)
+    shown = postings[:limit]
 
-    # SC-63: jobs they opened say so, and the job they opened last asks whether they applied (if it is on this page).
-    now = datetime.now(timezone.utc)
-    ask_id, others = choose_ask(opens, dismissals, {p["id"] for p in shown if p["applied"]}, now)
+    # SC-63: jobs they opened say Viewed, and the job they opened last asks whether they applied (if it is on this page).
+    ask_id = choose_ask(opens, dismissals, applied_ids, datetime.now(timezone.utc))
     for p in shown:
         if p["id"] in opens:
             p["viewed_ago"] = humanize_posted_at(opens[p["id"]])
-            if p["id"] == ask_id and not p.get("just_applied"):
-                p["ask_help"] = help_text(p["viewed_ago"], others)
+        p["asking"] = p["id"] == ask_id
+    for a in applications:
+        a["applied_ago"] = humanize_posted_at(a["applied_at"])
 
     return render_template(
         "index.html",
+        tab="applications" if request.args.get("tab") == "applications" else "open",
         postings=shown,
+        applications=applications,
         total=total,
         next_n=limit + PAGE_SIZE if total > limit and limit < MAX_SHOWN else None,
         page_size=PAGE_SIZE,
@@ -399,10 +379,7 @@ def index():
         posted_range=posted_range,
         skills_under=skills_under,
         skills_all=skills_all,
-        statuses=STATUSES,
-        status=status,
-        shown_count=sum(1 for p in shown if not p.get("just_applied")),
-        keep_n=limit if limit > PAGE_SIZE else None,
+        shown_count=len(shown),
     )
 
 
@@ -470,9 +447,9 @@ def return_state():
         applied = get_applied_among(conn, g.user_id, list(opens))
     finally:
         conn.close()
-    ask_id, others = choose_ask(opens, dismissals, applied, datetime.now(timezone.utc))
+    ask_id = choose_ask(opens, dismissals, applied, datetime.now(timezone.utc))
     body = {
-        "ask": ({"id": ask_id, "help": help_text(humanize_posted_at(opens[ask_id]), others)} if ask_id else None),
+        "ask": ({"id": ask_id} if ask_id else None),
         "viewed": {str(pid): humanize_posted_at(when) for pid, when in opens.items() if pid not in applied},
     }
     response = jsonify(body)
@@ -508,19 +485,9 @@ def set_applied_route(posting_id):
         conn.commit()
     finally:
         conn.close()
-    # SC-58: the row stays where it is for one more page load, checked, so the click can be undone (a new answer
-    # settles the previous one). Come back to the same row, still showing as many roles as before.
-    if applied:
-        session["just_applied"] = posting_id
-    else:
-        session.pop("just_applied", None)
-    params = {}
-    n = request.form.get("n", type=int)
-    if n and n > PAGE_SIZE:
-        params["n"] = min(n, MAX_SHOWN)
-    if request.form.get("skills") == "all":
-        params["skills"] = "all"
-    return redirect(url_for("index", _anchor=f"posting-{posting_id}", **params))
+    if request.headers.get("X-Requested-With") == "fetch":
+        return "", 204
+    return redirect(url_for("index", tab="applications") if applied else url_for("index"))
 
 
 @app.route("/open/<int:posting_id>")

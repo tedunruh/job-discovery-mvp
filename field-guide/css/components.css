@@ -1074,3 +1074,111 @@ button.fg-link {
 @media (prefers-reduced-motion: reduce) {
   .fg-progress-bar > span { transition: none; }
 }
+
+/* ---------- Tabs (SC-63) ---------- */
+/* Two views of the same jobs ("Open roles", "Applications"). Selected = Ink text over a 2px Forest underline; the rest
+   are secondary text. Each tab is a link to its own page, so a tab is always the current state of the server. */
+.fg-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fg-space-6);
+  margin-bottom: var(--fg-space-4);
+  border-bottom: 1px solid var(--fg-color-border-subtle);
+}
+.fg-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fg-space-2);
+  box-sizing: border-box;
+  min-height: var(--fg-size-touch-target);
+  margin-bottom: -1px;
+  padding: var(--fg-space-2) 0;
+  border-bottom: 2px solid transparent;
+  font-family: var(--fg-font-family-ui);
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-demibold);
+  color: var(--fg-color-text-secondary);
+  text-decoration: none;
+}
+.fg-tab[aria-selected="true"] {
+  color: var(--fg-color-text-primary);
+  border-bottom-color: var(--fg-color-action-primary);
+}
+.fg-tab:hover { color: var(--fg-color-text-primary); }
+.fg-tab:focus-visible {
+  outline: 3px solid var(--fg-color-action-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--fg-radius-sm);
+}
+.fg-tab-count {
+  font-size: var(--fg-font-size-sm);
+  font-weight: var(--fg-font-weight-medium);
+  color: var(--fg-color-text-secondary);
+}
+
+/* ---------- Toast (SC-63) ---------- */
+/* Confirms something happened somewhere you can't see, and says where to find it. Bottom centre, above everything,
+   never takes focus. The region is the polite live region, so it is in the page before any toast is. Text is left-aligned. */
+.fg-toast-region {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--fg-space-6);
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--fg-space-4);
+  pointer-events: none;
+}
+/* In the gallery (and anywhere a toast should sit in the flow) the region is drawn in place instead of fixed. */
+.fg-toast-region--static {
+  position: static;
+  padding: 0;
+  justify-content: flex-start;
+  pointer-events: auto;
+}
+.fg-toast {
+  pointer-events: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fg-space-2) var(--fg-space-4);
+  box-sizing: border-box;
+  max-width: 560px;
+  padding: var(--fg-space-3) var(--fg-space-3) var(--fg-space-3) var(--fg-space-4);
+  background: var(--fg-color-palette-ink);
+  color: var(--fg-color-text-on-action);
+  border-radius: var(--fg-radius-lg);
+  box-shadow: var(--fg-shadow-raised);
+  text-align: left;
+}
+.fg-toast-text {
+  flex: 1 1 260px;
+  margin: 0;
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-medium);
+  line-height: var(--fg-font-line-height-body);
+}
+.fg-toast-actions { display: flex; align-items: center; gap: var(--fg-space-1); }
+.fg-toast-action {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: var(--fg-size-touch-target);
+  padding: 0 var(--fg-space-3);
+  background: none;
+  border: 0;
+  border-radius: var(--fg-radius-md);
+  font-family: var(--fg-font-family-ui);
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-demibold);
+  color: var(--fg-color-text-on-action);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.fg-toast-action:hover { background: rgb(250 249 247 / 0.12); }
+.fg-toast-action:focus-visible { outline: 3px solid var(--fg-color-palette-sage); outline-offset: 0; }
+@media (max-width: 680px) {
+  .fg-toast-region { bottom: var(--fg-space-4); }
+}
