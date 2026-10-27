@@ -1107,23 +1107,26 @@ only used in the wording ("100+" when it hits the limit), and a test runs 30 hou
       fails. The streak read is checked against GitHub's real answer shape in the tests, not against a live run.
 
 ### 2026-10-27 — SC-65: a warning before the Neon plan runs out
-**Shipped:** each run asks Neon's usage-history API (with the `NEON_API_KEY` GitHub secret) how much of the month's compute
-hours and network transfer is used, and writes the numbers to the run log. Once a day (the run that starts in the first
-quarter hour of 14:00 UTC, 9 AM Central) it adds a health alert if either is at 80% or more of the $10 plan ("Neon compute
-is at 82% of this month's allowance (205.0 of 250 hours)"). If the figures cannot be read (Neon refuses, is down, or has
-no entry for the project) that daily message says "Neon usage warning is blind" instead of staying quiet, so a changed API
-cannot turn the warning off unnoticed. No key: nothing happens. A failure never stops a run. Storage is not watched (0.28
-of 5 GB, and the history reports it in byte-hours).
-**Rework count:** 1, found by the first live run. **Root cause:** *built on a data source nobody had read the docs for.*
-The first version read usage fields off the project record, which the Neon console tool had shown as 0 and which I
-treated as a quirk of that tool; the first real run logged "not reported". Neon's usage numbers live in a separate
-usage-history endpoint. Lesson: when a data source shows zeros, read its docs before building on it, not after.
-**Not yet verified:** that the new endpoint accepts this plan (the docs list Launch, Scale, Agent and Enterprise; this
-project reports itself as "build"). The first run after this ships logs either the real numbers or the refusal reason.
+**Shipped:** each run reads the project's usage so far this billing period from Neon (with the `NEON_API_KEY` GitHub
+secret): compute hours and network transfer, written to the run log. Once a day (the run that starts in the first quarter
+hour of 14:00 UTC, 9 AM Central) it adds a health alert if either is at 80% or more of the $10 plan ("Neon compute is at
+82% of this month's allowance (205.0 of 250 hours)"). If the figures cannot be read (Neon refuses, is down, or the record
+lacks them) that daily message says "Neon usage warning is blind" instead of staying quiet, so a changed API cannot turn
+the warning off unnoticed. No key: nothing happens. A failure never stops a run. Storage is not watched (0.28 of 5 GB, and
+the record reports it in byte-hours).
+**Rework count:** 2, both found by live runs. **Root cause:** *built on a data source nobody had read the docs for.* Version
+one read usage off the project record when the console tool showed it as 0 (it had only just been refreshed); the first
+real run logged "not reported". Version two used Neon's usage-history API from its docs, but that endpoint is "included
+with Launch plans and above" and this project's plan answers HTTP 403. Neon's docs for plans without it point at the
+project record, which by then carried real numbers (2,527 compute seconds, 59 MB transferred about six hours into the
+period). Lesson: check that an API is offered on *this* plan, with a real call, before building on it; and a zero seen
+early in a period is not the same as a field that is never filled.
+**Not yet verified:** a warning actually firing (nothing is near 80%), and how far the record's figures lag behind real use
+(Neon calls them approximate; the active-time figure was about two hours behind the clock).
 **Standing checks added:**
-- [x] Automated (`tests/test_quota_warning.py`, 24 tests): the sums (current period only, other metrics ignored, hours and
-      GB conversions, an unknown project is "unknown" not 0%), the 80% line for each allowance and the edges, the one
-      daily run, "blind" when Neon refuses / is down / has no entry / several projects, the request itself (key, project,
-      organization, window covering today, timeouts), the numbers and failure reason logged, and the workflow passing the
-      key. 30 mutation checks on a copy of the repo, all caught (one, the several-projects guess, was first missed).
-- [ ] Not done: a live read of Neon's usage (see above).
+- [x] Automated (`tests/test_quota_warning.py`, 22 tests): the conversions (seconds to hours, bytes to decimal GB), zero
+      is a real answer but missing or non-numeric figures are "unknown", the 80% line for each allowance and the edges,
+      the one daily run, "blind" when Neon refuses / is down / lacks the figures / several projects, the request itself
+      (key, the right project's record, timeouts), the numbers and failure reason logged, and the workflow passing the
+      key. 27 mutation checks on a copy of the repo, all caught.
+- [ ] Not done: a real warning at 80% (see above).

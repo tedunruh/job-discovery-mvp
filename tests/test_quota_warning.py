@@ -8,46 +8,32 @@ from unittest import mock
 from scheduler import quota_warning as qw
 from scheduler import run_collectors as rc
 
-GB = 1024 ** 3
+GB = 10 ** 9
 SLOT = datetime(2026, 10, 30, 14, 1, tzinfo=timezone.utc)      # the run that starts in the alert quarter hour
 LATER = datetime(2026, 10, 30, 14, 31, tzinfo=timezone.utc)    # same hour, later run
 EVENING = datetime(2026, 10, 30, 20, 1, tzinfo=timezone.utc)
 
 
-def history(*periods, project_id="p1"):
-    """A usage-history answer; each period is a list of days, each day {metric: value}."""
-    return {"projects": [{"project_id": project_id, "periods": [
-        {"period_id": str(i), "consumption": [
-            {"metrics": [{"metric_name": k, "value": v} for k, v in day.items()]} for day in days]}
-        for i, days in enumerate(periods)]}]}
-
-
-def day(hours=0.0, transfer_gb=0.0):
-    return {"compute_unit_seconds": hours * 3600, "public_network_transfer_bytes": transfer_gb * GB}
+def record(hours=0.0, transfer_gb=0.0, project_id="p1"):
+    """A Neon project record with this period's usage so far."""
+    return {"id": project_id, "compute_time_seconds": hours * 3600, "data_transfer_bytes": transfer_gb * GB}
 
 
 class Usage(unittest.TestCase):
-    def test_sums_the_days_of_the_current_period(self):
-        used = qw.usage(history([day(10, 1), day(20, 2)]), "p1")
+    def test_converts_seconds_to_hours_and_bytes_to_decimal_gb(self):
+        used = qw.usage(record(30, 3))
         self.assertAlmostEqual(used["compute"], 30)
         self.assertAlmostEqual(used["transfer"], 3)
 
-    def test_only_the_last_period_counts(self):
-        """A plan change starts a new period with a new allowance; the old one's use is not this month's."""
-        used = qw.usage(history([day(200, 20)], [day(5, 1)]), "p1")
-        self.assertAlmostEqual(used["compute"], 5)
-        self.assertAlmostEqual(used["transfer"], 1)
+    def test_zero_is_a_real_answer(self):
+        self.assertEqual(qw.usage(record(0, 0)), {"compute": 0.0, "transfer": 0.0})
 
-    def test_other_metrics_are_ignored_and_missing_ones_are_zero(self):
-        data = history([{"root_branch_bytes_month": 10 ** 12}])
-        self.assertEqual(qw.usage(data, "p1"), {"compute": 0.0, "transfer": 0.0})
-
-    def test_nothing_for_the_project_is_unknown_not_zero(self):
-        self.assertIsNone(qw.usage(history([day(1)], project_id="other"), "p1"))
-        self.assertIsNone(qw.usage({"projects": []}, "p1"))
-        self.assertIsNone(qw.usage({}, "p1"))
-        self.assertIsNone(qw.usage(None, "p1"))
-        self.assertIsNone(qw.usage({"projects": [{"project_id": "p1", "periods": []}]}, "p1"))
+    def test_a_record_without_the_figures_is_unknown_not_zero(self):
+        self.assertIsNone(qw.usage({"id": "p1"}))
+        self.assertIsNone(qw.usage({"id": "p1", "compute_time_seconds": 5}))
+        self.assertIsNone(qw.usage({"id": "p1", "compute_time_seconds": None, "data_transfer_bytes": None}))
+        self.assertIsNone(qw.usage({"id": "p1", "compute_time_seconds": "5", "data_transfer_bytes": "6"}))
+        self.assertIsNone(qw.usage(None))
 
 
 class Warnings(unittest.TestCase):
@@ -76,20 +62,20 @@ class Warnings(unittest.TestCase):
 
 
 class Check(unittest.TestCase):
-    PROJECT = {"id": "p1", "org_id": "org-1"}
+    LISTED = {"id": "p1", "org_id": "org-1"}
 
-    def run_check(self, now, answer=None, env=None, project=None, status=200, raises=None):
+    def run_check(self, now, detail=None, env=None, status=200, raises=None, listed=None):
         env = {"NEON_API_KEY": "k"} if env is None else env
-        project = self.PROJECT if project is None else project
-        usage_resp = mock.Mock(ok=status == 200, status_code=status, text="denied")
-        usage_resp.json.return_value = answer if answer is not None else history([day(10)])
+        listed = [self.LISTED] if listed is None else listed
+        detail_resp = mock.Mock(ok=status == 200, status_code=status, text="denied")
+        detail_resp.json.return_value = {"project": detail if detail is not None else record(10, 1)}
         list_resp = mock.Mock()
-        list_resp.json.return_value = {"projects": [project], "project": project}
+        list_resp.json.return_value = {"projects": listed}
 
         def get(url, **kwargs):
             if raises:
                 raise raises
-            return usage_resp if "consumption_history" in url else list_resp
+            return list_resp if url.endswith("/projects") else detail_resp
         with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(qw.requests, "get", side_effect=get) as g:
             return qw.check(now), g
 
@@ -99,45 +85,28 @@ class Check(unittest.TestCase):
         get.assert_not_called()
 
     def test_warns_only_in_the_one_daily_run(self):
-        answer = history([day(220)])
-        self.assertEqual(len(self.run_check(SLOT, answer)[0]), 1)
-        self.assertEqual(self.run_check(LATER, answer)[0], [])
-        self.assertEqual(self.run_check(EVENING, answer)[0], [])
+        project = record(220)
+        self.assertEqual(len(self.run_check(SLOT, project)[0]), 1)
+        self.assertEqual(self.run_check(LATER, project)[0], [])
+        self.assertEqual(self.run_check(EVENING, project)[0], [])
 
     def test_all_well_in_the_daily_run_is_silent(self):
-        self.assertEqual(self.run_check(SLOT, history([day(10)]))[0], [])
+        self.assertEqual(self.run_check(SLOT, record(10, 1))[0], [])
 
-    def test_asks_for_this_project_and_org_with_the_key(self):
+    def test_reads_the_record_of_the_project_it_found_with_the_key(self):
         _, get = self.run_check(SLOT)
-        call = [c for c in get.call_args_list if "consumption_history/v2/projects" in c.args[0]][0]
-        self.assertEqual(call.kwargs["headers"]["Authorization"], "Bearer k")
-        self.assertEqual(call.kwargs["params"]["org_id"], "org-1")
-        self.assertEqual(call.kwargs["params"]["project_ids"], "p1")
-        self.assertEqual(call.kwargs["params"]["granularity"], "daily")
-        self.assertIn("compute_unit_seconds", call.kwargs["params"]["metrics"])
-        self.assertIn("public_network_transfer_bytes", call.kwargs["params"]["metrics"])
+        urls = [c.args[0] for c in get.call_args_list]
+        self.assertTrue(urls[-1].endswith("/projects/p1"))
+        self.assertTrue(all(c.kwargs["headers"]["Authorization"] == "Bearer k" for c in get.call_args_list))
         self.assertTrue(all(c.kwargs["timeout"] for c in get.call_args_list))
 
-    def test_the_window_covers_today(self):
-        _, get = self.run_check(SLOT)
-        params = [c for c in get.call_args_list if "consumption_history" in c.args[0]][0].kwargs["params"]
-        self.assertEqual(params["to"], "2026-10-31T00:00:00Z")
-        self.assertLess(params["from"], "2026-10-01T00:00:00Z")
-
     def test_names_the_project_when_told_to(self):
-        _, get = self.run_check(SLOT, env={"NEON_API_KEY": "k", "NEON_PROJECT_ID": "p1"})
-        self.assertTrue(get.call_args_list[0].args[0].endswith("/projects/p1"))
+        _, get = self.run_check(SLOT, env={"NEON_API_KEY": "k", "NEON_PROJECT_ID": "p9"})
+        self.assertTrue(get.call_args_list[0].args[0].endswith("/projects/p9"))
 
     def test_several_projects_without_a_name_is_blind_in_the_daily_run(self):
-        listing = mock.Mock()
-        listing.json.return_value = {"projects": [self.PROJECT, {"id": "p2", "org_id": "org-1"}]}
-        usage_resp = mock.Mock(ok=True)
-        usage_resp.json.return_value = history([day(10)])  # healthy, so a guess of "the first one" would look fine
-
-        def get(url, **kwargs):
-            return usage_resp if "consumption_history" in url else listing
-        with mock.patch.dict(os.environ, {"NEON_API_KEY": "k"}, clear=True), mock.patch.object(qw.requests, "get", side_effect=get):
-            self.assertIn("blind", qw.check(SLOT)[0])
+        lines, _ = self.run_check(SLOT, record(10), listed=[self.LISTED, {"id": "p2"}])
+        self.assertIn("blind", lines[0])
 
     def test_neon_refusing_is_said_in_the_daily_run_and_never_raises(self):
         lines, _ = self.run_check(SLOT, status=403)
@@ -149,13 +118,15 @@ class Check(unittest.TestCase):
         self.assertIn("blind", self.run_check(SLOT, raises=RuntimeError("503"))[0][0])
         self.assertEqual(self.run_check(EVENING, raises=RuntimeError("503"))[0], [])
 
-    def test_an_answer_without_our_project_is_blind(self):
-        self.assertIn("blind", self.run_check(SLOT, {"projects": []})[0][0])
+    def test_a_record_without_the_figures_is_blind(self):
+        self.assertIn("blind", self.run_check(SLOT, {"id": "p1"})[0][0])
 
     def test_the_numbers_are_logged_every_run(self):
         with mock.patch("builtins.print") as out:
-            self.run_check(EVENING, history([day(12.5)]))
-        self.assertIn("compute 12.50 hours", " ".join(str(c.args[0]) for c in out.call_args_list))
+            self.run_check(EVENING, record(12.5, 2))
+        text = " ".join(str(c.args[0]) for c in out.call_args_list)
+        self.assertIn("compute 12.50 hours", text)
+        self.assertIn("network transfer 2.00 GB", text)
 
     def test_the_failure_is_logged_with_its_reason(self):
         with mock.patch("builtins.print") as out:

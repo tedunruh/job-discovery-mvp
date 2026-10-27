@@ -1,17 +1,18 @@
 """A warning before the database plan runs out (SC-65).
 
 The Neon plan includes a fixed amount of compute and network transfer a month. Going over it made every run crash,
-and nothing warned first. Each run asks Neon's usage-history API how much of the month's allowance is used (one
-small request, logged so the numbers can be checked), and once a day, if either is at WARN_AT or more, says so on the
-health channel. If the figures cannot be read, the same daily message says that instead of staying quiet, so a
-changed API cannot switch the warning off unnoticed. It needs NEON_API_KEY (a GitHub secret); without it nothing
-happens. Nothing here may stop a run.
+and nothing warned first. Each run reads the project's usage so far this billing period from Neon (one small request,
+logged so the numbers can be checked), and once a day, if either is at WARN_AT or more, says so on the health channel.
+The project record is used because Neon's usage-history API is not offered on this plan (it answers 403). Neon says
+these figures are approximate and can lag by hours, which is fine for a warning at 80%. If they cannot be read, the
+same daily message says that instead of staying quiet, so a changed API cannot switch the warning off unnoticed. It
+needs NEON_API_KEY (a GitHub secret); without it nothing happens. Nothing here may stop a run.
 
-Storage is not watched: it is far from its limit (0.28 of 5 GB when this was written) and Neon's usage history
-reports it in byte-hours, not a size.
+Storage is not watched: it is far from its limit (0.28 of 5 GB when this was written) and the record reports it in
+byte-hours, not a size.
 """
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import requests
 
@@ -23,27 +24,16 @@ ALLOWANCE = {
     "compute": ("compute", 250.0, "hours"),
     "transfer": ("network transfer", 25.0, "GB"),
 }
-METRICS = {"compute_unit_seconds": "compute", "public_network_transfer_bytes": "transfer"}
-GB = 1024 ** 3
+GB = 10 ** 9  # Neon counts decimal gigabytes
 
 
-def usage(response, project_id):
-    """{'compute': CU-hours, 'transfer': GB} for the current billing period from a usage-history answer, or None
-    when the answer has no entry for the project (so we never claim 0% when we simply cannot see)."""
-    for entry in (response or {}).get("projects", []):
-        if entry.get("project_id") != project_id:
-            continue
-        periods = entry.get("periods") or []
-        if not periods:
-            return None
-        totals = {"compute": 0.0, "transfer": 0.0}  # the last period is the current one (oldest first)
-        for day in periods[-1].get("consumption", []):
-            for metric in day.get("metrics", []):
-                key = METRICS.get(metric.get("metric_name"))
-                if key:
-                    totals[key] += metric.get("value") or 0
-        return {"compute": totals["compute"] / 3600, "transfer": totals["transfer"] / GB}
-    return None
+def usage(project):
+    """{'compute': CU-hours, 'transfer': GB} so far this billing period from a project record, or None when the
+    record does not carry the figures (so we never claim 0% when we simply cannot see)."""
+    seconds, sent = (project or {}).get("compute_time_seconds"), (project or {}).get("data_transfer_bytes")
+    if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (seconds, sent)):
+        return None
+    return {"compute": seconds / 3600, "transfer": sent / GB}
 
 
 def warnings(used):
@@ -78,23 +68,13 @@ def _project():
     return projects[0]
 
 
-def fetch_usage(now):
-    """Ask Neon for this month's usage. Raises on any problem; check() decides what that means."""
+def fetch_usage():
+    """Ask Neon for this billing period's usage. Raises on any problem; check() decides what that means."""
     project = _project()
-    org = project.get("org_id") or os.environ.get("NEON_ORG_ID")
-    if not org:
-        raise RuntimeError("the project record names no organization; set NEON_ORG_ID")
-    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    params = {
-        "org_id": org, "project_ids": project["id"], "granularity": "daily",
-        "from": (midnight - timedelta(days=45)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "to": (midnight + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "metrics": ",".join(METRICS),
-    }
-    response = requests.get(f"{API}/consumption_history/v2/projects", headers=_headers(), params=params, timeout=15)
+    response = requests.get(f"{API}/projects/{project['id']}", headers=_headers(), timeout=10)
     if not response.ok:
         raise RuntimeError(f"HTTP {response.status_code} {response.text[:200]}")
-    return usage(response.json(), project["id"])
+    return usage(response.json().get("project"))
 
 
 def check(now=None):
@@ -103,7 +83,7 @@ def check(now=None):
     if not os.environ.get("NEON_API_KEY"):
         return []
     try:
-        used = fetch_usage(now)
+        used = fetch_usage()
     except Exception as e:  # noqa: BLE001 - a courtesy check: nothing here may stop a run
         print(f"Neon usage check failed (non-fatal): {e}")
         used = None
