@@ -237,6 +237,27 @@
 </div>
 {%- endmacro %}
 
+{#- Tabs: switch between two views of the same things. Each tab is a link to its own page, so the selected one is
+    always what the server says. tabs = [(label, count, href, selected)]; count may be None.
+        {{ fg.tabs("Your jobs", [("Open roles", 12, "/", True), ("Applications", 3, "/?tab=applications", False)]) }}
+    Constraint: two to four short labels; the count says how many are in that view. -#}
+{% macro tabs(label, items) -%}
+<div class="fg-tabs" role="tablist" aria-label="{{ label }}">
+  {%- for text, count, href, selected in items %}
+  <a class="fg-tab" role="tab" href="{{ href }}" aria-selected="{{ 'true' if selected else 'false' }}"{% if selected %} aria-current="page"{% endif %}>{{ text }}{% if count is not none %} <span class="fg-tab-count" data-tab-count>{{ count }}</span>{% endif %}</a>
+  {%- endfor %}
+</div>
+{%- endmacro %}
+
+{#- Toast: a short confirmation with one or two actions (call block, .fg-toast-action). The page needs the live
+    region .fg-toast-region in place before any toast is added to it; field-guide/js/toast.js shows and hides it. -#}
+{% macro toast(text) -%}
+<div class="fg-toast">
+  <p class="fg-toast-text">{{ text }}</p>
+  <div class="fg-toast-actions">{{ caller() }}</div>
+</div>
+{%- endmacro %}
+
 {#- File row: icon, name, meta; call block = actions (View, Replace). -#}
 {% macro file_row(name, meta="") -%}
 <div class="fg-file-row">

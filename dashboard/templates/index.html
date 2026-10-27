@@ -1,19 +1,14 @@
 {% import "_fg.html" as fg %}
-{#- SC-63. These two are drawn on the server for the rows that need them and also sit in <template>s, which
-    field-guide/js/return.js copies when a tab regains focus, so the page and the script never disagree on markup. -#}
-{% macro viewed_line(when) -%}
-<p class="posting-viewed" data-viewed><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M9.5 2.5H13.5V6.5M13.5 2.5L7.5 8.5M11.5 9.5V12.5C11.5 13.05 11.05 13.5 10.5 13.5H3.5C2.95 13.5 2.5 13.05 2.5 12.5V5.5C2.5 4.95 2.95 4.5 3.5 4.5H6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Viewed <span data-viewed-when>{{ when }}</span></p>
+{#- SC-63. The two things a row's action spot can say. They are drawn on the server for the rows that need them and also sit
+    in <template>s, which field-guide/js/return.js copies when a tab regains focus, so the page and the script never
+    disagree on markup. -#}
+{% macro apply_button(id) -%}
+<a class="fg-button fg-button--secondary" href="/open/{{ id }}" target="_blank" rel="noopener" data-apply>Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a>
 {%- endmacro %}
-{% macro ask_block(id, help) -%}
-<div class="row-ask" data-ask>
-  <div class="row-ask-text">
-    <p class="fg-voice">Welcome back. Did you apply for this one?</p>
-    <p class="fg-card-help" data-ask-help>{{ help }}</p>
-  </div>
-  <form class="fg-row" method="post" action="/ask/dismiss/{{ id }}">
-    <button class="fg-button fg-button--secondary" type="submit" data-ask-dismiss>Not yet</button>
-  </form>
-</div>
+{% macro ask_actions(id) -%}
+<p class="fg-voice row-q">Did you apply?</p>
+<form method="post" action="/set_applied/{{ id }}" data-ask-yes><input type="hidden" name="applied" value="true"><button class="fg-button fg-button--secondary" type="submit">Yes</button></form>
+<form method="post" action="/ask/dismiss/{{ id }}" data-ask-dismiss><button class="fg-button fg-button--secondary" type="submit">Not yet</button></form>
 {%- endmacro %}
 <!DOCTYPE html>
 <html>
@@ -22,16 +17,18 @@
   <title>Scout</title>
   {% include "_field_guide_head.html" %}
   <script src="/field-guide/js/filter.js" defer></script>
+  <script src="/field-guide/js/toast.js" defer></script>
   <script src="/field-guide/js/return.js" defer></script>
   <style>
     /* Layout follows Figma "Scout Job Discovery Dashboard" (226:849): a Sage band
-       with topographic contours behind the header, then the list in a
-       Parchment-light card (surface.card). Page inset is 16px at the sides and 24px at the bottom; the page header sets the top. */
+       with topographic contours behind the header, then the list on the page surface inside a raised board. Each
+       job is its own bordered card (Figma 355:1272). Page inset is 16px at the sides and 24px at the bottom; the page
+       header sets the top. */
     body {
       position: relative;
       padding: 0 var(--fg-space-4) var(--fg-space-6); /* the page header sets the top space, as on every page */
     }
-    body > :not(.band) { position: relative; z-index: 1; }
+    body > :not(.band):not(.fg-toast-region) { position: relative; z-index: 1; }
 
     /* Decorative band: full width, 277px tall (Figma frame 226:850), clips the
        contours. The contour artwork keeps its Figma offset from the right edge. */
@@ -57,8 +54,8 @@
 
     .board {
       margin-top: calc(var(--fg-space-8) + var(--fg-space-1));
-      padding: var(--fg-space-6);
-      background: var(--fg-color-surface-card);
+      padding: var(--fg-space-2) var(--fg-space-6) var(--fg-space-6);
+      background: var(--fg-color-surface-page);
       border-radius: var(--fg-radius-xl);
       box-shadow: var(--fg-shadow-raised);
     }
@@ -94,12 +91,15 @@
       font-size: var(--fg-font-size-sm);
     }
     .empty {
-      margin: var(--fg-space-6) var(--fg-space-4) var(--fg-space-2);
-      color: var(--fg-color-text-secondary);
+      display: flex;
+      flex-direction: column;
+      gap: var(--fg-space-1);
+      margin: 0;
+      padding: var(--fg-space-8) var(--fg-space-4);
     }
+    .empty-title { font-size: var(--fg-font-size-xl); }
+    .empty .fg-card-help { margin: 0; }
 
-    /* Rows are separated by space, not rules (Figma 226:894: 8px gap, 16px row
-       padding, 4px radius so the hover fill reads as a soft tile). */
     ul.postings {
       list-style: none;
       margin: var(--fg-space-2) 0 0;
@@ -109,20 +109,22 @@
       gap: var(--fg-space-2);
     }
 
-    /* Two equal columns (Figma: "Lead" and "Second", each flex 1). Equal 1fr
-       tracks keep "Discovered" aligned across rows even though each <li> is its
-       own grid. The whole row opens the posting: the title link's ::after covers
-       the row, and the Applied toggle sits above it. */
+    /* The job on the left (42%), its state and one action spot on the right (58%). Fractions keep the state line
+       aligned across rows even though each <li> is its own grid. The whole row opens the posting: the title link's
+       ::after covers the row, and the action spot sits above it. */
     .posting {
       position: relative;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
       align-items: center;
-      column-gap: var(--fg-space-2);
-      row-gap: var(--fg-space-2);
+      column-gap: var(--fg-space-6);
+      row-gap: var(--fg-space-3);
       padding: var(--fg-space-4);
+      background: var(--fg-color-surface-card);
+      border: 1px solid var(--fg-color-border-subtle);
       border-radius: var(--fg-radius-sm);
     }
+    .posting[hidden] { display: none; }
     .posting:hover { background: var(--fg-color-surface-hover); }
     .posting:has(.posting-link:focus-visible) {
       outline: 3px solid var(--fg-color-action-focus-ring);
@@ -148,61 +150,33 @@
       gap: var(--fg-space-4);
       min-width: 0;
     }
-    .posting-meta { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
-
-    .applied-form { position: relative; z-index: 1; }
-
-    /* SC-58: the job just marked applied stays where it is for one more page load, checked, saying so; unchecking
-       it is the undo. It leaves the list on the next refresh or filter change. */
-    .posting--done:hover { background: transparent; }
-    .posting--done .posting-title { color: var(--fg-color-text-secondary); }
-    .posting-done-text { color: var(--fg-color-text-primary); }
-
-    /* SC-63: coming back from a job. Everything happens on the job's own row, not in a banner. A Viewed line in the
-       meta column (icon plus words, never colour alone); the row you came back from gets a Discovery outline and
-       opens a question under its details. */
-    .posting-meta { display: flex; flex-direction: column; gap: var(--fg-space-1); }
-    .posting-viewed { display: inline-flex; align-items: center; gap: var(--fg-space-1); color: var(--fg-color-text-primary); }
-    .posting-viewed svg { flex: none; }
-    .posting--asking { box-shadow: inset 0 0 0 2px var(--fg-color-signal-discovery); }
-    .row-ask {
-      grid-column: 1 / -1; position: relative; z-index: 1;
-      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-      gap: var(--fg-space-3) var(--fg-space-4); padding-top: var(--fg-space-3);
-      border-top: 1px solid var(--fg-color-border-subtle);
+    .posting-state { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
+    /* Apply, or the question that replaces it when you come back from the job. */
+    .row-action {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--fg-space-2);
     }
-    .row-ask-text { display: flex; flex-direction: column; gap: var(--fg-space-1); min-width: 0; flex: 1 1 320px; }
-    .row-ask .fg-voice { font-size: var(--fg-font-size-lg); }
-    .row-ask .fg-card-help { margin: 0; }
+    .row-action form { display: contents; }
+    .row-q { font-size: var(--fg-font-size-lg); margin-right: var(--fg-space-1); }
 
     @media (max-width: 680px) {
       body > .fg-header { padding-inline: 0; }
-      .board { margin-top: var(--fg-space-4); padding: var(--fg-space-3); }
-      .posting { padding: var(--fg-space-3); }
-      .more { margin-left: var(--fg-space-3); }
-      .empty { margin-left: var(--fg-space-3); margin-right: var(--fg-space-3); }
-      /* Applied moves up beside the title; Discovered drops under the lead.
-         .posting-second dissolves so its two children become grid items. The
-         toggle (44px tall) is pulled up so its center sits on the title's first
-         line rather than on the 44px box's top edge. */
+      .board { margin-top: var(--fg-space-4); padding: var(--fg-space-1) var(--fg-space-3) var(--fg-space-3); }
       .posting {
-        grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-areas:
-          "lead applied"
-          "meta meta"
-          "ask ask";
+        padding: var(--fg-space-3);
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "lead" "state" "action";
       }
-      .row-ask { grid-area: ask; }
-      .row-ask .fg-row { width: 100%; }
-      .row-ask .fg-row .fg-button { width: 100%; }
       .posting-lead { grid-area: lead; }
       .posting-second { display: contents; }
-      .posting-meta { grid-area: meta; }
-      .applied-form {
-        grid-area: applied;
-        align-self: start;
-        margin-top: calc((var(--fg-font-size-lg) * var(--fg-font-line-height-snug) - var(--fg-size-touch-target)) / 2);
-      }
+      .posting-state { grid-area: state; }
+      .row-action { grid-area: action; justify-content: flex-start; }
+      .more { margin-left: var(--fg-space-3); }
     }
   </style>
 </head>
@@ -212,13 +186,18 @@
     <a class="fg-button fg-button--ghost" href="/profile">Role preferences</a>
     <form method="post" action="/logout"><button class="fg-button fg-button--secondary" type="submit">Sign out</button></form>
   {% endcall %}
-  <h1 class="fg-visually-hidden">Open roles</h1>
+  <h1 class="fg-visually-hidden">Your jobs</h1>
 
-  <section class="board" aria-label="Open roles" data-return-url="/return.json">
+  <section class="board" aria-label="Your jobs"{% if tab == "open" %} data-return-url="/return.json"{% endif %}>
+    {{ fg.tabs("Your jobs", [("Open roles", total, "/", tab == "open"), ("Applications", applications|length, "/?tab=applications", tab == "applications")]) }}
     {#- A live region that is always in the page, so a screen reader hears the question when it appears. -#}
     <p class="fg-visually-hidden" role="status" aria-live="polite" id="return-live"></p>
-    <template id="return-viewed-template">{{ viewed_line("__when__") }}</template>
-    <template id="return-ask-template">{{ ask_block("__id__", "__help__") }}</template>
+    <template id="return-apply-template">{{ apply_button("__id__") }}</template>
+    <template id="return-ask-template">{{ ask_actions("__id__") }}</template>
+    <template id="toast-template">{% call fg.toast("You've applied to this role. You can find it in Applications.") %}<a class="fg-toast-action" href="/?tab=applications">View</a><button class="fg-toast-action" type="button" data-toast-undo>Undo</button>{% endcall %}</template>
+
+    <div role="tabpanel">
+    {% if tab == "open" %}
     <div class="toolbar">
       <div class="filters">
         {% call fg.filter("filter-work", "Work type", work_label) %}
@@ -243,26 +222,14 @@
             {% endfor %}
           </form>
         {% endcall %}
-
-        {% call fg.filter("filter-status", "Status", statuses[status]) %}
-          <form class="fg-menu" method="get" action="/">
-            {% for key, label in statuses.items() %}
-            <label class="fg-menu-item">
-              <input class="fg-radio" type="radio" name="status" value="{{ key }}" onchange="this.form.submit()" {{ "checked" if key == status else "" }}>
-              {{ label }}
-            </label>
-            {% endfor %}
-          </form>
-        {% endcall %}
       </div>
-      <p class="role-count">{{ total }} open role{{ "" if total == 1 else "s" }}</p>
+      <p class="role-count" data-open-count>{{ total }} open role{{ "" if total == 1 else "s" }}</p>
     </div>
 
     {% if not total %}
     <p class="empty">
-      {% if status == "applied" %}You haven't marked any of these roles as applied yet. Mark one Applied and it will show here.
-      {% else %}{% if posted_range == "all" %}No roles found{% else %}No roles discovered {{ ranges[posted_range][1] }}{% endif %}{% if work_label != "Any" %} matching {{ work_label }}{% endif %}.
-      {% if posted_range != "all" %}Try a wider range.{% endif %}{% endif %}
+      {% if posted_range == "all" %}No roles found{% else %}No roles discovered {{ ranges[posted_range][1] }}{% endif %}{% if work_label != "Any" %} matching {{ work_label }}{% endif %}.
+      {% if posted_range != "all" %}Try a wider range.{% endif %}
     </p>
     {% endif %}
 
@@ -280,27 +247,7 @@
 
     <ul class="postings">
       {% for p in postings %}
-      {% if p.just_applied %}
-      <li class="posting posting--done" id="posting-{{ p.id }}">
-        <div class="posting-lead">
-          <p class="posting-title">{{ p.title }}</p>
-          <p class="posting-subline">{{ p.company_name }}{% if p.location %} • {{ p.location }}{% endif %}</p>
-        </div>
-        <div class="posting-second">
-          <div class="posting-meta" role="status" aria-live="polite">
-            <p>Discovered {{ p.first_seen_at|humanize }}</p>
-            <p class="posting-done-text">Applied just now</p>
-          </div>
-          <form class="applied-form" method="post" action="/set_applied/{{ p.id }}">
-            <input type="hidden" name="applied" value="false">
-            {%- if keep_n %}<input type="hidden" name="n" value="{{ keep_n }}">{% endif %}
-            {%- if skills_all %}<input type="hidden" name="skills" value="all">{% endif %}
-            {{ fg.toggle("Applied", pressed=True, title="Applied. Click to unmark", extra_class="applied-toggle") }}
-          </form>
-        </div>
-      </li>
-      {% else %}
-      <li class="{{ 'posting posting--asking' if p.ask_help else 'posting' }}" id="posting-{{ p.id }}">
+      <li class="posting" id="posting-{{ p.id }}">
         <div class="posting-lead">
           <p class="posting-title"><a class="posting-link" href="/open/{{ p.id }}" target="_blank" rel="noopener">{{ p.title }}</a></p>
           <p class="posting-subline">{{ p.company_name }}{% if p.location %} • {{ p.location }}{% endif %}</p>
@@ -310,25 +257,13 @@
           {%- endif %}
         </div>
         <div class="posting-second">
-          <div class="posting-meta">
-            <p>Discovered {{ p.first_seen_at|humanize }}</p>
-            {%- if p.viewed_ago %}
-            {{ viewed_line(p.viewed_ago) }}
-            {%- endif %}
-            {# LinkedIn line ("Not seen on LinkedIn" / "Seen on LinkedIn 3 hours ago") goes here once LinkedIn sightings are recorded. #}
+          {# LinkedIn line ("Not seen on LinkedIn" / "Seen on LinkedIn 3 hours ago") goes here once LinkedIn sightings are recorded. #}
+          <p class="posting-state" data-state>{% if p.viewed_ago %}Viewed {{ p.viewed_ago }}{% else %}Discovered {{ p.first_seen_at|humanize }}{% endif %}</p>
+          <div class="row-action" data-action>
+            {%- if p.asking %}{{ ask_actions(p.id) }}{% else %}{{ apply_button(p.id) }}{% endif %}
           </div>
-          <form class="applied-form" method="post" action="/set_applied/{{ p.id }}">
-            <input type="hidden" name="applied" value="{{ 'false' if p.applied else 'true' }}">
-            {%- if keep_n %}<input type="hidden" name="n" value="{{ keep_n }}">{% endif %}
-            {%- if skills_all %}<input type="hidden" name="skills" value="all">{% endif %}
-            {{ fg.toggle("Applied", pressed=p.applied, title="Applied — click to unmark" if p.applied else "Mark as applied", extra_class="applied-toggle") }}
-          </form>
         </div>
-        {%- if p.ask_help %}
-        {{ ask_block(p.id, p.ask_help) }}
-        {%- endif %}
       </li>
-      {% endif %}
       {% endfor %}
     </ul>
 
@@ -338,6 +273,35 @@
       <a class="fg-link" href="/?n={{ next_n }}{% if skills_all %}&amp;skills=all{% endif %}">Show {{ page_size }} more</a>
     </p>
     {% endif %}
+
+    {% else %}
+    <div class="toolbar">
+      <p class="role-count">Newest first</p>
+      <p class="role-count">{{ applications|length }} application{{ "" if applications|length == 1 else "s" }}</p>
+    </div>
+    {% if not applications %}
+    <div class="empty">
+      <p class="fg-voice empty-title">No applications yet.</p>
+      <p class="fg-card-help">When you apply to a role from Open roles, it moves here.</p>
+    </div>
+    {% endif %}
+    <ul class="postings">
+      {% for p in applications %}
+      <li class="posting" id="posting-{{ p.id }}">
+        <div class="posting-lead">
+          <p class="posting-title"><a class="posting-link" href="/open/{{ p.id }}" target="_blank" rel="noopener">{{ p.title }}</a></p>
+          <p class="posting-subline">{{ p.company_name }}{% if p.location %} • {{ p.location }}{% endif %}</p>
+          <p class="posting-source">Found on {{ p.ats_type|capitalize }}</p>
+        </div>
+        <div class="posting-second">
+          <p class="posting-state">Applied{% if p.applied_ago %} {{ p.applied_ago }}{% endif %}</p>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    </div>
   </section>
+  <div class="fg-toast-region" role="status" aria-live="polite" id="toast-region"></div>
 </body>
 </html>

@@ -885,6 +885,27 @@ def get_return_events(conn, user_id, days=90):
     return opens, dismissals
 
 
+def get_applications(conn, user_id):
+    """The roles this person has marked applied, newest first, open or closed (a role that has since closed is
+    still something they applied to). applied_at is the time of their latest "applied" event for it, or None for a
+    role marked applied before events were kept."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT p.id, c.name AS company_name, c.ats_type, p.title, p.location,
+                   (SELECT max(e.created_at) FROM user_events e
+                    WHERE e.user_id = up.user_id AND e.posting_id = p.id AND e.event_type = 'applied') AS applied_at
+            FROM user_postings up
+            JOIN postings p ON p.id = up.posting_id
+            JOIN companies c ON c.id = p.company_id
+            WHERE up.user_id = %s AND up.applied
+            ORDER BY applied_at DESC NULLS LAST, p.id DESC
+            """,
+            (user_id,),
+        )
+        return cur.fetchall()
+
+
 def get_applied_among(conn, user_id, posting_ids):
     """The ids among these that this person has marked applied."""
     if not posting_ids:

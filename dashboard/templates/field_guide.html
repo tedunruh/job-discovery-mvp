@@ -609,6 +609,32 @@
     </div>
   </section>
 
+  <section class="spec" data-component="tabs">
+    <div>
+      <h3>Tabs</h3>
+      <p class="spec-use">Use to switch between two views of the same things, such as the jobs open to you and the ones you've applied to. The count says how many are in each. Each tab is a link, so the selected one is always what the server says. Don't use for steps in a process.</p>
+      <code class="spec-code">{% raw %}{{ fg.tabs(label, [(text, count, href, selected)]) }}{% endraw %} · .fg-tabs .fg-tab .fg-tab-count</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide"><span class="state-label">First selected</span>{{ fg.tabs("Your jobs, first selected", [("Open roles", 256, "#layout", True), ("Applications", 3, "#layout", False)]) }}</div>
+      <div class="state state--wide"><span class="state-label">Second selected</span>{{ fg.tabs("Your jobs, second selected", [("Open roles", 256, "#layout", False), ("Applications", 3, "#layout", True)]) }}</div>
+      <div class="state state--wide"><span class="state-label">Without counts</span>{{ fg.tabs("Without counts", [("Open roles", None, "#layout", True), ("Applications", None, "#layout", False)]) }}</div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="toast">
+    <div>
+      <h3>Toast</h3>
+      <p class="spec-use">Use to confirm something that happened somewhere you can't see, and say where to find it. It sits at the bottom centre, never takes focus, and goes by itself after about eight seconds (longer while you point at it or tab into it). Keep the text to one sentence and the actions to one or two words.</p>
+      <code class="spec-code">{% raw %}{% call fg.toast(text) %}actions{% endcall %}{% endraw %} · .fg-toast .fg-toast-text .fg-toast-action · .fg-toast-region (the page's live region)</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide"><span class="state-label">With two actions</span>{% call fg.toast("You've applied to this role. You can find it in Applications.") %}<button class="fg-toast-action" type="button">View</button><button class="fg-toast-action" type="button">Undo</button>{% endcall %}</div>
+      <div class="state state--wide"><span class="state-label">In the page: the live region (fixed at the bottom; drawn in place here)</span><div class="fg-toast-region fg-toast-region--static">{% call fg.toast("The region holds the toast; it is in the page before any toast is.") %}<button class="fg-toast-action" type="button">Dismiss</button>{% endcall %}</div></div>
+      <div class="state state--wide"><span class="state-label">With one action</span>{% call fg.toast("Saved.") %}<button class="fg-toast-action" type="button">Undo</button>{% endcall %}</div>
+    </div>
+  </section>
+
   <section class="spec" data-component="action-bar">
     <div>
       <h3>Action bar</h3>
