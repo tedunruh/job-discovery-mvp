@@ -84,3 +84,28 @@ def work_type(location, remote_type):
     if location and _HYBRID_RE.search(location):
         return "hybrid"
     return "onsite"
+
+
+_WORK_LABELS = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "Onsite"}
+_WORK_WORD_RE = re.compile(r"\b(remote|hybrid)\b[\s,\-\u2013\u2014:()/]*", re.IGNORECASE)
+_US_NAME_RE = re.compile(r"\bUnited States(?: of America)?\b|\bU\.S\.?(?=\W|$)|\bUSA\b", re.IGNORECASE)
+
+
+def location_line(location, remote_type):
+    """The job row's work type and place in one short line: "Remote, US", "Hybrid, Denver, CO", "Onsite, Austin, TX".
+    The work type comes from work_type() (non-US remote is still "Remote"); the place is the location text with the
+    work-type words and "United States" tidied. Nothing is made up: no location and no remote or hybrid signal gives
+    an empty line."""
+    kind = work_type(location, remote_type)
+    if kind is None and is_remote(location, remote_type):
+        kind = "remote"
+    place = _WORK_WORD_RE.sub("", location or "")
+    place = _US_NAME_RE.sub("US", place)
+    place = re.sub(r"\s+", " ", place).strip(" ,-\u2013\u2014:()/")
+    if re.fullmatch(r"\d+ locations?", place, re.IGNORECASE):  # a company's own "2 Locations": say so, not a work type
+        place = place.lower()
+        return ", ".join(p for p in (_WORK_LABELS.get(kind) if kind in ("remote", "hybrid") else "", place) if p)
+    if kind == "onsite" and not place:
+        return ""
+    label = _WORK_LABELS.get(kind, "")
+    return ", ".join(part for part in (label, place) if part)

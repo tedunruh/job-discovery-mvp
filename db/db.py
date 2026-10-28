@@ -163,7 +163,7 @@ def get_open_postings(conn, user_id, since=None, keywords=()):
             """
             SELECT p.id, c.name AS company_name, c.ats_type, p.title, p.location, p.remote_type,
                    p.url, p.first_seen_at, p.is_design,
-                   COALESCE(up.applied, false) AS applied
+                   COALESCE(up.applied, false) AS applied, up.hidden_at
             FROM postings p
             JOIN companies c ON c.id = p.company_id
             LEFT JOIN user_postings up ON up.posting_id = p.id AND up.user_id = %s
@@ -885,6 +885,57 @@ def get_return_events(conn, user_id, days=90):
     return opens, dismissals
 
 
+HIDE_REASONS = ("role", "junior", "senior", "location", "pay", "company", "other")
+
+
+def set_hidden(conn, posting_id, user_id, hidden, reason=None):
+    """Hide (or unhide) a job for one person (SC-59). The reason is one of HIDE_REASONS or None; anything else is
+    stored as None. Unhiding clears both columns. Caller commits."""
+    reason = reason if reason in HIDE_REASONS else None
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO user_postings (user_id, posting_id, hidden_at, hidden_reason)
+            VALUES (%s, %s, CASE WHEN %s THEN now() END, CASE WHEN %s THEN %s END)
+            ON CONFLICT (user_id, posting_id) DO UPDATE SET
+                hidden_at = CASE WHEN %s THEN COALESCE(user_postings.hidden_at, now()) END,
+                hidden_reason = CASE WHEN %s THEN EXCLUDED.hidden_reason END
+            """,
+            (user_id, posting_id, hidden, hidden, reason, hidden, hidden),
+        )
+
+
+def get_hidden(conn, user_id):
+    """The jobs this person has hidden, newest first, that are still open (a hidden job drops off once its posting
+    closes)."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT p.id, c.name AS company_name, c.ats_type, p.title, p.location, p.remote_type,
+                   up.hidden_at, up.hidden_reason
+            FROM user_postings up
+            JOIN postings p ON p.id = up.posting_id AND p.status = 'open'
+            JOIN companies c ON c.id = p.company_id
+            WHERE up.user_id = %s AND up.hidden_at IS NOT NULL
+            ORDER BY up.hidden_at DESC, p.id DESC
+            """,
+            (user_id,),
+        )
+        return cur.fetchall()
+
+
+def get_hidden_among(conn, user_id, posting_ids):
+    """The ids among these that this person has hidden."""
+    if not posting_ids:
+        return set()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT posting_id FROM user_postings WHERE user_id = %s AND hidden_at IS NOT NULL AND posting_id = ANY(%s)",
+            (user_id, list(posting_ids)),
+        )
+        return {r[0] for r in cur.fetchall()}
+
+
 def get_applications(conn, user_id):
     """The roles this person has marked applied, newest first, open or closed (a role that has since closed is
     still something they applied to). applied_at is the time of their latest "applied" event for it, or None for a
@@ -892,7 +943,7 @@ def get_applications(conn, user_id):
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
-            SELECT p.id, c.name AS company_name, c.ats_type, p.title, p.location,
+            SELECT p.id, c.name AS company_name, c.ats_type, p.title, p.location, p.remote_type,
                    (SELECT max(e.created_at) FROM user_events e
                     WHERE e.user_id = up.user_id AND e.posting_id = p.id AND e.event_type = 'applied') AS applied_at
             FROM user_postings up

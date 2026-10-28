@@ -17,7 +17,7 @@ def row(pid, title, hours_ago, applied=False):
 
 def application(pid, title, days_ago=None):
     when = datetime.now(timezone.utc) - timedelta(days=days_ago) if days_ago is not None else None
-    return {"id": pid, "title": title, "company_name": "Co", "ats_type": "lever", "location": "Remote", "applied_at": when}
+    return {"id": pid, "title": title, "company_name": "Co", "ats_type": "lever", "location": "Remote", "remote_type": "remote", "applied_at": when}
 
 
 class Base(unittest.TestCase):
@@ -25,7 +25,7 @@ class Base(unittest.TestCase):
         self.client = dapp.app.test_client()
         self.client.set_cookie(dapp.SESSION_COOKIE, "tok")
         self.rows = [row(1, "Senior Product Designer", 1), row(2, "Product Designer", 2), row(3, "UX Designer", 3)]
-        self.applications = []
+        self.applications, self.hidden = [], []
         self.events, self.applied = [], {}
         profile = {"titles": ["designer"], "level": None, "one_level_up": False, "city": None, "skills": []}
         patches = [
@@ -39,6 +39,7 @@ class Base(unittest.TestCase):
             mock.patch.object(dapp, "get_user_work_types", lambda c, u: []),
             mock.patch.object(dapp, "get_open_postings", lambda c, u, since=None, keywords=(): [dict(r) for r in self.rows]),
             mock.patch.object(dapp, "get_applications", lambda c, u: [dict(a) for a in self.applications]),
+            mock.patch.object(dapp, "get_hidden", lambda c, u: [dict(h) for h in self.hidden]),
             mock.patch.object(dapp, "get_return_events", lambda c, u: ({}, {})),
             mock.patch.object(dapp, "set_applied", lambda c, pid, flag, uid: self.applied.__setitem__(pid, flag)),
             mock.patch.object(dapp, "log_event", lambda c, uid, kind, pid=None: self.events.append((kind, pid))),
@@ -102,8 +103,9 @@ class Applications(Base):
         self.applications = [application(9, "Design Lead", 1), application(8, "Staff Designer", 8), application(7, "Old role")]
         html = self.get("/?tab=applications")
         self.assertEqual(self.titles(html), ["Design Lead", "Staff Designer", "Old role"])
-        self.assertIn("Applied 1 day ago", html)
-        self.assertRegex(html, r'<p class="fg-job-state" data-state>Applied</p>')      # applied before the time was kept: no invented time
+        self.assertIn("<p data-state-top>Applied 1 day ago</p>", html)
+        self.assertIn("<p data-state-top>Applied</p>", html)      # applied before the time was kept: no invented time
+        self.assertNotIn("data-state-when", html)                  # one line only: Applied [when]
         self.assertIn("Newest first", html)
         self.assertIn("3 applications", html)
 

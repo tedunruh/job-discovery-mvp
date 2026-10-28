@@ -14,7 +14,7 @@ from dashboard.auth import (
     too_many_recent_links,
     verify_magic_link,
 )
-from dashboard.filters import WORK_TYPES, work_type
+from dashboard.filters import WORK_TYPES, location_line, work_type
 from db.db import (
     SESSION_TTL_DAYS,
     create_session,
@@ -22,6 +22,8 @@ from db.db import (
     get_conn,
     get_applications,
     get_applied_among,
+    get_hidden,
+    get_hidden_among,
     get_open_postings,
     get_posting_url,
     get_return_events,
@@ -36,6 +38,7 @@ from db.db import (
     log_event,
     log_visit,
     set_applied,
+    set_hidden,
     set_user_work_types,
 )
 from dashboard.profile import ask_for_catch_up
@@ -90,6 +93,12 @@ DEFAULT_ONBOARDING_CATEGORIES = {"product_design"}
 # every role at every tracked company, so an unbounded list is thousands of rows.
 PAGE_SIZE = 50
 MAX_SHOWN = 1000
+
+# SC-59: why someone hid a job, in the words the Hidden list shows (the reason itself is saved, never acted on silently).
+HIDE_REASON_LABELS = {
+    "role": "Not my kind of role", "junior": "Too junior", "senior": "Too senior", "location": "Location or remote setup",
+    "pay": "Pay", "company": "Not interested in this company", "other": "Other",
+}
 
 FIELD_GUIDE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "field-guide")
 
@@ -317,6 +326,7 @@ def index():
         postings = get_open_postings(conn, user_id, since=cutoff, keywords=keywords)
         opens, dismissals = get_return_events(conn, user_id)  # SC-63: what they opened, and what they said "Not yet" to
         applications = get_applications(conn, user_id)
+        hidden = get_hidden(conn, user_id)  # SC-59: the jobs they hid (still open), newest first
     finally:
         conn.close()
 
@@ -349,26 +359,35 @@ def index():
 
     # SC-63: roles they marked applied are not "open" to them any more; they live in the Applications tab.
     applied_ids = {p["id"] for p in postings if p["applied"]}
-    postings = [p for p in postings if not p["applied"]]
+    hidden_ids = {h["id"] for h in hidden}
+    postings = [p for p in postings if not p["applied"] and p["id"] not in hidden_ids]
 
     total = len(postings)
     limit = min(max(request.args.get("n", PAGE_SIZE, type=int), PAGE_SIZE), MAX_SHOWN)
     shown = postings[:limit]
 
     # SC-63: jobs they opened say Viewed, and the job they opened last asks whether they applied (if it is on this page).
-    ask_id = choose_ask(opens, dismissals, applied_ids, datetime.now(timezone.utc))
+    ask_id = choose_ask(opens, dismissals, applied_ids | hidden_ids, datetime.now(timezone.utc))
     for p in shown:
-        if p["id"] in opens:
-            p["viewed_ago"] = humanize_posted_at(opens[p["id"]])
+        p["viewed"] = p["id"] in opens           # SC-59: a quiet "Viewed" marker, no date of its own
         p["asking"] = p["id"] == ask_id
+        p["place"] = location_line(p["location"], p["remote_type"])
+        p["discovered_ago"] = humanize_posted_at(p["first_seen_at"])
     for a in applications:
         a["applied_ago"] = humanize_posted_at(a["applied_at"])
+        a["place"] = location_line(a["location"], a["remote_type"])
+    for h in hidden:
+        h["hidden_ago"] = humanize_posted_at(h["hidden_at"])
+        h["place"] = location_line(h["location"], h["remote_type"])
+        h["reason_label"] = HIDE_REASON_LABELS.get(h["hidden_reason"], "")
 
     return render_template(
         "index.html",
         tab="applications" if request.args.get("tab") == "applications" else "open",
         postings=shown,
         applications=applications,
+        hidden=hidden,
+        view="hidden" if request.args.get("view") == "hidden" and request.args.get("tab") != "applications" else "open",
         total=total,
         next_n=limit + PAGE_SIZE if total > limit and limit < MAX_SHOWN else None,
         page_size=PAGE_SIZE,
@@ -444,7 +463,7 @@ def return_state():
     conn = get_conn()
     try:
         opens, dismissals = get_return_events(conn, g.user_id)
-        applied = get_applied_among(conn, g.user_id, list(opens))
+        applied = get_applied_among(conn, g.user_id, list(opens)) | get_hidden_among(conn, g.user_id, list(opens))
     finally:
         conn.close()
     ask_id = choose_ask(opens, dismissals, applied, datetime.now(timezone.utc))
@@ -488,6 +507,40 @@ def set_applied_route(posting_id):
     if request.headers.get("X-Requested-With") == "fetch":
         return "", 204
     return redirect(url_for("index", tab="applications") if applied else url_for("index"))
+
+
+@app.route("/hide/<int:posting_id>", methods=["POST"])
+@require_login
+def hide_route(posting_id):
+    """Hide a job from Open roles (SC-59). The reason is optional: one of the known reasons, or nothing (Skip)."""
+    reason = request.form.get("reason") or None
+    conn = get_conn()
+    try:
+        if get_posting_url(conn, posting_id):
+            set_hidden(conn, posting_id, g.user_id, True, reason)
+            if request.form.get("again") != "1":  # putting it back after an Undo is not a new hide
+                log_event(conn, g.user_id, "hidden", posting_id)
+            conn.commit()
+    finally:
+        conn.close()
+    if request.headers.get("X-Requested-With") == "fetch":
+        return "", 204
+    return redirect(url_for("index"))
+
+
+@app.route("/unhide/<int:posting_id>", methods=["POST"])
+@require_login
+def unhide_route(posting_id):
+    """Put a hidden job back in Open roles."""
+    conn = get_conn()
+    try:
+        set_hidden(conn, posting_id, g.user_id, False)
+        conn.commit()
+    finally:
+        conn.close()
+    if request.headers.get("X-Requested-With") == "fetch":
+        return "", 204
+    return redirect(url_for("index", view="hidden"))
 
 
 @app.route("/open/<int:posting_id>")

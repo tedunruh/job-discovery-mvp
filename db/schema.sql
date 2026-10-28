@@ -326,3 +326,10 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS skill_cutoff INTEGER;
 -- get_alert_target, which tolerate the column being absent, so the collector never depends on it.
 ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS alert_token TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS user_postings_alert_token_idx ON user_postings (alert_token) WHERE alert_token IS NOT NULL;
+
+-- SC-59: a person can hide a job from Open roles, optionally saying why. hidden_at set = hidden; hidden_reason is one of
+-- role, junior, senior, location, pay, company, other, or NULL when they skipped the question. Read and written only
+-- through db.set_hidden / get_hidden / get_hidden_among and the hidden_at column of get_open_postings; the reason is
+-- kept per person and job for later profile suggestions (never applied silently).
+ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMPTZ;
+ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS hidden_reason TEXT;

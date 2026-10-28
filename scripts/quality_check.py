@@ -590,7 +590,7 @@ def check_return_ask(browser, base, token):
     page.locator(f"#posting-{ids[0]} [data-ask-yes] button").click()
     page.wait_for_selector(".fg-toast", timeout=8000)
     page.locator(".fg-toast button", has_text="Undo").click()
-    page.wait_for_function("document.querySelectorAll('.fg-toast').length === 0", timeout=8000)
+    page.wait_for_function("(id) => { const r = document.getElementById('posting-' + id); return r && !r.hidden }", arg=ids[0], timeout=8000)
     check(page.locator(f"#posting-{ids[0]}").is_visible() and page.locator(f"#posting-{ids[0]} [data-apply]").count() == 1
           and counts() == before and page.locator(".fg-toast").count() == 0,
           "Undo puts the row back with Apply, restores the counts and clears the toast", f"{counts()} vs {before}")
@@ -639,6 +639,169 @@ def check_return_ask(browser, base, token):
         return {left: r.left, right: r.right, top: r.top, bottom: r.bottom, vw: window.innerWidth, vh: window.innerHeight, sw: document.documentElement.scrollWidth} }""")
     check(geo["left"] >= 0 and geo["right"] <= geo["vw"] and geo["bottom"] <= geo["vh"] and geo["top"] >= 0 and geo["sw"] <= geo["vw"],
           "on a phone the toast fits the screen", str(geo))
+    mctx.close()
+
+
+def check_hide(browser, base, token):
+    """Hide a job (SC-59). Hide swaps Apply and Hide for "Why are you hiding?" with a reason menu and Skip; a reason or
+    Skip hides the job (it leaves Open roles at once, the counts move, a toast says "Job hidden." with Undo, never
+    View); Undo puts it back; the footer then offers "Show N hidden jobs", which opens "Jobs you hid" with when and
+    why and an Unhide button; Unhide sends it back with its own toast and Undo; "Already applied" is not hiding (it
+    goes to Applications); a failing server hides nothing; a phone fits it all."""
+    ctx = browser.new_context(viewport={"width": 1280, "height": 900})
+    ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+    page = ctx.new_page()
+    page.goto(base + "/?range=all", wait_until="load")
+    page.goto(base + "/", wait_until="load")
+    ids = page.evaluate("[...document.querySelectorAll('li.fg-job')].slice(0, 4).map(li => li.id.replace('posting-', ''))")
+    check(len(ids) == 4, "the dashboard has jobs to hide", f"{ids}")
+    if len(ids) < 4:
+        ctx.close()
+        return
+    a, b, c, d = ids
+
+    def counts():
+        return page.evaluate("[...document.querySelectorAll('[data-tab-count]')].map(e => e.textContent.trim())")
+
+    def link():
+        return page.evaluate("(() => { const l = document.querySelector('[data-hidden-link]'); return l && !l.hidden ? l.textContent.trim() : null })()")
+
+    def row(i):
+        return page.locator(f"#posting-{i}")
+
+    check(link() is None, "there is no hidden-jobs link while nothing is hidden")
+    check(row(a).locator("[data-apply]").count() == 1 and row(a).locator("[data-hide] button").count() == 1,
+          "each card has Apply and Hide (Hide is the quieter one)", row(a).inner_text()[:120])
+    hide_color = page.evaluate("(id) => getComputedStyle(document.querySelector('#posting-' + id + ' [data-hide] button')).color", a)
+    forest = page.evaluate("getComputedStyle(document.querySelector('.fg-header-actions .fg-button--ghost')).color")   # a ghost button outside a card is Forest
+    check(hide_color != forest, "Hide is in secondary text, not Forest (the colour of a plain ghost button)", f"{hide_color} vs {forest}")
+
+    # Hide asks why: the menu and Skip replace Apply and Hide, and the menu has the focus the person just asked for
+    start = counts()
+    row(a).locator("[data-hide] button").click()
+    page.wait_for_selector(f"#why-{a}")
+    check(row(a).locator("[data-apply]").count() == 0 and row(a).locator("[data-hide]").count() == 0
+          and "Why are you hiding?" in row(a).inner_text() and row(a).locator("button", has_text="Skip").is_visible(),
+          "Hide asks 'Why are you hiding?' with a menu and Skip in place of Apply and Hide", row(a).inner_text()[:120])
+    check(page.evaluate("document.activeElement.id") == f"why-{a}", "...and the menu has focus (they just asked for it)")
+    options = page.evaluate("(id) => [...document.querySelectorAll('#why-' + id + ' option')].map(o => o.textContent.trim())", a)
+    check(options == ["Select", "Not my kind of role", "Too junior", "Too senior", "Location or remote setup", "Pay",
+                      "Not interested in this company", "Already applied", "Other"], "...with the agreed reasons in order", f"{options}")
+    check(counts() == start and page.locator(".fg-toast").count() == 0, "...and nothing is hidden until they answer", f"{counts()}")
+
+    # a failing server hides nothing
+    page.route("**/hide/*", lambda route: route.fulfill(status=500, body="no"))
+    page.select_option(f"#why-{a}", "junior")
+    page.wait_for_timeout(1200)
+    check(row(a).is_visible() and counts() == start and page.locator(".fg-toast").count() == 0,
+          "if the server fails, a reason hides nothing: the card stays and there is no toast")
+    page.unroute("**/hide/*")
+
+    # a reason hides it; the toast has Undo and no View
+    page.select_option(f"#why-{a}", "senior")
+    page.wait_for_selector(".fg-toast", timeout=8000)
+    after = counts()
+    toast = page.locator(".fg-toast")
+    check(not row(a).is_visible() and int(after[0]) == int(start[0]) - 1 and int(after[1]) == int(start[1]),
+          "a reason hides the card at once and Open roles goes down by one", f"{start} -> {after}")
+    check(toast.inner_text().startswith("Job hidden.") and toast.locator("button", has_text="Undo").is_visible() and toast.locator("a").count() == 0,
+          "...the toast says 'Job hidden.' with Undo and no View", toast.inner_text()[:80])
+    check(link() == "Show 1 hidden job", "...and the footer now offers 'Show 1 hidden job'", f"{link()}")
+    check(page.evaluate("!document.querySelector('.fg-toast').contains(document.activeElement)"), "...and the toast does not take focus")
+
+    # Undo puts it back exactly where it was
+    toast.locator("button", has_text="Undo").click()
+    page.wait_for_function("(id) => { const r = document.getElementById('posting-' + id); return r && !r.hidden }", arg=a, timeout=8000)
+    position = page.evaluate("(id) => [...document.querySelectorAll('li.fg-job')].findIndex(li => li.id === 'posting-' + id)", a)
+    check(row(a).is_visible() and position == 0 and row(a).locator("[data-apply]").count() == 1 and row(a).locator("[data-hide]").count() == 1
+          and counts() == start and link() is None,
+          "Undo puts the card back where it was, with Apply and Hide, and the counts and link go back", f"{counts()} {link()} at {position}")
+    page.reload(wait_until="load")
+    check(row(a).count() == 1 and link() is None, "...and after a reload it is still in Open roles")
+
+    # Skip hides with no reason
+    row(b).locator("[data-hide] button").click()
+    page.wait_for_selector(f"#why-{b}")
+    row(b).locator("button", has_text="Skip").click()
+    page.wait_for_selector(".fg-toast", timeout=8000)
+    check(not row(b).is_visible() and link() == "Show 1 hidden job", "Skip hides it too", f"{link()}")
+    page.wait_for_function("document.querySelectorAll('.fg-toast').length === 0", timeout=12000)
+
+    # a reason too: Too junior on another job, then reload and open the hidden list
+    row(c).locator("[data-hide] button").click()
+    page.wait_for_selector(f"#why-{c}")
+    page.select_option(f"#why-{c}", "junior")
+    page.wait_for_selector(".fg-toast", timeout=8000)
+    page.reload(wait_until="load")
+    check(row(b).count() == 0 and row(c).count() == 0 and link() == "Show 2 hidden jobs", "hidden jobs stay hidden after a reload", f"{link()}")
+    page.locator("[data-hidden-link]").click()
+    page.wait_for_load_state("load")
+    check(page.locator("h2#hidden-title").inner_text() == "Jobs you hid" and page.evaluate("document.activeElement.id") == "hidden-title",
+          "the link opens 'Jobs you hid' and the heading has focus")
+    check(page.locator(".toolbar .fg-filter-pill").count() == 0 and "Back to open roles" in page.locator(".hidden-head").inner_text(),
+          "...with no filters and a way back")
+    first = page.locator("li.fg-job").first
+    check(f"posting-{c}" == first.get_attribute("id") and "Hidden" in first.locator("[data-state-top]").inner_text()
+          and "Too junior" in first.locator("[data-state-when]").inner_text() and first.locator("button", has_text="Unhide").is_visible(),
+          "newest first, with when and why and an Unhide button", first.inner_text()[:140])
+    second = page.locator(f"#posting-{b}")
+    check(second.locator("[data-state-when]").count() == 0, "...and nothing after the time when they skipped the question")
+    check(page.locator("li.fg-job [data-apply], li.fg-job [data-hide]").count() == 0, "...and no Apply or Hide in this list")
+
+    # Unhide: leaves the list, toast with Undo, and the job is in Open roles
+    before = counts()
+    page.locator(f"#posting-{c} button", has_text="Unhide").click()
+    page.wait_for_selector(".fg-toast", timeout=8000)
+    check(not page.locator(f"#posting-{c}").is_visible() and page.locator(".fg-toast").inner_text().startswith("Back in Open roles.")
+          and int(counts()[0]) == int(before[0]) + 1, "Unhide sends it out of the list, says 'Back in Open roles.' and moves the count", f"{before} -> {counts()}")
+    page.locator(".fg-toast button", has_text="Undo").click()
+    page.wait_for_function("(id) => { const r = document.getElementById('posting-' + id); return r && !r.hidden }", arg=c, timeout=8000)
+    check(page.locator(f"#posting-{c}").is_visible() and counts() == before, "...and Undo puts it back in the hidden list", f"{counts()}")
+    page.locator(f"#posting-{c} button", has_text="Unhide").click()
+    page.wait_for_selector(".fg-toast", timeout=8000)
+    page.goto(base + "/", wait_until="load")
+    check(row(c).count() == 1 and row(b).count() == 0 and link() == "Show 1 hidden job", "after Unhide the job is in Open roles and the link counts one fewer", f"{link()}")
+    page.locator("[data-hidden-link]").click()
+    page.wait_for_load_state("load")
+    page.locator(f"#posting-{b} button", has_text="Unhide").click()
+    page.wait_for_selector(".fg-toast", timeout=8000)
+    page.goto(base + "/", wait_until="load")
+    check(link() is None and row(b).count() == 1, "with nothing left hidden the link goes away")
+
+    # Already applied is not hiding
+    start = counts()
+    row(d).locator("[data-hide] button").click()
+    page.wait_for_selector(f"#why-{d}")
+    page.select_option(f"#why-{d}", "applied")
+    page.wait_for_selector(".fg-toast", timeout=8000)
+    after = counts()
+    check("applied" in page.locator(".fg-toast").inner_text() and page.locator(".fg-toast a", has_text="View").is_visible()
+          and int(after[1]) == int(start[1]) + 1 and link() is None,
+          "'Already applied' is not hiding: the job goes to Applications with the applied toast", f"{start} -> {after} {link()}")
+    ctx.close()
+
+    # a phone: the question on its own line, the group full width with equal buttons, the toast fits
+    mctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    mctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+    mp = mctx.new_page()
+    mp.goto(base + "/", wait_until="load")
+    pid = mp.evaluate("document.querySelector('li.fg-job').id.replace('posting-', '')")
+    mp.locator(f"#posting-{pid} [data-hide] button").click()
+    mp.wait_for_selector(f"#why-{pid}")
+    geo = mp.evaluate("""(id) => {
+        const li = document.querySelector('#posting-' + id), c = li.getBoundingClientRect();
+        const q = li.querySelector('.fg-job-question').getBoundingClientRect();
+        const g = li.querySelector('.fg-job-group').getBoundingClientRect();
+        const sel = li.querySelector('.fg-job-select').getBoundingClientRect(), skip = li.querySelector('[data-skip]').getBoundingClientRect();
+        return {q: q.bottom <= g.top + 1, fill: g.left >= c.left - 0.5 && g.right <= c.right + 0.5 && g.width > c.width * 0.8,
+                equal: Math.abs(sel.width - skip.width) <= 2, sw: document.documentElement.scrollWidth, vw: window.innerWidth} }""", pid)
+    check(geo["q"] and geo["fill"] and geo["equal"] and geo["sw"] <= geo["vw"],
+          "on a phone the question has its own line and the menu and Skip fill the width equally, with no sideways scroll", str(geo))
+    mp.select_option(f"#why-{pid}", "pay")
+    mp.wait_for_selector(".fg-toast", timeout=8000)
+    t = mp.evaluate("""() => { const r = document.querySelector('.fg-toast').getBoundingClientRect();
+        return {l: r.left, r: r.right, b: r.bottom, vw: window.innerWidth, vh: window.innerHeight} }""")
+    check(t["l"] >= 0 and t["r"] <= t["vw"] and t["b"] <= t["vh"], "on a phone the 'Job hidden.' toast fits the screen", str(t))
     mctx.close()
 
 
@@ -813,6 +976,7 @@ def main():
             ctx.close()
             check_signin_states(browser, base)
             check_return_ask(browser, base, token)
+            check_hide(browser, base, token)
             check_alerts_switch_no_js(browser, base, token)
             header_infos = {}
             for (w, h) in VIEWPORTS:

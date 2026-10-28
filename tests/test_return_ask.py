@@ -54,13 +54,18 @@ def row(pid, title, hours_ago, applied=False):
             "first_seen_at": datetime.now(timezone.utc) - timedelta(hours=hours_ago)}
 
 
+def hidden_row(pid, title, days_ago=1, reason=None):
+    return {"id": pid, "title": title, "company_name": "Co", "ats_type": "ashby", "location": "Remote - United States",
+            "remote_type": "remote", "hidden_at": datetime.now(timezone.utc) - timedelta(days=days_ago), "hidden_reason": reason}
+
+
 class Base(unittest.TestCase):
     def setUp(self):
         self.client = dapp.app.test_client()
         self.client.set_cookie(dapp.SESSION_COOKIE, "tok")
         now = datetime.now(timezone.utc)
         self.now = now
-        self.opens, self.dismissals, self.events = {}, {}, []
+        self.opens, self.dismissals, self.events, self.hidden = {}, {}, [], []
         self.rows = [row(1, "Senior Product Designer", 1), row(2, "Product Designer", 2), row(3, "UX Designer", 3)]
         self.exists = {1, 2, 3, 99}
         profile = {"titles": ["designer"], "level": None, "one_level_up": False, "city": None, "skills": []}
@@ -75,6 +80,8 @@ class Base(unittest.TestCase):
             mock.patch.object(dapp, "get_user_work_types", lambda c, u: []),
             mock.patch.object(dapp, "get_open_postings", lambda c, u, since=None, keywords=(): [dict(r) for r in self.rows]),
             mock.patch.object(dapp, "get_applications", lambda c, u: []),
+            mock.patch.object(dapp, "get_hidden", lambda c, u: [dict(h) for h in self.hidden]),
+            mock.patch.object(dapp, "get_hidden_among", lambda c, u, ids: {h["id"] for h in self.hidden if h["id"] in ids}),
             mock.patch.object(dapp, "get_return_events", lambda c, u: (dict(self.opens), dict(self.dismissals))),
             mock.patch.object(dapp, "get_applied_among", lambda c, u, ids: {r["id"] for r in self.rows if r["applied"] and r["id"] in ids}),
             mock.patch.object(dapp, "get_posting_url", lambda c, pid: "https://jobs.example/x" if pid in self.exists else None),
@@ -98,15 +105,18 @@ class Base(unittest.TestCase):
 
 
 class Page(Base):
-    def test_a_page_with_nothing_opened_shows_discovered_and_apply_on_every_row(self):
+    def test_a_page_with_nothing_opened_shows_discovered_apply_and_hide_on_every_row(self):
         html = self.live()
         for pid in (1, 2, 3):
             r = self.row_html(html, pid)
-            self.assertRegex(r, r'<p class="fg-job-state" data-state>Discovered \d+ hours? ago</p>')
+            self.assertRegex(r, r'<p data-state-top>Discovered on Ashby</p>')
+            self.assertRegex(r, r'<p class="fg-job-when" data-state-when>\d+ hours? ago</p>')
             self.assertIn(f'href="/open/{pid}" target="_blank" rel="noopener" data-apply>Apply', r)
+            self.assertIn(f'action="/hide/{pid}" data-hide', r)
             self.assertNotIn("Did you apply?", r)
+            self.assertNotIn("data-viewed", r)
 
-    def test_the_job_opened_last_asks_in_its_own_action_spot_and_says_viewed(self):
+    def test_the_job_opened_last_asks_in_its_own_action_spot_without_hide(self):
         self.opens = {2: self.now - timedelta(minutes=12)}
         html = self.live()
         asking = self.row_html(html, 2)
@@ -116,24 +126,34 @@ class Page(Base):
         self.assertIn('action="/ask/dismiss/2"', asking)
         self.assertIn(">Yes</button>", asking)
         self.assertIn(">Not yet</button>", asking)
-        self.assertIn('data-state>Viewed 12 minutes ago</p>', asking)
-        self.assertNotIn("data-apply", asking)                       # the question replaces Apply in the same spot
+        self.assertIn("data-viewed", asking)
+        self.assertNotIn("data-apply", asking)                       # the question replaces Apply and Hide in the same spot
+        self.assertNotIn("data-hide", asking)                        # no Hide during the question
         for pid in (1, 3):
             self.assertNotIn("Did you apply?", self.row_html(html, pid))
             self.assertIn("data-apply", self.row_html(html, pid))
 
-    def test_the_old_welcome_sentence_help_line_and_viewed_icon_are_gone(self):
+    def test_viewed_is_a_quiet_marker_after_the_discovery_time_with_no_date_of_its_own(self):
+        self.opens = {3: self.now - timedelta(hours=5)}
+        r = self.row_html(self.live(), 3)
+        when = re.search(r'<p class="fg-job-when" data-state-when>(.*?)</p>', r, re.S).group(1)
+        self.assertRegex(when, r"^\d+ hours? ago<span class=\"fg-job-viewed\" data-viewed>")
+        self.assertIn("Viewed</span>", when)
+        self.assertNotIn("5 hours ago", when)                        # the discovery time, never the time it was viewed
+        self.assertRegex(when, r'<svg(?![^>]*\shidden[\s>])[^>]*aria-hidden="true"')   # an icon plus the word, not colour alone
+
+    def test_the_old_state_line_help_line_and_outline_are_gone(self):
         self.opens = {2: self.now - timedelta(minutes=12)}
         html = self.live()
-        for gone in ("Welcome back", "If you did, mark it Applied", "posting-viewed", "row-ask", "posting--asking"):
+        for gone in ("Welcome back", "If you did, mark it Applied", "posting-viewed", "row-ask", "posting--asking", "Viewed 12 minutes ago"):
             self.assertNotIn(gone, html)
 
     def test_several_opened_only_the_latest_asks_and_the_rest_say_viewed(self):
         self.opens = {1: self.now - timedelta(minutes=40), 2: self.now - timedelta(minutes=12), 3: self.now - timedelta(minutes=25)}
         html = self.live()
         self.assertEqual(html.count(">Did you apply?</p>"), 1)
-        self.assertIn("Viewed 40 minutes ago", self.row_html(html, 1))
-        self.assertIn("Viewed 25 minutes ago", self.row_html(html, 3))
+        for pid in (1, 2, 3):
+            self.assertIn("data-viewed", self.row_html(html, pid))
         for pid in (1, 3):
             self.assertIn("data-apply", self.row_html(html, pid))
 
@@ -148,7 +168,7 @@ class Page(Base):
     def test_a_job_opened_long_ago_is_viewed_but_not_asked_about(self):
         self.opens = {2: self.now - timedelta(days=3)}
         html = self.live()
-        self.assertIn("Viewed 3 days ago", self.row_html(html, 2))
+        self.assertIn("data-viewed", self.row_html(html, 2))
         self.assertNotIn("Did you apply?", html)
 
     def test_not_yet_means_no_question_until_it_is_opened_again(self):
@@ -156,8 +176,9 @@ class Page(Base):
         self.dismissals = {2: self.now - timedelta(minutes=20)}
         html = self.live()
         self.assertNotIn("Did you apply?", html)
-        self.assertIn("data-apply", self.row_html(html, 2))                  # Apply comes back
-        self.assertIn("Viewed 30 minutes ago", self.row_html(html, 2))       # and the row still says Viewed
+        self.assertIn("data-apply", self.row_html(html, 2))                  # Apply (and Hide) come back
+        self.assertIn("data-hide", self.row_html(html, 2))
+        self.assertIn("data-viewed", self.row_html(html, 2))                 # and the row still says Viewed
         self.opens = {2: self.now - timedelta(minutes=2)}
         self.assertIn("Did you apply?", self.live())
 
@@ -172,15 +193,24 @@ class Page(Base):
         self.assertNotIn("Did you apply?", html)
         self.assertNotIn('id="posting-2"', html)
 
+    def test_a_hidden_job_is_not_asked_about_and_is_not_in_open_roles(self):
+        self.hidden = [hidden_row(2, "Product Designer", days_ago=2, reason="junior")]
+        self.opens = {2: self.now - timedelta(minutes=5)}
+        html = self.live()
+        self.assertNotIn("Did you apply?", html)
+        self.assertNotIn('id="posting-2"', html)
+
     def test_the_templates_the_script_copies_are_in_the_page(self):
         html = self.page()
         self.assertRegex(html, r'<template id="return-ask-template">\s*<p class="fg-voice fg-job-question">Did you apply\?</p>')
         self.assertIn('action="/ask/dismiss/__id__"', html)
         self.assertIn('action="/set_applied/__id__"', html)
-        self.assertRegex(html, r'<template id="return-apply-template">\s*<a class="fg-button fg-button--secondary" href="/open/__id__"')
+        self.assertRegex(html, r'<template id="return-apply-template">\s*<span class="fg-job-group"><a class="fg-button fg-button--secondary" href="/open/__id__"')
+        self.assertIn('action="/hide/__id__" data-hide', html)
+        self.assertRegex(html, r'<template id="return-viewed-template">\s*<span class="fg-job-viewed" data-viewed>')
         self.assertIn('data-return-url="/return.json"', html)
-        self.assertIn('<script src="/field-guide/js/return.js" defer></script>', html)
-        self.assertIn('<script src="/field-guide/js/toast.js" defer></script>', html)
+        for script in ("toast.js", "job.js", "return.js"):
+            self.assertIn(f'<script src="/field-guide/js/{script}" defer></script>', html)
 
 
 class State(Base):
