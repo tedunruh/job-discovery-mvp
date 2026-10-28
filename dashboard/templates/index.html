@@ -1,14 +1,19 @@
 {% import "_fg.html" as fg %}
-{#- SC-63. The two things a row's action spot can say. They are drawn on the server for the rows that need them and also sit
-    in <template>s, which field-guide/js/return.js copies when a tab regains focus, so the page and the script never
-    disagree on markup. -#}
-{% macro apply_button(id) -%}
-<a class="fg-button fg-button--secondary" href="/open/{{ id }}" target="_blank" rel="noopener" data-apply>Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a>
+{#- The things a card's action spot can say (SC-63, SC-59). They are drawn on the server for the rows that need them and also
+    sit in <template>s, which the page's scripts copy, so the page and the scripts never disagree on markup. -#}
+{% macro apply_group(id, title) -%}
+<span class="fg-job-group"><a class="fg-button fg-button--secondary" href="/open/{{ id }}" target="_blank" rel="noopener" data-apply>Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a><form method="post" action="/hide/{{ id }}" data-hide><button class="fg-button fg-button--ghost" type="submit">Hide<span class="fg-visually-hidden"> {{ title }}</span></button></form></span>
 {%- endmacro %}
 {% macro ask_actions(id) -%}
 <p class="fg-voice fg-job-question">Did you apply?</p>
-<form method="post" action="/set_applied/{{ id }}" data-ask-yes><input type="hidden" name="applied" value="true"><button class="fg-button fg-button--secondary" type="submit">Yes</button></form>
-<form method="post" action="/ask/dismiss/{{ id }}" data-ask-dismiss><button class="fg-button fg-button--secondary" type="submit">Not yet</button></form>
+<span class="fg-job-group"><form method="post" action="/set_applied/{{ id }}" data-ask-yes><input type="hidden" name="applied" value="true"><button class="fg-button fg-button--secondary" type="submit">Yes</button></form><form method="post" action="/ask/dismiss/{{ id }}" data-ask-dismiss><button class="fg-button fg-button--secondary" type="submit">Not yet</button></form></span>
+{%- endmacro %}
+{% macro why_actions(id) -%}
+<label class="fg-voice fg-job-question" for="why-{{ id }}">Why are you hiding?</label>
+<span class="fg-job-group"><span class="fg-select fg-job-select"><select id="why-{{ id }}" data-why><option value="" disabled selected>Select</option><option value="role">Not my kind of role</option><option value="junior">Too junior</option><option value="senior">Too senior</option><option value="location">Location or remote setup</option><option value="pay">Pay</option><option value="company">Not interested in this company</option><option value="applied">Already applied</option><option value="other">Other</option></select><svg width="14" height="8" viewBox="0 0 14 8" fill="none" aria-hidden="true"><path d="M1 1L7 7L13 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><button class="fg-button fg-button--ghost" type="button" data-skip>Skip</button></span>
+{%- endmacro %}
+{% macro unhide_button(id, title, reason="") -%}
+<form method="post" action="/unhide/{{ id }}" data-unhide data-reason="{{ reason }}"><button class="fg-button fg-button--secondary" type="submit">Unhide<span class="fg-visually-hidden"> {{ title }}</span></button></form>
 {%- endmacro %}
 <!DOCTYPE html>
 <html>
@@ -18,6 +23,7 @@
   {% include "_field_guide_head.html" %}
   <script src="/field-guide/js/filter.js" defer></script>
   <script src="/field-guide/js/toast.js" defer></script>
+  <script src="/field-guide/js/job.js" defer></script>
   <script src="/field-guide/js/return.js" defer></script>
   <style>
     /* Layout follows Figma "Scout Job Discovery Dashboard" (226:849): a Sage band
@@ -56,8 +62,8 @@
       margin-top: calc(var(--fg-space-8) + var(--fg-space-1));
       padding: var(--fg-space-2) var(--fg-space-6) var(--fg-space-6);
       background: var(--fg-color-surface-page);
+      border: 1px solid var(--fg-color-border-default);
       border-radius: var(--fg-radius-xl);
-      box-shadow: var(--fg-shadow-raised);
     }
 
     .toolbar {
@@ -90,6 +96,29 @@
       margin: var(--fg-space-4) 0 0 var(--fg-space-4);
       font-size: var(--fg-font-size-sm);
     }
+    /* The list's footer: pagination pinned left, the hidden-jobs link pinned right (wraps on a phone). */
+    .list-foot {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--fg-space-2) var(--fg-space-4);
+      margin-top: var(--fg-space-4);
+    }
+    .list-foot[hidden] { display: none; }
+    .list-foot .more { margin: 0 0 0 var(--fg-space-4); }
+    .list-foot-end { margin-left: auto; margin-right: var(--fg-space-4); font-size: var(--fg-font-size-sm); }
+    .list-foot-end[hidden] { display: none; }
+    .hidden-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--fg-space-2) var(--fg-space-4);
+      padding-bottom: var(--fg-space-2);
+    }
+    .hidden-title { margin: 0; font-size: var(--fg-font-size-lg); font-weight: var(--fg-font-weight-demibold); color: var(--fg-color-text-primary); }
+    .hidden-title:focus { outline: none; }
     .empty {
       display: flex;
       flex-direction: column;
@@ -115,16 +144,37 @@
   {% endcall %}
   <h1 class="fg-visually-hidden">Your jobs</h1>
 
-  <section class="board" aria-label="Your jobs"{% if tab == "open" %} data-return-url="/return.json"{% endif %}>
+  <section class="board" aria-label="Your jobs"{% if tab == "open" and view == "open" %} data-return-url="/return.json"{% endif %}{% if tab == "open" %} data-hide-board{% endif %}>
     {{ fg.tabs("Your jobs", [("Open roles", total, "/", tab == "open"), ("Applications", applications|length, "/?tab=applications", tab == "applications")]) }}
     {#- A live region that is always in the page, so a screen reader hears the question when it appears. -#}
     <p class="fg-visually-hidden" role="status" aria-live="polite" id="return-live"></p>
-    <template id="return-apply-template">{{ apply_button("__id__") }}</template>
+    <template id="return-apply-template">{{ apply_group("__id__", "__title__") }}</template>
     <template id="return-ask-template">{{ ask_actions("__id__") }}</template>
+    <template id="return-why-template">{{ why_actions("__id__") }}</template>
+    <template id="return-viewed-template">{{ fg.job_viewed() }}</template>
     <template id="toast-template">{% call fg.toast("You've applied to this role. You can find it in Applications.") %}<a class="fg-toast-action" href="/?tab=applications">View</a><button class="fg-toast-action" type="button" data-toast-undo>Undo</button>{% endcall %}</template>
+    <template id="toast-simple-template">{% call fg.toast("__text__") %}<button class="fg-toast-action" type="button" data-toast-undo>Undo</button>{% endcall %}</template>
 
     <div role="tabpanel">
-    {% if tab == "open" %}
+    {% if tab == "open" and view == "hidden" %}
+    <div class="hidden-head">
+      <h2 class="hidden-title" id="hidden-title" tabindex="-1" data-focus-on-load>Jobs you hid</h2>
+      <a class="fg-link" href="/">Back to open roles</a>
+    </div>
+    {% if not hidden %}
+    <div class="empty">
+      <p class="fg-voice empty-title">Nothing hidden.</p>
+      <p class="fg-card-help">Jobs you hide land here, in case you change your mind.</p>
+    </div>
+    {% endif %}
+    <ul class="fg-job-list">
+      {% for h in hidden %}
+      {% call fg.job("posting-" ~ h.id, h.title, "/open/" ~ h.id, h.company_name, h.place, "Hidden " ~ h.hidden_ago, h.reason_label) %}
+        {{- unhide_button(h.id, h.title, h.hidden_reason or "") -}}
+      {% endcall %}
+      {% endfor %}
+    </ul>
+    {% elif tab == "open" %}
     <div class="toolbar">
       <div class="filters">
         {% call fg.filter("filter-work", "Work type", work_label) %}
@@ -174,18 +224,23 @@
 
     <ul class="fg-job-list">
       {% for p in postings %}
-      {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.location, p.ats_type|capitalize, ("Viewed " ~ p.viewed_ago) if p.viewed_ago else ("Discovered " ~ (p.first_seen_at|humanize)), p.skill_line) %}
-        {%- if p.asking %}{{ ask_actions(p.id) }}{% else %}{{ apply_button(p.id) }}{% endif %}
+      {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Discovered on " ~ p.ats_type|capitalize, p.discovered_ago, p.viewed, skills=p.skill_line) %}
+        {%- if p.asking %}{{ ask_actions(p.id) }}{% else %}{{ apply_group(p.id, p.title) }}{% endif %}
       {% endcall %}
       {% endfor %}
     </ul>
 
-    {% if next_n %}
-    <p class="more">
-      <span class="fg-text-secondary">Showing {{ shown_count }} of {{ total }}</span>
-      <a class="fg-link" href="/?n={{ next_n }}{% if skills_all %}&amp;skills=all{% endif %}">Show {{ page_size }} more</a>
-    </p>
-    {% endif %}
+    {#- The footer: pagination on the left, the hidden-jobs link on the right once anything is hidden. The link is in the page
+        from the start (hidden while there is nothing to show) so the script can reveal it when a job is hidden. -#}
+    <div class="list-foot" data-foot{% if not next_n and not hidden %} hidden{% endif %}>
+      {% if next_n %}
+      <p class="more">
+        <span class="fg-text-secondary">Showing {{ shown_count }} of {{ total }}</span>
+        <a class="fg-link" href="/?n={{ next_n }}{% if skills_all %}&amp;skills=all{% endif %}">Show {{ page_size }} more</a>
+      </p>
+      {% endif %}
+      <a class="fg-link list-foot-end" href="/?view=hidden" data-hidden-link{% if not hidden %} hidden{% endif %}>Show {{ hidden|length }} hidden job{{ "" if hidden|length == 1 else "s" }}</a>
+    </div>
 
     {% else %}
     <div class="toolbar">
@@ -200,7 +255,7 @@
     {% endif %}
     <ul class="fg-job-list">
       {% for p in applications %}
-      {{ fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.location, p.ats_type|capitalize, "Applied" ~ ((" " ~ p.applied_ago) if p.applied_ago else "")) }}
+      {{ fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Applied" ~ ((" " ~ p.applied_ago) if p.applied_ago else "")) }}
       {% endfor %}
     </ul>
     {% endif %}

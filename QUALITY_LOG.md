@@ -1203,3 +1203,48 @@ row clipped 960px cards in a 776px column); both found from screenshots, fixed b
 and 314 browser checks were renamed to the new classes, and the "gallery shows every Field Guide class" check now covers
 the job card's eleven.
 - [ ] Not done: the Figma gallery still stops after Messages apart from the "Navigation & feedback" section.
+
+### 2026-10-28 — SC-59: hide a job from Open roles and say why, a clearer job card, a bordered board
+**Shipped (from the SC-59 card and its mock):** each Open roles card has **Apply** and a quieter **Hide** (secondary text, not
+Forest) in one locked group; Hide swaps them for **"Why are you hiding?"** with a reason menu (Not my kind of role, Too
+junior, Too senior, Location or remote setup, Pay, Not interested in this company, Already applied, Other) and **Skip**. A
+reason or Skip hides the job: the card leaves at once, the counts move, a toast says **"Job hidden."** with Undo (no View).
+**"Already applied"** is not hiding: it goes to Applications with the applied toast. Once anything is hidden the list footer
+shows **"Show N hidden jobs"** on the right (pagination stays left); it opens **"Jobs you hid"** (newest first, "Hidden 2 days
+ago" and the reason, an Unhide button, "Back to open roles"; focus moves to the heading; nothing hidden says so). **Unhide**
+sends the job back with "Back in Open roles." and Undo. Hidden jobs are never asked about, drop off when the posting closes, and
+the reason is saved per person and job (`user_postings.hidden_at`, `hidden_reason`: additive columns, applied to Neon first, on a
+rehearsal branch and then production) for later profile suggestions, never applied silently. **The job card** is restyled:
+company overline, title, "Remote, US" / "Hybrid, Denver, CO" / "Onsite, Austin, TX", then a blank pay line (collectors do not
+capture pay yet, SC-71); the middle column says "Discovered on Ashby" over the discovery time with a quiet eye-icon **Viewed**
+marker after it (no date of its own); applications read "Applied 3 days ago"; the old "Viewed 12 minutes ago" and "Found on"
+lines are gone. Answers and actions are one group that never wraps apart, equal-width on a phone. The board has a 1px default
+border and no shadow. Hiding is allowed at any time and does not mark a job viewed. Field Guide: `.fg-job` restyled, `.fg-job-group`,
+`.fg-job-select`, `.fg-job-company`/`-pay`/`-when`/`-viewed`, the `fg.job` and `fg.job_viewed` macros, six gallery states; Figma:
+Job card now has Apply / Question / Hiding / None / Unhide. No change to alerts: they fire once at discovery, before anything can
+be hidden.
+**Rework count:** 3 in my own checks, none reached a person. **Root causes:**
+- *asking before reading the current spec.* I asked Ted three design questions from a stale local copy of the card, which had
+  already been updated with all of them decided (reason menu, footer link instead of a tab, the restyle). Lesson: re-read the
+  card from the board, not the copy fetched earlier in the session, before asking or building.
+- *a fixed wait standing in for an answer* (again): checks waited for the toast to go and then read counts, but Undo now answers
+  after a server round trip. They now wait for the card to come back.
+- *a flex basis of 0 plus padding.* On a phone the menu and Skip were 132 and 166 pixels wide, not equal, because a button's
+  padding is added to a basis of 0. The check caught it; the group now uses a basis of half.
+**Standing checks added:**
+- [x] Automated (`tests/test_hide_job.py`, 37 tests, plus the updated `test_return_ask.py` and `test_applications_tab.py`): the card's
+      column order and wording, the blank pay line, state lines, Hide after Apply, the board border, the location line for 13
+      real kinds of location text, hidden jobs out of Open roles and the count, the footer link and its place, the reason
+      menu's options and order, the hidden list (order, when and why, Unhide only, focus, no filters, empty), hide and unhide
+      routes (reason kept, Skip, no event for an Undo, unknown job, commits, no GET), return state, and the queries and schema.
+      45 mutation checks on a copy of the repo; all caught except 2 that cannot change what a person sees (a hidden job passed to
+      the ask rule when the page already leaves it out; the Applications tab and the hidden view, which the template guards twice).
+- [x] Automated, in a real browser (`scripts/quality_check.py`, 343 checks): Hide asks why with the menu focused and nothing hidden
+      yet; a failing server hides nothing; a reason hides, moves the counts, shows "Job hidden." with Undo and no View and the footer
+      link; Undo restores the card, Apply and Hide, the counts and the link; Skip hides; hidden jobs stay hidden after a reload;
+      the link opens "Jobs you hid" with the heading focused, no filters and when and why; Unhide and its Undo; "Already applied"
+      goes to Applications; with nothing hidden the link goes; a phone fits the question, equal buttons and the toast. 25 deliberate
+      breakages of the scripts, template and styles on a throwaway database branch (deleted afterwards): all caught except one
+      that is equivalent (the question wraps to its own line either way).
+- [ ] Not done: one run of the browser check timed out waiting for a toast and passed on the next four; I did not find the cause
+      (suspect a slow database wake on the throwaway branch). Not mirrored: the phone state of the hide question in Figma.

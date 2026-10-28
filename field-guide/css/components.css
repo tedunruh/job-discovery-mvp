@@ -1224,8 +1224,15 @@ button.fg-link {
 .fg-job-title { font-size: var(--fg-font-size-lg); max-width: 500px; }
 .fg-job-link { color: inherit; text-decoration: none; outline: none; }
 .fg-job-link::after { content: ""; position: absolute; inset: 0; }
+/* The job column, top to bottom: company (a small overline), title, work type and place, then pay. Pay keeps its line
+   when it is not known (a blank line, not a dash that reads as an error), so every card is the same height. */
+.fg-job-company { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-primary); }
 .fg-job-subline { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
-.fg-job-source { font-size: var(--fg-font-size-xs); color: var(--fg-color-text-secondary); }
+.fg-job-pay {
+  font-size: var(--fg-font-size-xs);
+  color: var(--fg-color-text-secondary);
+  min-height: calc(var(--fg-font-size-xs) * var(--fg-font-line-height-snug));
+}
 .fg-job-skills { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
 .fg-job-second {
   display: flex;
@@ -1234,7 +1241,20 @@ button.fg-link {
   gap: var(--fg-space-4);
   min-width: 0;
 }
-.fg-job-state { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
+/* The middle column: where it was found, then when. After applying, one line: "Applied 3 days ago". In the hidden
+   list: "Hidden 2 days ago" with the reason under it. */
+.fg-job-state {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--fg-font-size-sm);
+  color: var(--fg-color-text-secondary);
+}
+.fg-job-when { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--fg-space-1); }
+/* Viewed: an eye icon plus the word, in the same quiet text as the time. Never colour alone. It has no date of its
+   own: the list is sorted by when jobs were found, so the time on line two is always the discovery time. */
+.fg-job-viewed { display: inline-flex; align-items: center; gap: var(--fg-space-1); }
+.fg-job-viewed svg { flex: none; }
 .fg-job-action {
   position: relative;
   z-index: 1;
@@ -1246,6 +1266,22 @@ button.fg-link {
 }
 .fg-job-action form { display: contents; }
 .fg-job-question { font-size: var(--fg-font-size-lg); margin-right: var(--fg-space-1); }
+/* Answers and actions are one group and never wrap apart (Apply + Hide, Yes + Not yet, the reason menu + Skip). When
+   the card is narrow the question takes its own line and the whole group moves to the next one. */
+.fg-job-group { display: inline-flex; flex: none; align-items: center; gap: var(--fg-space-2); }
+/* Hide is quieter than Apply: secondary text, no Forest. */
+.fg-job-group .fg-button--ghost { color: var(--fg-color-text-secondary); }
+.fg-job-group .fg-button--ghost:hover { background: var(--fg-color-action-secondary-fill); color: var(--fg-color-text-primary); }
+/* The reason menu in a card: a pill that is only as wide as its text. */
+.fg-job-select { display: inline-block; }
+.fg-job-select select {
+  width: auto;
+  field-sizing: content;
+  border-radius: var(--fg-radius-full);
+  border-color: var(--fg-color-border-default);
+  background: var(--fg-color-surface-card);
+  padding-left: var(--fg-space-3);
+}
 @media (max-width: 680px) {
   .fg-job {
     padding: var(--fg-space-3);
@@ -1255,5 +1291,11 @@ button.fg-link {
   .fg-job-lead { grid-area: lead; }
   .fg-job-second { display: contents; }
   .fg-job-state { grid-area: state; }
-  .fg-job-action { grid-area: action; justify-content: flex-start; }
+  .fg-job-action { grid-area: action; justify-content: flex-start; flex-direction: column; align-items: stretch; }
+  .fg-job-action .fg-job-question { margin-right: 0; }
+  /* Phone: the question on its own line, then the group fills the width with equal buttons. */
+  .fg-job-group { display: flex; width: 100%; }
+  /* a basis of half the group, not 0: a button's padding would otherwise make it wider than its neighbour */
+  .fg-job-group .fg-button, .fg-job-group .fg-job-select { flex: 1 1 50%; min-width: 0; }
+  .fg-job-group .fg-job-select select { width: 100%; }
 }

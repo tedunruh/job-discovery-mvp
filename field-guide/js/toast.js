@@ -3,8 +3,11 @@
    is added; nothing here moves focus. It goes after about eight seconds, and later while the pointer is over it or
    focus is inside it. Markup comes from a <template> (fg.toast), never from this script.
 
-       var toast = window.fgToast.show(document.getElementById("toast-template"));
+       window.fgToast.show(document.getElementById("toast-template"), { text: "Job hidden.", onUndo: function () {} });
        window.fgToast.hide();
+
+   text    replaces the toast's sentence (the template's own is used without it)
+   onUndo  called when its [data-toast-undo] button is pressed; the toast then goes
 */
 (function () {
   "use strict";
@@ -14,7 +17,6 @@
 
   var STAY_MS = 8000;      // how long a toast stays when nobody is pointing at it
   var timer = null;
-  var held = false;        // pointer over it or focus inside it
 
   function stop() {
     if (timer) { clearTimeout(timer); timer = null; }
@@ -27,21 +29,28 @@
 
   function hide() {
     stop();
-    held = false;
     region.textContent = "";
   }
 
-  function show(template) {
+  function show(template, options) {
+    options = options || {};
     hide();
     var node = template.content.firstElementChild.cloneNode(true);
+    if (options.text) node.querySelector(".fg-toast-text").textContent = options.text;
+    var undo = node.querySelector("[data-toast-undo]");
+    if (undo && options.onUndo) {
+      undo.addEventListener("click", function () {
+        hide();
+        options.onUndo();
+      });
+    }
     region.appendChild(node);
     start(STAY_MS);
     return node;
   }
 
-  function hold() { held = true; stop(); }
+  function hold() { stop(); }
   function release() {
-    held = false;
     if (region.firstElementChild) start(STAY_MS / 2);
   }
 
