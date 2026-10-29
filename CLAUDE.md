@@ -93,6 +93,7 @@ fingerprint (`'rescan'` = silent re-scan).
 - Health: last runs in `scheduler_runs` (should be ~6-10 min, finished); `source_health` statuses;
   `python scripts/engagement.py 7` for per-person use; `python scripts/actions_usage.py`.
 - Switch a board/batch off: `UPDATE companies SET tier='off' WHERE ...` (reversible).
+- Pay ranges (SC-71): the collector fills them as it writes postings; `python scripts/backfill_pay.py` (dry run; `--sample 25`; `--write`) fills the ones already stored.
 - Add boards: `scripts/discover_boards.py` (harvest/validate/enrich/report, read-only) then
   `scripts/import_discovered.py --tier hot --ats <platform>`; import in **batches** and watch two runs.
 - Deploy: push to `main` auto-deploys the dashboard; the collector uses `main` at dispatch.

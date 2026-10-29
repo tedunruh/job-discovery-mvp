@@ -8,7 +8,9 @@ def fetch(ats_identifier: str, light: bool = False) -> list[dict]:
     3.3 MB for a 210-job board) while still returning title, location, URL and posted dates.
     Used for the many discovered boards that are only scanned for design roles."""
     url = BOARD_URL.format(token=ats_identifier)
-    resp = request_with_retries("GET", url, params=None if light else {"content": "true"}, timeout=30)
+    # pay_transparency adds each job's pay_input_ranges (also on the light fetch, where it costs little) (SC-71).
+    params = {"pay_transparency": "true"} if light else {"content": "true", "pay_transparency": "true"}
+    resp = request_with_retries("GET", url, params=params, timeout=30)
     jobs = resp.json().get("jobs", [])
     return [_normalize(job) for job in jobs]
 

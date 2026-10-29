@@ -1247,7 +1247,7 @@ be hidden.
       breakages of the scripts, template and styles on a throwaway database branch (deleted afterwards): all caught except one
       that is equivalent (the question wraps to its own line either way).
 - [ ] Not done: one run of the browser check timed out waiting for a toast and passed on the next four; I did not find the cause
-      (suspect a slow database wake on the throwaway branch). Not mirrored: the phone state of the hide question in Figma.
+      (suspect a slow database wake on the throwaway branch).
 
 ### 2026-10-28 — SC-68: the serif was rendering at weight 500 in one place
 **Found:** a survey of every element set in Fraunces across the login, dashboard (all three views), profile, start and gallery
@@ -1298,3 +1298,51 @@ the check now says that.
       up with the text. 12 deliberate breakages on a throwaway database branch (deleted afterwards): all caught.
 - [ ] Not done: the caught-up state is checked in unit tests and by screenshot only (the browser check's user always has jobs); the
       page does not swap to the caught-up state live when the last card leaves (it appears on the next load).
+
+### 2026-10-28 — Figma Job card: phone states added (a gap I left, and called a limitation)
+**What happened:** I mirrored the SC-59 job card into Figma at desktop width only and logged "phone state not mirrored" as a
+minor not-done item. Ted pointed out the design already prescribes the phone behaviour (the question on its own line, the group
+below it full width with equal buttons) and that a design system must show every state responsively; the app was right all along
+(checked at seven widths from 320 to 1024 pixels: both questions visible at every one). **Fixed:** `Job card` in Figma now has
+`Size=Desktop` and `Size=Phone` variants for Apply, Question, Hiding, None and Unhide (330px card, stacked, equal-width groups), and
+the gallery row shows the phone states under the desktop ones. **Root cause:** *treating a responsive behaviour as optional
+polish when mirroring.* The rule going forward: when a component's design has a phone layout, the Figma mirror ships with its phone
+variants in the same piece of work; it is not a follow-up.
+- [x] Done: Figma phone variants and gallery states. [ ] Not done: tablet width (681-1023px) is the desktop layout in the code and in Figma.
+
+### 2026-10-29 — SC-71: pay ranges on the job card
+**Shipped:** a posting's pay range is collected and the card's pay line shows it ("$150,000 - $188,000", "$45 - $60 / hour",
+"£55,000 - £65,000", "$120,000+"); no pay found leaves the blank line (never a dash). **Where pay comes from:** Ashby
+(`compensation.summaryComponents`, the Salary one only, asked for with `includeCompensation`), Greenhouse (`pay_input_ranges`,
+asked for with `pay_transparency`, also on the light fetch of discovered boards) and Lever (`salaryRange`, already in the data) give
+it as data; for every other board, and as a fallback, it is **read from the stored description**, conservatively (a range must sit
+among words about pay and away from funding, equity, bonus, on-target-earnings and "total compensation + equity"; the next zone or
+city listed after a range counts and several are spanned from the lowest low to the highest high; a period is only taken from a
+word right beside the range or a label right before it, else only a figure of 20,000 or more is read as a year). Five additive
+columns on `postings` (`pay_min`, `pay_max`, `pay_currency`, `pay_period`, `pay_source` = board or text; applied to Neon first, on a
+rehearsal branch and then production). The content fingerprint ignores the bulky pay keys of the raw payload and includes the
+pay only when there is some, so asking the boards for pay rewrites only the postings that have pay (verified on the branch:
+249 rows once, then 0). The description step reads pay only where the board gave none. `scripts/backfill_pay.py` fills what is already
+stored (dry run by default, `--sample N` for the hand check, `--write` in short batches).
+**Hand check (the card's last criterion):** on a copy of the live data 722 of 11,968 stored postings have pay found (208 Lever from data,
+about 420 Ashby and Greenhouse from text, the rest Workable, Workday and Rippling). I read about 120 of them beside their source text.
+It found two real errors, both fixed and now tests: an Equity range merged into the base salary ("Equity: $80,000 - $100,000 / Base: $180,000 -
+$275,000" read as $80,000 - $275,000), and a lower pay zone dropped (Mercury's second zone). It also found the OTE range merged into base
+(Braze), two levels written "$117,000 CAD to $143,000 CAD; or $144,000 to $176,000" read as only the second, a monthly salary read as
+a year (Roblox), a benefit "$950/month" setting the period of a salary, "Days 1-30" setting a day rate, and a "total compensation (base +
+equity)" read as pay. After the fixes 28 of 28 ordinary readings and every unusual reading (non-dollar, hourly, very wide) matched the text.
+**Not shown to testers yet:** the code ships with every pay column empty, so every line is blank until the collector rewrites a posting
+or the backfill runs; the backfill is run after the sample has been seen.
+**Rework count:** 0 reached Ted; 4 rounds of fixes inside my own hand check. **Root cause of those rounds:** *a rule tested only on the
+example it was written for.* Each text rule was first tried on a handful of snippets; the sample of real postings broke it six times.
+**Standing checks added:**
+- [x] Automated (`tests/test_pay.py`, 41 tests): the three boards' parsers (Salary not bonus, cents, intervals, bi-weekly refused), what
+      is believable, every wording found in the sample, every trap (funding, bonus, equity, OTE, total comp, stipend, period words in
+      other sentences), spans of zones and levels, currency signs, the pay line format, the stable fingerprint (compared with the
+      pre-pay formula), the upsert and description SQL, discovered boards, and the page. 49 mutation checks on a copy of the repo, all caught
+      (11 first missed: each led to a test above).
+- [x] Automated, in a real browser (`scripts/quality_check.py`, 370 checks, run on production and on the rehearsal copy where pay is stored): every
+      pay line reads as a range, lines up with the title, uses tabular numbers, and a card with no pay keeps its blank line; 4 deliberate
+      breakages caught.
+- [ ] Not done: Workable, Rippling and Workday pay is read from description text only for the roles whose description Scout has stored (the ones that
+      pass someone's filters); the others stay blank. Currencies are shown with their sign (CA$, A$, NZ$) or code (SEK 500,000), not converted.

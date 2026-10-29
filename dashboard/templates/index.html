@@ -198,7 +198,7 @@
     {% endif %}
     <ul class="fg-job-list">
       {% for h in hidden %}
-      {% call fg.job("posting-" ~ h.id, h.title, "/open/" ~ h.id, h.company_name, h.place, "Hidden " ~ h.hidden_ago, h.reason_label, mono=h.mono, tint=h.tint) %}
+      {% call fg.job("posting-" ~ h.id, h.title, "/open/" ~ h.id, h.company_name, h.place, "Hidden " ~ h.hidden_ago, h.reason_label, mono=h.mono, tint=h.tint, pay=h.pay) %}
         {{- unhide_button(h.id, h.title, h.hidden_reason or "") -}}
       {% endcall %}
       {% endfor %}
@@ -263,7 +263,7 @@
       {{ fg.day(label, count) }}
       <ul class="fg-job-list">
         {% for p in rows %}
-        {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Discovered on " ~ p.ats_type|capitalize, p.when, p.viewed, skills=p.skill_line, mono=p.mono, tint=p.tint) %}
+        {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Discovered on " ~ p.ats_type|capitalize, p.when, p.viewed, skills=p.skill_line, mono=p.mono, tint=p.tint, pay=p.pay) %}
           {%- if p.asking %}{{ ask_actions(p.id) }}{% else %}{{ apply_group(p.id, p.title) }}{% endif %}
         {% endcall %}
         {% endfor %}
@@ -296,7 +296,7 @@
     {% endif %}
     <ul class="fg-job-list">
       {% for p in applications %}
-      {{ fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Applied" ~ ((" " ~ p.applied_ago) if p.applied_ago else ""), mono=p.mono, tint=p.tint) }}
+      {{ fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Applied" ~ ((" " ~ p.applied_ago) if p.applied_ago else ""), mono=p.mono, tint=p.tint, pay=p.pay) }}
       {% endfor %}
     </ul>
     {% endif %}

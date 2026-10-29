@@ -6,7 +6,8 @@ BOARD_URL = "https://api.ashbyhq.com/posting-api/job-board/{org}"
 def fetch(ats_identifier: str) -> list[dict]:
     # Note: not every org exposes this public board endpoint — some disable it.
     url = BOARD_URL.format(org=ats_identifier)
-    resp = request_with_retries("GET", url, timeout=30)
+    # includeCompensation adds each job's pay (compensation.summaryComponents); without it the board gives none (SC-71).
+    resp = request_with_retries("GET", url, params={"includeCompensation": "true"}, timeout=30)
     jobs = resp.json().get("jobs", [])
     return [_normalize(job) for job in jobs]
 

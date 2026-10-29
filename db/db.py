@@ -52,6 +52,9 @@ def upsert_company(conn, name, ats_type, ats_identifier):
         return cur.fetchone()[0]
 
 
+PAY_RAW_KEYS = ("compensation", "pay_input_ranges")   # Ashby's and Greenhouse's pay, in the raw posting (SC-71)
+
+
 def content_hash(posting):
     """Fingerprint of what we store. Unchanged postings (same hash) aren't
     rewritten, so a cycle that finds nothing new does almost no writes."""
@@ -62,7 +65,12 @@ def content_hash(posting):
         posting["url"], str(posting.get("ats_posted_at") or "")[:10],
     ]
     if posting.get("is_design"):
-        core.append(posting.get("raw_json"))  # full payload is kept (and so tracked) for design roles only
+        raw = posting.get("raw_json")
+        if isinstance(raw, dict):   # the parts that only carry pay are tracked through the pay itself (below), so asking a
+            raw = {k: v for k, v in raw.items() if k not in PAY_RAW_KEYS}   # board for pay does not rewrite every posting
+        core.append(raw)  # full payload is kept (and so tracked) for design roles only
+    if posting.get("pay"):
+        core.append(posting["pay"])  # only when there is some: a posting with none keeps the fingerprint it always had
     return hashlib.sha256(json.dumps(core, sort_keys=True, default=str).encode()).hexdigest()
 
 
@@ -93,6 +101,7 @@ def upsert_postings(conn, company_id, postings, backfill=False):
             p["url"], p.get("ats_posted_at"),
             psycopg2.extras.Json((p.get("raw_json") or {}) if p.get("is_design") else {}),
             content_hash(p), bool(p.get("is_design")), backfill, p.get("ats_posted_at"),
+            *_pay_columns(p.get("pay")),
         ))
     new_ids = {}
     with conn.cursor() as cur:
@@ -101,7 +110,8 @@ def upsert_postings(conn, company_id, postings, backfill=False):
             """
             INSERT INTO postings (
                 company_id, ats_posting_id, title, location, remote_type, url,
-                ats_posted_at, raw_json, content_hash, is_design, first_seen_at, last_seen_at
+                ats_posted_at, raw_json, content_hash, is_design, first_seen_at, last_seen_at,
+                pay_min, pay_max, pay_currency, pay_period, pay_source
             )
             VALUES %s
             ON CONFLICT (company_id, ats_posting_id) DO UPDATE SET
@@ -114,7 +124,13 @@ def upsert_postings(conn, company_id, postings, backfill=False):
                 content_hash = EXCLUDED.content_hash,
                 is_design = EXCLUDED.is_design,
                 last_seen_at = now(),
-                status = 'open'
+                status = 'open',
+                -- pay the board gave replaces what was stored; no pay from the board keeps what was read from the text
+                pay_min = CASE WHEN EXCLUDED.pay_source IS NOT NULL THEN EXCLUDED.pay_min ELSE postings.pay_min END,
+                pay_max = CASE WHEN EXCLUDED.pay_source IS NOT NULL THEN EXCLUDED.pay_max ELSE postings.pay_max END,
+                pay_currency = CASE WHEN EXCLUDED.pay_source IS NOT NULL THEN EXCLUDED.pay_currency ELSE postings.pay_currency END,
+                pay_period = CASE WHEN EXCLUDED.pay_source IS NOT NULL THEN EXCLUDED.pay_period ELSE postings.pay_period END,
+                pay_source = CASE WHEN EXCLUDED.pay_source IS NOT NULL THEN EXCLUDED.pay_source ELSE postings.pay_source END
             WHERE postings.content_hash IS DISTINCT FROM EXCLUDED.content_hash
                OR postings.status <> 'open'
             RETURNING id, ats_posting_id, (xmax = 0) AS is_new
@@ -122,7 +138,7 @@ def upsert_postings(conn, company_id, postings, backfill=False):
             rows,
             template="""(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 CASE WHEN %s THEN LEAST(COALESCE(%s::timestamptz, now() - interval '180 days'), now()) ELSE now() END,
-                now())""",
+                now(), %s, %s, %s, %s, %s)""",
             page_size=500,
             fetch=True,
         )
@@ -130,6 +146,13 @@ def upsert_postings(conn, company_id, postings, backfill=False):
             if is_new:
                 new_ids[ats_id] = posting_id
     return new_ids
+
+
+def _pay_columns(pay):
+    """(min, max, currency, period, source) for the postings columns; all None when there is no pay."""
+    if not pay:
+        return (None, None, None, None, None)
+    return (pay["min"], pay["max"], pay["currency"], pay["period"], pay["source"])
 
 
 def mark_stale_postings_closed(conn, company_id, seen_ats_posting_ids):
@@ -163,6 +186,7 @@ def get_open_postings(conn, user_id, since=None, keywords=()):
             """
             SELECT p.id, c.name AS company_name, c.ats_type, p.title, p.location, p.remote_type,
                    p.url, p.first_seen_at, p.is_design,
+                   p.pay_min, p.pay_max, p.pay_currency, p.pay_period,
                    COALESCE(up.applied, false) AS applied, up.hidden_at
             FROM postings p
             JOIN companies c ON c.id = p.company_id
@@ -488,12 +512,27 @@ def resume_usage(conn, user_id):
 
 
 def set_posting_description(conn, posting_id, text):
-    """Store a role's description (plain text) and when it was fetched. Caller commits."""
+    """Store a role's description (plain text) and when it was fetched. Where the board gave no pay, read it from the
+    text (SC-71); pay the board gave as data is never replaced. Caller commits."""
+    found = _pay_from_text(text)
     with conn.cursor() as cur:
         cur.execute(
-            "UPDATE postings SET description = %s, description_fetched_at = now() WHERE id = %s",
-            (text, posting_id),
+            """
+            UPDATE postings SET description = %s, description_fetched_at = now(),
+                pay_min = CASE WHEN pay_source IS NULL THEN %s ELSE pay_min END,
+                pay_max = CASE WHEN pay_source IS NULL THEN %s ELSE pay_max END,
+                pay_currency = CASE WHEN pay_source IS NULL THEN %s ELSE pay_currency END,
+                pay_period = CASE WHEN pay_source IS NULL THEN %s ELSE pay_period END,
+                pay_source = CASE WHEN pay_source IS NULL THEN %s ELSE pay_source END
+            WHERE id = %s
+            """,
+            (text, *_pay_columns(found), posting_id),
         )
+
+
+def _pay_from_text(text):
+    from collectors import pay   # imported here: db/db.py is imported by the collectors' own package
+    return pay.from_text(text)
 
 
 def clear_closed_descriptions(conn, grace_days=14):
@@ -912,6 +951,7 @@ def get_hidden(conn, user_id):
         cur.execute(
             """
             SELECT p.id, c.name AS company_name, c.ats_type, p.title, p.location, p.remote_type,
+                   p.pay_min, p.pay_max, p.pay_currency, p.pay_period,
                    up.hidden_at, up.hidden_reason
             FROM user_postings up
             JOIN postings p ON p.id = up.posting_id AND p.status = 'open'
@@ -944,6 +984,7 @@ def get_applications(conn, user_id):
         cur.execute(
             """
             SELECT p.id, c.name AS company_name, c.ats_type, p.title, p.location, p.remote_type,
+                   p.pay_min, p.pay_max, p.pay_currency, p.pay_period,
                    (SELECT max(e.created_at) FROM user_events e
                     WHERE e.user_id = up.user_id AND e.posting_id = p.id AND e.event_type = 'applied') AS applied_at
             FROM user_postings up

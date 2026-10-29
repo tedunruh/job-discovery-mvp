@@ -333,3 +333,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_postings_alert_token_idx ON user_postings
 -- kept per person and job for later profile suggestions (never applied silently).
 ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMPTZ;
 ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS hidden_reason TEXT;
+
+-- SC-71: a posting's pay range, as the job board gave it (pay_source = 'board') or as read from its description
+-- (pay_source = 'text'). NULL pay_source = no pay found (the job row shows a blank pay line). pay_min / pay_max are in
+-- pay_currency (ISO code) per pay_period (year, month, week, day or hour); either may be NULL ("from X" / "up to X").
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS pay_min NUMERIC(14,2);
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS pay_max NUMERIC(14,2);
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS pay_currency TEXT;
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS pay_period TEXT;
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS pay_source TEXT;
