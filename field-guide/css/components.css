@@ -1215,7 +1215,9 @@ button.fg-link {
   outline: 3px solid var(--fg-color-action-focus-ring);
   outline-offset: -3px;
 }
-.fg-job p {
+/* :where() keeps these card defaults at the lowest specificity, so a class on a paragraph (the serif .fg-voice question)
+   always wins. A selector like ".fg-job p" outranked ".fg-voice" and set the serif at weight 500 (SC-68). */
+:where(.fg-job) p {
   margin: 0;
   font-weight: var(--fg-font-weight-medium);
   line-height: var(--fg-font-line-height-snug);

@@ -1248,3 +1248,20 @@ be hidden.
       that is equivalent (the question wraps to its own line either way).
 - [ ] Not done: one run of the browser check timed out waiting for a toast and passed on the next four; I did not find the cause
       (suspect a slow database wake on the throwaway branch). Not mirrored: the phone state of the hide question in Figma.
+
+### 2026-10-28 — SC-68: the serif was rendering at weight 500 in one place
+**Found:** a survey of every element set in Fraunces across the login, dashboard (all three views), profile, start and gallery
+pages, at their computed weight, found exactly one offender: **"Did you apply?"** (and the same markup in the gallery) at 500.
+Cause: the job card's `.fg-job p { font-weight: medium }` (specificity 0,1,1) outranked `.fg-voice` (0,1,0) on the question, a
+paragraph inside the card. Everything else (wordmark, headlines, intros, the empty-state lines, "Why are you hiding?") was already 400.
+**Fixed at the system level:** the card's paragraph defaults are now `:where(.fg-job) p` (lowest specificity, so a class always
+wins); the font request loads Fraunces at weight 400 only (the rest of the range, 100-900, is no longer downloaded, so a stray
+weight cannot render; the wordmark's rendering is unchanged to within anti-aliasing); the rule is written in the README. **Guard:**
+`scripts/quality_check.py` now fails if any Fraunces text on any page computes to a weight other than 400, or if a Fraunces face
+other than 400 is loaded; it also checks the two question rows in the states people see them (asking, hiding). Verified to fail
+when each cause is put back (a card rule outranking the serif, the serif class set to Medium, the full weight range loaded).
+**Rework count:** 0. **Root cause:** *a descendant selector outranking a class.* A component that styles `p` inside itself beats
+any single-class style on one of those paragraphs; the check that would have caught it (serif weight) did not exist.
+- [x] Automated: serif weight exactly 400 on every page and in the two question states; Fraunces loaded at 400 only.
+- [ ] Not done: the Sprint 3 design mocks (the design canvas) have the same `.posting p` rule and set the question at 500 there; they are
+      design files and were not edited.
