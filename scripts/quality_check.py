@@ -799,15 +799,107 @@ def check_hide(browser, base, token):
         const q = li.querySelector('.fg-job-question').getBoundingClientRect();
         const g = li.querySelector('.fg-job-group').getBoundingClientRect();
         const sel = li.querySelector('.fg-job-select').getBoundingClientRect(), skip = li.querySelector('[data-skip]').getBoundingClientRect();
-        return {q: q.bottom <= g.top + 1, fill: g.left >= c.left - 0.5 && g.right <= c.right + 0.5 && g.width > c.width * 0.8,
+        const text = li.querySelector('.fg-job-title').getBoundingClientRect();   // the group lines up with the text, not the monogram
+        return {q: q.bottom <= g.top + 1, fill: Math.abs(g.left - text.left) <= 1 && g.right >= c.right - 14 && g.right <= c.right,
                 equal: Math.abs(sel.width - skip.width) <= 2, sw: document.documentElement.scrollWidth, vw: window.innerWidth} }""", pid)
     check(geo["q"] and geo["fill"] and geo["equal"] and geo["sw"] <= geo["vw"],
-          "on a phone the question has its own line and the menu and Skip fill the width equally, with no sideways scroll", str(geo))
+          "on a phone the question has its own line and the menu and Skip fill the text column equally, with no sideways scroll", str(geo))
     mp.select_option(f"#why-{pid}", "pay")
     mp.wait_for_selector(".fg-toast", timeout=8000)
     t = mp.evaluate("""() => { const r = document.querySelector('.fg-toast').getBoundingClientRect();
         return {l: r.left, r: r.right, b: r.bottom, vw: window.innerWidth, vh: window.innerHeight} }""")
     check(t["l"] >= 0 and t["r"] <= t["vw"] and t["b"] <= t["vh"], "on a phone the 'Job hidden.' toast fits the screen", str(t))
+    mctx.close()
+
+
+def check_elevated(browser, base, token):
+    """Open roles with Scout's character (SC-69): a line in Scout's voice above the board, jobs grouped by day with a
+    heading, a count and a hairline, a monogram on every card centred on the company and title lines (the same tint for a
+    company), small-caps company, an 18px title, tabular pay, a card that folds closed when it leaves (a fade with reduced
+    motion), and on a phone the monogram alone on the left with the state and action lined up with the text."""
+    ctx = browser.new_context(viewport={"width": 1280, "height": 900})
+    ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+    page = ctx.new_page()
+    page.goto(base + "/?range=all", wait_until="load")
+    page.goto(base + "/", wait_until="load")
+    voice = page.locator("[data-voice]")
+    text = voice.inner_text() if voice.count() else ""
+    check(re.fullmatch(r"(\d+ new since yesterday\.|Nothing new since yesterday\.)", text) is not None
+          and page.evaluate("document.querySelector('[data-voice]').getBoundingClientRect().bottom <= document.querySelector('.board').getBoundingClientRect().top + 1"),
+          "Scout's line sits above the board and says something true", text)
+    heads = page.evaluate("[...document.querySelectorAll('.fg-day')].map(s => ({label: s.querySelector('.fg-day-label').firstChild.textContent.trim(), count: parseInt(s.querySelector('.fg-day-count').textContent.replace(/\\D+/g, ''), 10), shown: s.querySelectorAll('li.fg-job').length, rule: !!s.querySelector('.fg-day-rule')}))")
+    order = ["Today", "Yesterday", "Earlier this week", "Last week", "Earlier"]
+    check(heads and [h["label"] for h in heads] == [l for l in order if l in [h["label"] for h in heads]]
+          and all(h["rule"] and h["count"] >= h["shown"] > 0 for h in heads),
+          "jobs are grouped by day, in order, each with a count and a hairline", str(heads[:4]))
+    cards = page.evaluate("""() => [...document.querySelectorAll('li.fg-job')].slice(0, 12).map(li => {
+        const m = li.querySelector('.fg-mono'), mr = m.getBoundingClientRect();
+        const c = li.querySelector('.fg-job-company').getBoundingClientRect(), t = li.querySelector('.fg-job-title').getBoundingClientRect();
+        const mid = (c.top + t.bottom) / 2, cs = getComputedStyle(li.querySelector('.fg-job-company'));
+        const title = getComputedStyle(li.querySelector('.fg-job-title')), pay = getComputedStyle(li.querySelector('.fg-job-pay'));
+        return {company: li.querySelector('.fg-job-company').textContent.trim(), tint: m.className, hidden: m.getAttribute('aria-hidden'), w: Math.round(mr.width), h: Math.round(mr.height),
+                off: Math.abs((mr.top + mr.bottom) / 2 - mid), caps: cs.fontVariantCaps, title: title.fontSize, tab: pay.fontVariantNumeric, text: m.textContent.trim().length} })""")
+    check(cards and all(c["hidden"] == "true" and c["w"] == 40 and c["h"] == 40 and 1 <= c["text"] <= 3 for c in cards),
+          "every card has a decorative 40px monogram with its initials", str(cards[:1]))
+    check(cards and all(c["off"] <= 4 for c in cards), "the monogram is centred on the company and title lines", f"worst {max(c['off'] for c in cards):.1f}px")
+    seen = {}
+    for c in cards:
+        seen.setdefault(c["company"], set()).add(c["tint"])
+    check(all(len(v) == 1 for v in seen.values()), "a company has the same tint on every card", str({k: v for k, v in seen.items() if len(v) > 1}))
+    check(cards and all(c["caps"] == "all-small-caps" and c["title"] == "18px" and "tabular-nums" in c["tab"] for c in cards),
+          "type: company in small caps, 18px title, tabular numbers for pay", str(cards[:1]))
+    check(page.locator(".fg-fit, .fg-job-fit").count() == 0, "no fit line on cards until the fit score exists")
+
+    # a card that leaves folds closed; the day's count follows
+    first = page.locator("li.fg-job").first
+    pid = first.get_attribute("id").replace("posting-", "")
+    before = page.evaluate("(id) => { const s = document.getElementById('posting-' + id).closest('.fg-day'); return parseInt(s.querySelector('.fg-day-count').textContent.replace(/\\D+/g, ''), 10) }", pid)
+    page.evaluate("""(id) => { window.__leaving = []; const li = document.getElementById('posting-' + id);
+        new MutationObserver(() => { if (li.classList.contains('is-leaving')) window.__leaving.push(getComputedStyle(li).animationName) }).observe(li, {attributes: true}) }""", pid)
+    first.locator("[data-hide] button").click()
+    page.wait_for_selector(f"#why-{pid}")
+    first.locator("button", has_text="Skip").click()
+    page.wait_for_selector(".fg-toast", timeout=8000)
+    seen_anim = page.evaluate("window.__leaving")
+    after = page.evaluate("(id) => { const s = document.getElementById('posting-' + id).closest('.fg-day'); return parseInt(s.querySelector('.fg-day-count').textContent.replace(/\\D+/g, ''), 10) }", pid)
+    check("fg-fold" in seen_anim, "a card that leaves folds closed", f"{seen_anim}")
+    check(after == before - 1, "...and its day's count goes down by one", f"{before} -> {after}")
+    page.locator(".fg-toast button", has_text="Undo").click()
+    page.wait_for_function("(id) => { const r = document.getElementById('posting-' + id); return r && !r.hidden }", arg=pid, timeout=8000)
+    back = page.evaluate("(id) => parseInt(document.getElementById('posting-' + id).closest('.fg-day').querySelector('.fg-day-count').textContent.replace(/\\D+/g, ''), 10)", pid)
+    check(back == before, "...and Undo brings the card and the count back", f"{back} vs {before}")
+    ctx.close()
+
+    # reduced motion: only a fade
+    rctx = browser.new_context(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+    rctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+    rp = rctx.new_page()
+    rp.goto(base + "/", wait_until="load")
+    pid = rp.locator("li.fg-job").first.get_attribute("id").replace("posting-", "")
+    rp.evaluate("""(id) => { window.__leaving = []; const li = document.getElementById('posting-' + id);
+        new MutationObserver(() => { if (li.classList.contains('is-leaving')) window.__leaving.push(getComputedStyle(li).animationName) }).observe(li, {attributes: true}) }""", pid)
+    rp.locator(f"#posting-{pid} [data-hide] button").click()
+    rp.wait_for_selector(f"#why-{pid}")
+    rp.locator(f"#posting-{pid} button", has_text="Skip").click()
+    rp.wait_for_selector(".fg-toast", timeout=8000)
+    check("fg-fade" in rp.evaluate("window.__leaving") and "fg-fold" not in rp.evaluate("window.__leaving"),
+          "with reduced motion the card only fades", f"{rp.evaluate('window.__leaving')}")
+    check(rp.evaluate("getComputedStyle(document.querySelector('.fg-toast')).animationName") == "none", "...and the toast does not rise")
+    rp.locator(".fg-toast button", has_text="Undo").click()
+    rctx.close()
+
+    # a phone: the monogram alone on the left, the state and the action lined up with the text
+    mctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    mctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+    mp = mctx.new_page()
+    mp.goto(base + "/", wait_until="load")
+    geo = mp.evaluate("""() => { const li = document.querySelector('li.fg-job'); const m = li.querySelector('.fg-mono').getBoundingClientRect();
+        const t = li.querySelector('.fg-job-title').getBoundingClientRect(), st = li.querySelector('[data-state-top]').getBoundingClientRect();
+        const ac = li.querySelector('[data-action] .fg-button').getBoundingClientRect(), c = li.getBoundingClientRect(), pay = li.querySelector('.fg-job-pay').getBoundingClientRect();
+        return {mono: Math.round(m.width), monoLeft: m.left >= c.left, textAfterMono: t.left >= m.right, stateAligned: Math.abs(st.left - t.left) <= 1,
+                actionAligned: Math.abs(ac.left - t.left) <= 1, payAligned: Math.abs(pay.left - t.left) <= 1, sw: document.documentElement.scrollWidth, vw: innerWidth} }""")
+    check(geo["mono"] == 36 and geo["textAfterMono"] and geo["stateAligned"] and geo["actionAligned"] and geo["payAligned"] and geo["sw"] <= geo["vw"],
+          "on a phone the monogram sits alone on the left and the state, action and pay line up with the text", str(geo))
     mctx.close()
 
 
@@ -983,6 +1075,7 @@ def main():
             check_signin_states(browser, base)
             check_return_ask(browser, base, token)
             check_hide(browser, base, token)
+            check_elevated(browser, base, token)
             check_alerts_switch_no_js(browser, base, token)
             header_infos = {}
             for (w, h) in VIEWPORTS:

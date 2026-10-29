@@ -77,7 +77,7 @@ class Card(Base):
     def test_the_state_column_says_where_then_when(self):
         c = self.card(self.get(), 1)
         self.assertIn("<p data-state-top>Discovered on Greenhouse</p>", c)
-        self.assertRegex(c, r'<p class="fg-job-when" data-state-when>1 hour ago</p>')
+        self.assertRegex(c, r'<p class="fg-job-when" data-state-when>\d{1,2}:\d{2} [AP]M</p>')   # the time of day, not "1 hour ago"
 
     def test_the_action_spot_is_apply_then_hide_with_the_job_named_for_screen_readers(self):
         c = self.card(self.get(), 2)

@@ -1265,3 +1265,36 @@ any single-class style on one of those paragraphs; the check that would have cau
 - [x] Automated: serif weight exactly 400 on every page and in the two question states; Fraunces loaded at 400 only.
 - [ ] Not done: the Sprint 3 design mocks (the design canvas) have the same `.posting p` rule and set the question at 500 there; they are
       design files and were not edited.
+
+### 2026-10-29 — SC-69: Open roles with Scout's character
+**Shipped (from the SC-69 card and its mock):** **Scout's line** in the serif above the board, built from real counts ("10 new
+since yesterday.", "Nothing new since yesterday.", or when caught up "You're caught up. I'll keep looking."; nothing when a filter
+has emptied the list). Open roles is **grouped by day** (Today, Yesterday, Earlier this week, Last week, and Earlier for anything older; weeks run
+Sunday to Saturday; each group with a true count and a hairline) and times are short ("9:40 AM" today and yesterday, "Mon" for this
+week and last week, "Oct 14" beyond). Days are the person's calendar days in US Central, not UTC. Every card has a **company monogram** (two initials on a soft
+palette tint; the same tint every time for a company; decorative; 40px, 36px on a phone), the company as a small-caps overline, an
+18px title, tabular pay. A card that leaves (Yes or a hide) **folds closed** over 240ms, its day's count follows, and the toast
+rises; with reduced motion both only fade. The **caught-up state** says so, with a faint piece of the contour line. On a phone the
+monogram sits alone on the left and the state, action and pay line up with the text. New in Field Guide with gallery entries:
+**Monogram, Fit (five pips and a word, display only, not on rows until SC-70), Day heading**; new tokens `font.size.title` (18px) and
+`size.mono` / `size.mono-phone` (40 / 36px). Figma: Monogram (tint x size), Fit (level 1 to 5), Day heading, the Job card restyled
+(desktop and phone), and gallery rows for each.
+**Choices not in the card:** the design defines only Today, Yesterday and Earlier this week; after that Ted chose **Last week**
+(calendar weeks, Sunday to Saturday) and anything older sits under **Earlier**; the caught-up state shows only when nothing is filtered (posted range All and Work type Any), otherwise the filter message stays
+because it is truer; the card's Figma small caps are drawn as 11px capitals (Albert Sans has no small-caps feature there).
+**Rework count:** 2 in my own checks. **Root causes:** *a base rule written after its media query.* The phone monogram stayed 40px
+because `.fg-mono` was defined after the `@media` block that shrinks it; the phone check caught it. *a check written for the layout
+it replaced.* The phone group check expected the button group to fill the card; with the new indent it fills the text column, so
+the check now says that.
+**Standing checks added:**
+- [x] Automated (`tests/test_elevate.py`, 22 tests, plus the updated card tests): day boundaries in Central (11:59 PM vs 12:01 AM, six
+      vs seven days), short times, true group counts, group order, monogram initials, a steady tint (30 names, case-insensitive),
+      Scout's line for each case, the page (line above the board, groups, counts, hairlines, times, decorative monograms, no fit on rows,
+      caught up vs a filter-emptied list), and the size tokens. 25 mutation checks on a copy of the repo, all caught.
+- [x] Automated, in a real browser (`scripts/quality_check.py`, 366 checks): the line above the board; groups in order with a count and
+      hairline; every card has a 40px aria-hidden monogram centred on the company and title lines, the same tint per company;
+      small-caps company, 18px title, tabular pay; a leaving card runs the fold (a fade with reduced motion; the toast does not
+      rise); the day count goes down and Undo restores it; on a phone the monogram is 36px and alone and state, action and pay line
+      up with the text. 12 deliberate breakages on a throwaway database branch (deleted afterwards): all caught.
+- [ ] Not done: the caught-up state is checked in unit tests and by screenshot only (the browser check's user always has jobs); the
+      page does not swap to the caught-up state live when the last card leaves (it appears on the next load).

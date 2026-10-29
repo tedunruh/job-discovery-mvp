@@ -614,16 +614,57 @@
   <section class="spec spec--stack" data-component="job">
     <div>
       <h3>Job card</h3>
-      <p class="spec-use">Use for one job in a list. The job on the left (company, title, work type and place, pay), where it was found and when in the middle, and one action on the right. The whole card opens the posting; the action sits above that. Apply is the main action and Hide the quiet one; coming back from the job, the question "Did you apply?" takes their place (no Hide during the question). Answers and actions are one group and never wrap apart. Pay keeps its line when it isn't known, so every card is the same height. A list of jobs you've applied to has no action. Don't add menus.</p>
+      <p class="spec-use">Use for one job in a list. The job on the left (a company monogram, company, title, work type and place, pay, and a fit once scores exist), where it was found and when in the middle, and one action on the right. The whole card opens the posting; the action sits above that. Apply is the main action and Hide the quiet one; coming back from the job, the question "Did you apply?" takes their place (no Hide during the question). Answers and actions are one group and never wrap apart. Pay keeps its line when it isn't known, so every card is the same height. A list of jobs you've applied to has no action. Don't add menus.</p>
       <code class="spec-code">{% raw %}{% call fg.job(id, title, href, company, place, state_top, state_bottom, viewed, pay) %}action{% endcall %}{% endraw %} · .fg-job-list .fg-job · .fg-job-group · .fg-job-select</code>
     </div>
     <div class="states">
-      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Open role: Apply and Hide</span><ul class="fg-job-list">{% call fg.job("g-job-1", "Senior Product Designer", "#layout", "Northwind Health", "Remote, US", "Discovered on Greenhouse", "45 minutes ago", pay="$150,000 - $188,000") %}<span class="fg-job-group"><a class="fg-button fg-button--secondary" href="#layout">Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a><button class="fg-button fg-button--ghost" type="button">Hide</button></span>{% endcall %}</ul></div>
-      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Open role: viewed (a quiet marker, no date), pay not known, skills line</span><ul class="fg-job-list">{% call fg.job("g-job-2", "Staff Product Designer, Design Systems", "#layout", "Juniper Labs", "Hybrid, Denver, CO", "Discovered on Ashby", "5 hours ago", viewed=True, skills="Matches 4 of your skills: Figma, Prototyping, Accessibility, Research") %}<span class="fg-job-group"><a class="fg-button fg-button--secondary" href="#layout">Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a><button class="fg-button fg-button--ghost" type="button">Hide</button></span>{% endcall %}</ul></div>
-      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Open role: back from the job, asking</span><ul class="fg-job-list">{% call fg.job("g-job-3", "Senior UX Designer", "#layout", "Fieldstone", "Remote, US", "Discovered on Lever", "1 day ago", viewed=True) %}<p class="fg-voice fg-job-question">Did you apply?</p><span class="fg-job-group"><button class="fg-button fg-button--secondary" type="button">Yes</button><button class="fg-button fg-button--secondary" type="button">Not yet</button></span>{% endcall %}</ul></div>
-      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Open role: Hide asks why (a menu and Skip; either one hides the job)</span><ul class="fg-job-list">{% call fg.job("g-job-4", "Lead Product Designer", "#layout", "Brightline", "Hybrid, Chicago, IL", "Discovered on Greenhouse", "1 day ago", viewed=True) %}<label class="fg-voice fg-job-question" for="g-why">Why are you hiding?</label><span class="fg-job-group"><span class="fg-select fg-job-select"><select id="g-why"><option value="" disabled selected>Select</option><option>Not my kind of role</option><option>Too junior</option><option>Too senior</option><option>Location or remote setup</option><option>Pay</option><option>Not interested in this company</option><option>Already applied</option><option>Other</option></select><svg width="14" height="8" viewBox="0 0 14 8" fill="none" aria-hidden="true"><path d="M1 1L7 7L13 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><button class="fg-button fg-button--ghost" type="button">Skip</button></span>{% endcall %}</ul></div>
-      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Application: one line, no action</span><ul class="fg-job-list">{{ fg.job("g-job-5", "Design Lead, Platform", "#layout", "Larkspur", "Remote, US", "Applied 3 days ago") }}</ul></div>
-      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Jobs you hid: when and why, with Unhide</span><ul class="fg-job-list">{% call fg.job("g-job-6", "Product Designer II", "#layout", "Copperline", "Remote, US", "Hidden 2 days ago", "Too junior") %}<button class="fg-button fg-button--secondary" type="button">Unhide</button>{% endcall %}</ul></div>
+      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Open role: Apply and Hide</span><ul class="fg-job-list">{% call fg.job("g-job-1", "Senior Product Designer", "#layout", "Northwind Health", "Remote, US", "Discovered on Greenhouse", "9:40 AM", pay="$150,000 - $188,000", mono="NH", tint="forest") %}<span class="fg-job-group"><a class="fg-button fg-button--secondary" href="#layout">Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a><button class="fg-button fg-button--ghost" type="button">Hide</button></span>{% endcall %}</ul></div>
+      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Open role: viewed (a quiet marker, no date), pay not known, skills line, and a fit once scores exist</span><ul class="fg-job-list">{% call fg.job("g-job-2", "Staff Product Designer, Design Systems", "#layout", "Juniper Labs", "Hybrid, Denver, CO", "Discovered on Ashby", "8:15 AM", viewed=True, skills="Matches 4 of your skills: Figma, Prototyping, Accessibility, Research", mono="JL", tint="sage", fit_score=4) %}<span class="fg-job-group"><a class="fg-button fg-button--secondary" href="#layout">Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a><button class="fg-button fg-button--ghost" type="button">Hide</button></span>{% endcall %}</ul></div>
+      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Open role: back from the job, asking</span><ul class="fg-job-list">{% call fg.job("g-job-3", "Senior UX Designer", "#layout", "Fieldstone", "Remote, US", "Discovered on Lever", "4:30 PM", viewed=True, mono="FI", tint="clay") %}<p class="fg-voice fg-job-question">Did you apply?</p><span class="fg-job-group"><button class="fg-button fg-button--secondary" type="button">Yes</button><button class="fg-button fg-button--secondary" type="button">Not yet</button></span>{% endcall %}</ul></div>
+      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Open role: Hide asks why (a menu and Skip; either one hides the job)</span><ul class="fg-job-list">{% call fg.job("g-job-4", "Lead Product Designer", "#layout", "Brightline", "Hybrid, Chicago, IL", "Discovered on Greenhouse", "11:10 AM", viewed=True, mono="BL", tint="sage") %}<label class="fg-voice fg-job-question" for="g-why">Why are you hiding?</label><span class="fg-job-group"><span class="fg-select fg-job-select"><select id="g-why"><option value="" disabled selected>Select</option><option>Not my kind of role</option><option>Too junior</option><option>Too senior</option><option>Location or remote setup</option><option>Pay</option><option>Not interested in this company</option><option>Already applied</option><option>Other</option></select><svg width="14" height="8" viewBox="0 0 14 8" fill="none" aria-hidden="true"><path d="M1 1L7 7L13 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><button class="fg-button fg-button--ghost" type="button">Skip</button></span>{% endcall %}</ul></div>
+      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Application: one line, no action</span><ul class="fg-job-list">{{ fg.job("g-job-5", "Design Lead, Platform", "#layout", "Larkspur", "Remote, US", "Applied 3 days ago", mono="LA", tint="gold") }}</ul></div>
+      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Jobs you hid: when and why, with Unhide</span><ul class="fg-job-list">{% call fg.job("g-job-6", "Product Designer II", "#layout", "Copperline", "Remote, US", "Hidden 2 days ago", "Too junior", mono="CO", tint="gold") %}<button class="fg-button fg-button--secondary" type="button">Unhide</button>{% endcall %}</ul></div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="mono">
+    <div>
+      <h3>Company monogram</h3>
+      <p class="spec-use">Use as a mark for a company in a job card. Two initials in Ink on a soft palette tint, the same tint every time for a company, so a list reads at a glance. Decorative, so it is hidden from screen readers (the company name is in the text beside it). No real logos: licensing and fetching.</p>
+      <code class="spec-code">{% raw %}{{ fg.job(..., mono="JL", tint="sage") }}{% endraw %} · .fg-mono .fg-mono--sage | --gold | --clay | --forest</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Sage</span><span class="fg-mono fg-mono--sage" aria-hidden="true" style="grid-row: auto">JL</span></div>
+      <div class="state"><span class="state-label">Goldenrod</span><span class="fg-mono fg-mono--gold" aria-hidden="true" style="grid-row: auto">CS</span></div>
+      <div class="state"><span class="state-label">Clay</span><span class="fg-mono fg-mono--clay" aria-hidden="true" style="grid-row: auto">FI</span></div>
+      <div class="state"><span class="state-label">Forest</span><span class="fg-mono fg-mono--forest" aria-hidden="true" style="grid-row: auto">NH</span></div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="fit">
+    <div>
+      <h3>Fit</h3>
+      <p class="spec-use">Use to say how well a job fits a person: five pips and one word for the level. The word carries the meaning, so the pips are hidden from screen readers; filled versus empty carries the count, not colour alone. Display only: not a button. It is Scout's estimate, never called an ATS score. Not shown on jobs until the fit score exists (SC-70).</p>
+      <code class="spec-code">{% raw %}{{ fg.fit(score) }}{% endraw %} · .fg-fit .fg-pips .fg-pip .fg-pip--on</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Light</span>{{ fg.fit(1) }}</div>
+      <div class="state"><span class="state-label">Okay</span>{{ fg.fit(2) }}</div>
+      <div class="state"><span class="state-label">Good</span>{{ fg.fit(3) }}</div>
+      <div class="state"><span class="state-label">Great</span>{{ fg.fit(4) }}</div>
+      <div class="state"><span class="state-label">Strong</span>{{ fg.fit(5) }}</div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="day">
+    <div>
+      <h3>Day heading</h3>
+      <p class="spec-use">Use to group a list by when things were found: a small label, how many are in the group, and a hairline across. The groups follow the sort, so the order is obvious.</p>
+      <code class="spec-code">{% raw %}{{ fg.day(label, count) }}{% endraw %} · .fg-day .fg-day-head .fg-day-label .fg-day-count .fg-day-rule</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Today</span><section class="fg-day" aria-label="Today">{{ fg.day("Today", 3) }}</section></div>
+      <div class="state state--wide" style="max-width: none; flex: 0 0 100%"><span class="state-label">Earlier this week</span><section class="fg-day" aria-label="Earlier this week">{{ fg.day("Earlier this week", 2) }}</section></div>
     </div>
   </section>
 

@@ -1222,20 +1222,38 @@ button.fg-link {
   font-weight: var(--fg-font-weight-medium);
   line-height: var(--fg-font-line-height-snug);
 }
-.fg-job-lead { min-width: 0; }
-.fg-job-title { font-size: var(--fg-font-size-lg); max-width: 500px; }
+/* The job column is a small grid: the monogram on the left spans the company and title lines and centres on them; the
+   text (company, title, place, pay, fit) all sits in the second column, aligned with each other. */
+.fg-job-lead {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: var(--fg-size-mono) minmax(0, 1fr);
+  column-gap: var(--fg-space-3);
+  row-gap: 2px;
+  align-items: center;
+}
+.fg-job-lead > p { grid-column: 2; }
+.fg-job-title { font-size: var(--fg-font-size-title); line-height: var(--fg-font-line-height-tight); max-width: 520px; }
 .fg-job-link { color: inherit; text-decoration: none; outline: none; }
 .fg-job-link::after { content: ""; position: absolute; inset: 0; }
 /* The job column, top to bottom: company (a small overline), title, work type and place, then pay. Pay keeps its line
    when it is not known (a blank line, not a dash that reads as an error), so every card is the same height. */
-.fg-job-company { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-primary); }
+/* The company is a small-caps overline with a little letter spacing. */
+.fg-job-company {
+  font-size: var(--fg-font-size-sm);
+  color: var(--fg-color-text-secondary);
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.05em;
+}
 .fg-job-subline { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
 .fg-job-pay {
-  font-size: var(--fg-font-size-xs);
+  font-size: var(--fg-font-size-sm);
   color: var(--fg-color-text-secondary);
+  font-variant-numeric: tabular-nums;
   min-height: calc(var(--fg-font-size-xs) * var(--fg-font-line-height-snug));
 }
 .fg-job-skills { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
+.fg-job-fit { margin-top: var(--fg-space-1); }
 .fg-job-second {
   display: flex;
   align-items: center;
@@ -1252,7 +1270,7 @@ button.fg-link {
   font-size: var(--fg-font-size-sm);
   color: var(--fg-color-text-secondary);
 }
-.fg-job-when { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--fg-space-1); }
+.fg-job-when { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--fg-space-1); font-variant-numeric: tabular-nums; }
 /* Viewed: an eye icon plus the word, in the same quiet text as the time. Never colour alone. It has no date of its
    own: the list is sorted by when jobs were found, so the time on line two is always the discovery time. */
 .fg-job-viewed { display: inline-flex; align-items: center; gap: var(--fg-space-1); }
@@ -1290,14 +1308,99 @@ button.fg-link {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "lead" "state" "action";
   }
-  .fg-job-lead { grid-area: lead; }
+  .fg-job-lead { grid-area: lead; grid-template-columns: var(--fg-size-mono-phone) minmax(0, 1fr); }
   .fg-job-second { display: contents; }
-  .fg-job-state { grid-area: state; }
-  .fg-job-action { grid-area: action; justify-content: flex-start; flex-direction: column; align-items: stretch; }
+  /* On a phone the monogram sits alone on the left; the state and the action line up with the text, not under it. */
+  .fg-job-state { grid-area: state; padding-left: calc(var(--fg-size-mono-phone) + var(--fg-space-3)); }
+  .fg-job-action { grid-area: action; justify-content: flex-start; flex-direction: column; align-items: stretch; padding-left: calc(var(--fg-size-mono-phone) + var(--fg-space-3)); }
   .fg-job-action .fg-job-question { margin-right: 0; }
   /* Phone: the question on its own line, then the group fills the width with equal buttons. */
   .fg-job-group { display: flex; width: 100%; }
   /* a basis of half the group, not 0: a button's padding would otherwise make it wider than its neighbour */
   .fg-job-group .fg-button, .fg-job-group .fg-job-select { flex: 1 1 50%; min-width: 0; }
   .fg-job-group .fg-job-select select { width: 100%; }
+}
+
+/* ---------- Company monogram (SC-69) ---------- */
+/* Two initials on a soft palette tint, in Ink: a mark for a company without a logo (no real logos: licensing and
+   fetching). Decorative, so it is aria-hidden; the company's name is in the text beside it. One tint per company, the
+   same every time. */
+.fg-mono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: var(--fg-size-mono);
+  height: var(--fg-size-mono);
+  grid-column: 1;
+  grid-row: 1 / 3;
+  border-radius: var(--fg-radius-lg);
+  font-size: var(--fg-font-size-md);
+  font-weight: var(--fg-font-weight-demibold);
+  letter-spacing: 0.02em;
+  color: var(--fg-color-text-primary);
+}
+@media (max-width: 680px) {
+  .fg-mono { width: var(--fg-size-mono-phone); height: var(--fg-size-mono-phone); }
+}
+.fg-mono--sage { background: var(--fg-color-signal-support-subtle); }
+.fg-mono--gold { background: var(--fg-color-signal-discovery-subtle); }
+.fg-mono--clay { background: var(--fg-color-signal-attention-subtle); }
+.fg-mono--forest { background: var(--fg-color-signal-progress-subtle); }
+
+/* ---------- Fit (SC-69) ---------- */
+/* How well a job fits, as five pips and one word for the level ("Great fit"). The word carries the meaning, so the pips
+   are decorative to a screen reader. Filled versus empty carries the count (shape, not colour alone); the filled pip's
+   edge is a deeper Goldenrod so it clears 3:1 against the card with no black outline. Display only: it is not a
+   button, and it is never called an ATS score (it is Scout's estimate). */
+.fg-fit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fg-space-2);
+  font-size: var(--fg-font-size-sm);
+  font-weight: var(--fg-font-weight-medium);
+  color: var(--fg-color-text-secondary);
+}
+.fg-pips { display: inline-flex; gap: 3px; }
+.fg-pip {
+  box-sizing: border-box;
+  width: var(--fg-space-2);
+  height: var(--fg-space-2);
+  border-radius: var(--fg-radius-full);
+  border: 1px solid var(--fg-color-border-strong);
+}
+.fg-pip--on {
+  background: var(--fg-color-signal-discovery);
+  border-color: color-mix(in srgb, var(--fg-color-signal-discovery) 62%, var(--fg-color-palette-ink));
+}
+
+/* ---------- Day heading (SC-69) ---------- */
+/* Groups a list by when jobs were found: a small label, how many are in the group, and a hairline across. */
+.fg-day-head { display: flex; align-items: center; gap: var(--fg-space-3); margin: 0 0 var(--fg-space-2); }
+.fg-day-label {
+  margin: 0;
+  font-size: var(--fg-font-size-sm);
+  font-weight: var(--fg-font-weight-demibold);
+  color: var(--fg-color-text-primary);
+  white-space: nowrap;
+}
+.fg-day-count { font-weight: var(--fg-font-weight-medium); color: var(--fg-color-text-secondary); }
+.fg-day-rule { flex: 1; height: 1px; background: var(--fg-color-border-subtle); }
+.fg-day + .fg-day { margin-top: var(--fg-space-6); }
+.fg-day[hidden] { display: none; }
+
+/* ---------- Motion for a card that leaves (SC-69) ---------- */
+/* After Yes or a hide, the card folds closed instead of jumping away. With reduced motion it only fades. */
+.fg-job.is-leaving { animation: fg-fold 240ms ease forwards; pointer-events: none; overflow: hidden; }
+@keyframes fg-fold {
+  0% { opacity: 1; max-height: 240px; }
+  40% { opacity: 0; }
+  100% { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-bottom: calc(var(--fg-space-2) * -1); }
+}
+@keyframes fg-rise { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+.fg-toast { animation: fg-rise 220ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .fg-job.is-leaving { animation: fg-fade 160ms linear forwards; }
+  @keyframes fg-fade { to { opacity: 0; } }
+  .fg-toast { animation: none; }
 }

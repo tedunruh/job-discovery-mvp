@@ -89,6 +89,37 @@
     }
   }
 
+  /* A card that leaves folds closed (CSS: .is-leaving; with reduced motion it only fades), then is taken out. The day
+     heading's count follows, and the heading goes when its group is empty. */
+  function leave(row, then) {
+    var finished = false;
+    function finish() {
+      if (finished) return;
+      finished = true;
+      row.classList.remove("is-leaving");
+      row.hidden = true;
+      dayCount(row, -1);
+      then();
+    }
+    row.classList.add("is-leaving");
+    row.addEventListener("animationend", finish, { once: true });
+    setTimeout(finish, 320);          // in case the animation never runs (hidden tab, no animation support)
+  }
+
+  function dayCount(row, delta) {
+    var section = row.closest(".fg-day");
+    var count = section && section.querySelector(".fg-day-count");
+    if (!count) return;
+    var n = Math.max(0, parseInt(count.textContent.replace(/\D+/g, ""), 10) + delta);
+    count.textContent = "\u00b7 " + n;
+    section.hidden = n === 0;
+  }
+
+  function comeBack(row) {
+    row.hidden = false;
+    dayCount(row, 1);
+  }
+
   function post(action, fields) {
     return fetch(action, {
       method: "POST",
@@ -104,19 +135,20 @@
     var id = idOf(row);
     return post("/set_applied/" + id, { applied: "true" }).then(function (response) {
       if (!response.ok) return false;
-      row.hidden = true;
       adjust({ open: -1, apps: 1 });
       if (live) live.textContent = "";
-      if (window.fgToast && appliedToast) {
-        window.fgToast.show(appliedToast, { onUndo: function () {
-          post("/set_applied/" + id, { applied: "false" }).then(function (r) {
-            if (!r.ok) return;
-            row.hidden = false;
-            showApply(row);
-            adjust({ open: 1, apps: -1 });
-          });
-        } });
-      }
+      leave(row, function () {
+        if (window.fgToast && appliedToast) {
+          window.fgToast.show(appliedToast, { onUndo: function () {
+            post("/set_applied/" + id, { applied: "false" }).then(function (r) {
+              if (!r.ok) return;
+              comeBack(row);
+              showApply(row);
+              adjust({ open: 1, apps: -1 });
+            });
+          } });
+        }
+      });
       return true;
     }).catch(function () { return false; });
   }
@@ -125,18 +157,19 @@
     var id = idOf(row);
     return post("/hide/" + id, reason ? { reason: reason } : {}).then(function (response) {
       if (!response.ok) return;
-      row.hidden = true;
       adjust({ open: -1, hidden: 1 });
-      if (window.fgToast && simpleToast) {
-        window.fgToast.show(simpleToast, { text: "Job hidden.", onUndo: function () {
-          post("/unhide/" + id).then(function (r) {
-            if (!r.ok) return;
-            row.hidden = false;
-            showApply(row);
-            adjust({ open: 1, hidden: -1 });
-          });
-        } });
-      }
+      leave(row, function () {
+        if (window.fgToast && simpleToast) {
+          window.fgToast.show(simpleToast, { text: "Job hidden.", onUndo: function () {
+            post("/unhide/" + id).then(function (r) {
+              if (!r.ok) return;
+              comeBack(row);
+              showApply(row);
+              adjust({ open: 1, hidden: -1 });
+            });
+          } });
+        }
+      });
     }).catch(function () { /* the card stays as it was */ });
   }
 

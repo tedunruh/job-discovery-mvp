@@ -259,8 +259,9 @@
 {%- endmacro %}
 
 {#- Job card: one job in a list (use inside <ul class="fg-job-list">). id = the card's own DOM id.
-    The job column: company (overline), title (the link that opens the posting), place ("Remote, US"), pay (blank when
-    not known). The state column: state_top ("Discovered on Ashby", "Applied 3 days ago", "Hidden 2 days ago") and,
+    The job column: a company monogram (mono = initials, tint = sage, gold, clay or forest), company (a small-caps overline),
+    title (the link that opens the posting), place ("Remote, US"), pay (blank when not known) and, once fit scores
+    exist, fit_score 1 to 5 (five pips and a word). The state column: state_top ("Discovered on Ashby", "Applied 3 days ago", "Hidden 2 days ago") and,
     under it, state_bottom (when it was found, or why it was hidden); viewed=True adds the quiet Viewed marker after
     state_bottom. The call block is the one action spot on the right (Apply and Hide, the question "Did you apply?", the
     reason menu, Unhide); leave it out and the card has no action.
@@ -269,15 +270,30 @@
 {% macro job_viewed() -%}
 <span class="fg-job-viewed" data-viewed><span aria-hidden="true">·</span><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 8C2.9 5.2 5.2 3.5 8 3.5S13.1 5.2 14.5 8C13.1 10.8 10.8 12.5 8 12.5S2.9 10.8 1.5 8Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.4"/></svg>Viewed</span>
 {%- endmacro %}
-{% macro job(id, title, href, company, place, state_top, state_bottom="", viewed=False, pay="", skills="") -%}
+{% macro fit(score) -%}
+{%- set labels = ["", "Light fit", "Okay fit", "Good fit", "Great fit", "Strong fit"] -%}
+<span class="fg-fit"><span class="fg-pips" aria-hidden="true">{% for i in range(5) %}<span class="fg-pip{{ ' fg-pip--on' if i < score else '' }}"></span>{% endfor %}</span>{{ labels[score] }}</span>
+{%- endmacro %}
+{#- Day heading: the label, how many jobs are in the group, and a hairline across. The caller wraps the group in
+    <section class="fg-day" aria-label="Today">. -#}
+{% macro day(label, count) -%}
+<div class="fg-day-head"><h2 class="fg-day-label">{{ label }} <span class="fg-day-count">· {{ count }}</span></h2><span class="fg-day-rule" aria-hidden="true"></span></div>
+{%- endmacro %}
+{% macro job(id, title, href, company, place, state_top, state_bottom="", viewed=False, pay="", skills="", mono="", tint="sage", fit_score=0) -%}
 <li class="fg-job" id="{{ id }}">
   <div class="fg-job-lead">
+    {%- if mono %}
+    <span class="fg-mono fg-mono--{{ tint }}" aria-hidden="true">{{ mono }}</span>
+    {%- endif %}
     <p class="fg-job-company">{{ company }}</p>
     <p class="fg-job-title"><a class="fg-job-link" href="{{ href }}" target="_blank" rel="noopener">{{ title }}</a></p>
     <p class="fg-job-subline">{{ place }}</p>
     <p class="fg-job-pay">{{ pay or "\u00a0" }}</p>
     {%- if skills %}
     <p class="fg-job-skills">{{ skills }}</p>
+    {%- endif %}
+    {%- if fit_score %}
+    <p class="fg-job-fit">{{ fit(fit_score) }}</p>
     {%- endif %}
   </div>
   <div class="fg-job-second">

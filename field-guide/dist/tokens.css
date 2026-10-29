@@ -71,6 +71,8 @@
   /* size */
   --fg-size-touch-target: 44px;
   --fg-size-control: 18px;
+  --fg-size-mono: 40px;
+  --fg-size-mono-phone: 36px;
 
   /* font.family */
   --fg-font-family-display: Fraunces, Georgia, serif;
@@ -89,6 +91,7 @@
   --fg-font-size-sm: 14px;
   --fg-font-size-md: 15px;
   --fg-font-size-lg: 16px;
+  --fg-font-size-title: 18px;
   --fg-font-size-xl: 20px;
   --fg-font-size-2xl: 24px;
   --fg-font-size-3xl: 28px;
