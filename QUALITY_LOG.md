@@ -1269,9 +1269,9 @@ any single-class style on one of those paragraphs; the check that would have cau
 ### 2026-10-29 — SC-69: Open roles with Scout's character
 **Shipped (from the SC-69 card and its mock):** **Scout's line** in the serif above the board, built from real counts ("10 new
 since yesterday.", "Nothing new since yesterday.", or when caught up "You're caught up. I'll keep looking."; nothing when a filter
-has emptied the list). Open roles is **grouped by day** (Today, Yesterday, Earlier this week, and Earlier for anything older than
-six days; each with a true count and a hairline) and times are short ("9:40 AM" today and yesterday, "Mon" this week, "Oct 14"
-beyond). Days are the person's calendar days in US Central, not UTC. Every card has a **company monogram** (two initials on a soft
+has emptied the list). Open roles is **grouped by day** (Today, Yesterday, Earlier this week, Last week, and Earlier for anything older; weeks run
+Sunday to Saturday; each group with a true count and a hairline) and times are short ("9:40 AM" today and yesterday, "Mon" for this
+week and last week, "Oct 14" beyond). Days are the person's calendar days in US Central, not UTC. Every card has a **company monogram** (two initials on a soft
 palette tint; the same tint every time for a company; decorative; 40px, 36px on a phone), the company as a small-caps overline, an
 18px title, tabular pay. A card that leaves (Yes or a hide) **folds closed** over 240ms, its day's count follows, and the toast
 rises; with reduced motion both only fade. The **caught-up state** says so, with a faint piece of the contour line. On a phone the
@@ -1279,8 +1279,8 @@ monogram sits alone on the left and the state, action and pay line up with the t
 **Monogram, Fit (five pips and a word, display only, not on rows until SC-70), Day heading**; new tokens `font.size.title` (18px) and
 `size.mono` / `size.mono-phone` (40 / 36px). Figma: Monogram (tint x size), Fit (level 1 to 5), Day heading, the Job card restyled
 (desktop and phone), and gallery rows for each.
-**Choices not in the card (check with Ted):** "Earlier this week" is 2 to 6 days ago and older jobs sit under **Earlier**; the
-caught-up state shows only when nothing is filtered (posted range All and Work type Any), otherwise the filter message stays
+**Choices not in the card:** the design defines only Today, Yesterday and Earlier this week; after that Ted chose **Last week**
+(calendar weeks, Sunday to Saturday) and anything older sits under **Earlier**; the caught-up state shows only when nothing is filtered (posted range All and Work type Any), otherwise the filter message stays
 because it is truer; the card's Figma small caps are drawn as 11px capitals (Albert Sans has no small-caps feature there).
 **Rework count:** 2 in my own checks. **Root causes:** *a base rule written after its media query.* The phone monogram stayed 40px
 because `.fg-mono` was defined after the `@media` block that shrinks it; the phone check caught it. *a check written for the layout

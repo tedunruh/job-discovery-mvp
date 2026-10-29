@@ -5,7 +5,7 @@ Days are the person's calendar days in APP_TZ (US Central, where Scout's people 
 Tuesday Central is "Today" on Tuesday evening, not "Yesterday"."""
 import re
 import zlib
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 try:
     from zoneinfo import ZoneInfo
@@ -13,29 +13,38 @@ try:
 except Exception:  # noqa: BLE001 - no timezone database: days fall back to UTC rather than failing the page
     APP_TZ = timezone.utc
 
-DAY_LABELS = ("Today", "Yesterday", "Earlier this week", "Earlier")
+DAY_LABELS = ("Today", "Yesterday", "Earlier this week", "Last week", "Earlier")
 TINTS = ("sage", "gold", "clay", "forest")  # Field Guide tints: support, discovery, attention, progress (all subtle)
 _STOP = {"the", "and", "of", "inc", "llc", "ltd", "co", "corp", "company"}
 
 
 def day_label(when, now=None):
-    """Today, Yesterday, Earlier this week (2 to 6 days ago) or Earlier, by calendar day in APP_TZ."""
+    """Today, Yesterday, Earlier this week, Last week or Earlier, by calendar day in APP_TZ. Weeks run Sunday to Saturday
+    (as in the US): "Earlier this week" is the rest of this week before yesterday, "Last week" is the whole week before
+    it, and anything older is "Earlier"."""
     now = now or datetime.now(timezone.utc)
-    days = (now.astimezone(APP_TZ).date() - when.astimezone(APP_TZ).date()).days
+    today = now.astimezone(APP_TZ).date()
+    day = when.astimezone(APP_TZ).date()
+    days = (today - day).days
     if days <= 0:
         return DAY_LABELS[0]
     if days == 1:
         return DAY_LABELS[1]
-    return DAY_LABELS[2] if days <= 6 else DAY_LABELS[3]
+    this_week = today - timedelta(days=(today.weekday() + 1) % 7)   # the Sunday that began this week
+    if day >= this_week:
+        return DAY_LABELS[2]
+    if day >= this_week - timedelta(days=7):
+        return DAY_LABELS[3]
+    return DAY_LABELS[4]
 
 
 def short_time(when, now=None):
-    """The time on a row: "9:40 AM" for today and yesterday, "Mon" for the rest of the week, "Oct 14" beyond that."""
+    """The time on a row: "9:40 AM" for today and yesterday, "Mon" for this week and last week, "Oct 14" beyond that."""
     local = when.astimezone(APP_TZ)
     label = day_label(when, now)
     if label in (DAY_LABELS[0], DAY_LABELS[1]):
         return local.strftime("%-I:%M %p")
-    if label == DAY_LABELS[2]:
+    if label in (DAY_LABELS[2], DAY_LABELS[3]):
         return local.strftime("%a")
     return local.strftime("%b %-d")
 

@@ -22,10 +22,21 @@ class Days(unittest.TestCase):
         self.assertEqual(day_label(datetime(2026, 10, 28, 4, 59, tzinfo=timezone.utc), NOW), "Yesterday")   # 11:59 PM Tue Central
         self.assertEqual(day_label(datetime(2026, 10, 28, 5, 1, tzinfo=timezone.utc), NOW), "Today")        # 12:01 AM Wed Central
         self.assertEqual(day_label(at(days=1, hours=2), NOW), "Yesterday")
-        self.assertEqual(day_label(at(days=2), NOW), "Earlier this week")
-        self.assertEqual(day_label(at(days=6), NOW), "Earlier this week")
-        self.assertEqual(day_label(at(days=7), NOW), "Earlier")
+        # NOW is Wednesday 28 Oct 2026: this week began Sunday 25 Oct, last week was 18 to 24 Oct
+        self.assertEqual(day_label(at(days=2), NOW), "Earlier this week")       # Mon 26
+        self.assertEqual(day_label(at(days=3), NOW), "Earlier this week")       # Sun 25, the first day of this week
+        self.assertEqual(day_label(at(days=4), NOW), "Last week")               # Sat 24, the last day of last week
+        self.assertEqual(day_label(at(days=10), NOW), "Last week")              # Sun 18, the first day of last week
+        self.assertEqual(day_label(at(days=11), NOW), "Earlier")                # Sat 17
         self.assertEqual(day_label(at(days=40), NOW), "Earlier")
+
+    def test_a_sunday_and_a_monday_start_the_week_in_the_right_place(self):
+        monday = datetime(2026, 10, 26, 18, 30, tzinfo=timezone.utc)            # Monday: yesterday was Sunday
+        self.assertEqual(day_label(monday - timedelta(days=1), monday), "Yesterday")
+        self.assertEqual(day_label(monday - timedelta(days=2), monday), "Last week")     # Saturday belongs to last week
+        sunday = datetime(2026, 10, 25, 18, 30, tzinfo=timezone.utc)
+        self.assertEqual(day_label(sunday - timedelta(days=1), sunday), "Yesterday")
+        self.assertEqual(day_label(sunday - timedelta(days=2), sunday), "Last week")
 
     def test_a_job_found_late_in_the_evening_is_still_today_in_the_evening(self):
         late = datetime(2026, 10, 29, 3, 30, tzinfo=timezone.utc)   # 10:30 PM Wed Central, already Thursday in UTC
@@ -35,6 +46,7 @@ class Days(unittest.TestCase):
         self.assertEqual(short_time(datetime(2026, 10, 28, 14, 40, tzinfo=timezone.utc), NOW), "9:40 AM")
         self.assertEqual(short_time(datetime(2026, 10, 27, 21, 30, tzinfo=timezone.utc), NOW), "4:30 PM")     # yesterday: a time
         self.assertEqual(short_time(datetime(2026, 10, 26, 18, 0, tzinfo=timezone.utc), NOW), "Mon")          # earlier this week: the day
+        self.assertEqual(short_time(datetime(2026, 10, 21, 18, 0, tzinfo=timezone.utc), NOW), "Wed")          # last week: the day
         self.assertEqual(short_time(datetime(2026, 10, 14, 18, 0, tzinfo=timezone.utc), NOW), "Oct 14")       # older: the date
 
     def test_groups_count_every_matching_job_not_just_the_page(self):
@@ -45,7 +57,7 @@ class Days(unittest.TestCase):
         self.assertEqual([(l, c, len(r)) for l, c, r in rows_by_day(page, counts, NOW)], [("Today", 5, 3)])
 
     def test_groups_come_in_the_order_of_the_headings(self):
-        rows = [{"first_seen_at": at(days=9)}, {"first_seen_at": at(hours=1)}, {"first_seen_at": at(days=3)}, {"first_seen_at": at(days=1, hours=2)}]
+        rows = [{"first_seen_at": at(days=20)}, {"first_seen_at": at(days=7)}, {"first_seen_at": at(hours=1)}, {"first_seen_at": at(days=3)}, {"first_seen_at": at(days=1, hours=2)}]
         rows.sort(key=lambda r: r["first_seen_at"], reverse=True)
         counts = group_by_day(rows, NOW)
         self.assertEqual([g[0] for g in rows_by_day(rows, counts, NOW)], list(DAY_LABELS))
@@ -138,6 +150,11 @@ class Page(unittest.TestCase):
         self.assertEqual([(h.strip(), c) for h, c in heads], [("Today", "2"), ("Yesterday", "1"), ("Earlier this week", "1"), ("Earlier", "1")])
         self.assertEqual(html.count('class="fg-day-rule" aria-hidden="true"'), 4)
         self.assertEqual(html.count('<section class="fg-day"'), 4)
+
+    def test_last_week_has_its_own_group(self):
+        self.rows = [row(1, "Lead Designer", at(days=5)), row(2, "Product Designer", at(days=10)), row(3, "UX Designer", at(days=11))]
+        heads = re.findall(r'<h2 class="fg-day-label">([^<]+)<span class="fg-day-count">· (\d+)</span></h2>', self.get("/?range=all"))
+        self.assertEqual([(h.strip(), c) for h, c in heads], [("Last week", "2"), ("Earlier", "1")])
 
     def test_each_group_holds_its_own_jobs_in_the_order_found(self):
         html = self.get("/?range=all")

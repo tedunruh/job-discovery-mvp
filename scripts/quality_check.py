@@ -828,7 +828,7 @@ def check_elevated(browser, base, token):
           and page.evaluate("document.querySelector('[data-voice]').getBoundingClientRect().bottom <= document.querySelector('.board').getBoundingClientRect().top + 1"),
           "Scout's line sits above the board and says something true", text)
     heads = page.evaluate("[...document.querySelectorAll('.fg-day')].map(s => ({label: s.querySelector('.fg-day-label').firstChild.textContent.trim(), count: parseInt(s.querySelector('.fg-day-count').textContent.replace(/\\D+/g, ''), 10), shown: s.querySelectorAll('li.fg-job').length, rule: !!s.querySelector('.fg-day-rule')}))")
-    order = ["Today", "Yesterday", "Earlier this week", "Earlier"]
+    order = ["Today", "Yesterday", "Earlier this week", "Last week", "Earlier"]
     check(heads and [h["label"] for h in heads] == [l for l in order if l in [h["label"] for h in heads]]
           and all(h["rule"] and h["count"] >= h["shown"] > 0 for h in heads),
           "jobs are grouped by day, in order, each with a count and a hairline", str(heads[:4]))
