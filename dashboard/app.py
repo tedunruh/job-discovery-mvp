@@ -14,6 +14,7 @@ from dashboard.auth import (
     too_many_recent_links,
     verify_magic_link,
 )
+from dashboard.elevate import group_by_day, monogram, rows_by_day, scout_line, short_time, tint
 from dashboard.filters import WORK_TYPES, location_line, work_type
 from db.db import (
     SESSION_TTL_DAYS,
@@ -368,11 +369,12 @@ def index():
 
     # SC-63: jobs they opened say Viewed, and the job they opened last asks whether they applied (if it is on this page).
     ask_id = choose_ask(opens, dismissals, applied_ids | hidden_ids, datetime.now(timezone.utc))
+    now = datetime.now(timezone.utc)
     for p in shown:
         p["viewed"] = p["id"] in opens           # SC-59: a quiet "Viewed" marker, no date of its own
         p["asking"] = p["id"] == ask_id
         p["place"] = location_line(p["location"], p["remote_type"])
-        p["discovered_ago"] = humanize_posted_at(p["first_seen_at"])
+        p["when"] = short_time(p["first_seen_at"], now)   # SC-69: "9:40 AM", "Mon", "Oct 14"
     for a in applications:
         a["applied_ago"] = humanize_posted_at(a["applied_at"])
         a["place"] = location_line(a["location"], a["remote_type"])
@@ -380,6 +382,15 @@ def index():
         h["hidden_ago"] = humanize_posted_at(h["hidden_at"])
         h["place"] = location_line(h["location"], h["remote_type"])
         h["reason_label"] = HIDE_REASON_LABELS.get(h["hidden_reason"], "")
+    for rows in (shown, applications, hidden):    # SC-69: the company monogram, the same tint every time for a company
+        for r in rows:
+            r["mono"], r["tint"] = monogram(r["company_name"]), tint(r["company_name"])
+
+    # SC-69: the day groups (counts are true, over every matching job, not just the page shown) and Scout's line
+    day_counts = group_by_day(postings, now)
+    day_groups = rows_by_day(shown, day_counts, now)
+    caught_up = total == 0 and posted_range == "all" and work_type_label(work_types) == "Any"
+    voice = scout_line(day_counts.get("Today", 0), total, caught_up)
 
     return render_template(
         "index.html",
@@ -387,6 +398,9 @@ def index():
         postings=shown,
         applications=applications,
         hidden=hidden,
+        day_groups=day_groups,
+        voice=voice,
+        caught_up=caught_up,
         view="hidden" if request.args.get("view") == "hidden" and request.args.get("tab") != "applications" else "open",
         total=total,
         next_n=limit + PAGE_SIZE if total > limit and limit < MAX_SHOWN else None,

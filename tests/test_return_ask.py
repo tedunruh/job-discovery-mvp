@@ -110,7 +110,7 @@ class Page(Base):
         for pid in (1, 2, 3):
             r = self.row_html(html, pid)
             self.assertRegex(r, r'<p data-state-top>Discovered on Ashby</p>')
-            self.assertRegex(r, r'<p class="fg-job-when" data-state-when>\d+ hours? ago</p>')
+            self.assertRegex(r, r'<p class="fg-job-when" data-state-when>\d{1,2}:\d{2} [AP]M</p>')
             self.assertIn(f'href="/open/{pid}" target="_blank" rel="noopener" data-apply>Apply', r)
             self.assertIn(f'action="/hide/{pid}" data-hide', r)
             self.assertNotIn("Did you apply?", r)
@@ -137,7 +137,7 @@ class Page(Base):
         self.opens = {3: self.now - timedelta(hours=5)}
         r = self.row_html(self.live(), 3)
         when = re.search(r'<p class="fg-job-when" data-state-when>(.*?)</p>', r, re.S).group(1)
-        self.assertRegex(when, r"^\d+ hours? ago<span class=\"fg-job-viewed\" data-viewed>")
+        self.assertRegex(when, r"^\d{1,2}:\d{2} [AP]M<span class=\"fg-job-viewed\" data-viewed>")
         self.assertIn("Viewed</span>", when)
         self.assertNotIn("5 hours ago", when)                        # the discovery time, never the time it was viewed
         self.assertRegex(when, r'<svg(?![^>]*\shidden[\s>])[^>]*aria-hidden="true"')   # an icon plus the word, not colour alone
