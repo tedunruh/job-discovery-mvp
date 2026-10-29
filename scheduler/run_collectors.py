@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from collectors import ashby, greenhouse, lever, rippling, workable, workday
+from collectors import ashby, greenhouse, lever, pay, rippling, workable, workday
 from collectors.filters import is_design_role
 from dashboard.filters import work_type
 from db.db import (
@@ -153,6 +153,7 @@ def _fetch_company(company):
         postings = COLLECTORS[company["ats_type"]](company["ats_identifier"])
     except Exception as e:
         return None, e
+    pay.attach(company["ats_type"], postings)  # SC-71: the pay the board gave as data, before the payload is dropped
     for p in postings:
         p["is_design"] = is_design_role(p.get("title") or "")
         if _describer is not None:
@@ -192,6 +193,7 @@ def _fetch_tail(company):
         except Exception as e:
             _note_rate_limit(ats, e)
             return None, e
+    pay.attach(ats, postings)  # SC-71
     storable = [p for p in postings if _is_storable(p)]
     design, other = [], []
     for p in storable:

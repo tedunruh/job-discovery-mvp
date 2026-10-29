@@ -903,6 +903,29 @@ def check_elevated(browser, base, token):
     mctx.close()
 
 
+def check_pay(browser, base, token):
+    """The pay line on a job card (SC-71): a range like "$150,000 - $188,000" ("/ hour" or "/ month" when it is not a year),
+    never a dash, in tabular numbers, on the card's text column; a card with no pay keeps the line as blank space, so
+    every card in a list is the same height."""
+    ctx = browser.new_context(viewport={"width": 1280, "height": 900})
+    ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+    page = ctx.new_page()
+    page.goto(base + "/?range=all", wait_until="load")
+    page.goto(base + "/", wait_until="load")
+    cards = page.evaluate("""() => [...document.querySelectorAll('li.fg-job')].map(li => {
+        const p = li.querySelector('.fg-job-pay'), r = li.getBoundingClientRect(), t = li.querySelector('.fg-job-title').getBoundingClientRect(), pr = p.getBoundingClientRect();
+        return {text: p.textContent.trim(), h: Math.round(r.height), left: Math.abs(pr.left - t.left) <= 1, tab: getComputedStyle(p).fontVariantNumeric.includes('tabular-nums'), lines: Math.round(pr.height) } })""")
+    with_pay = [c for c in cards if c["text"]]
+    check(all(re.fullmatch(r"(Up to )?[^\s\d]*\s?[\d,.]+(?: - [^\s\d]*\s?[\d,.]+|\+)?(?: / (?:hour|month|week|day))?", c["text"]) for c in with_pay),
+          f"every pay line reads as a range, never a dash or a stray word ({len(with_pay)} of {len(cards)} cards have one)", str([c["text"] for c in with_pay][:4]))
+    check(all(c["left"] and c["tab"] for c in cards), "pay lines line up with the title and use tabular numbers")
+    check(all(c["lines"] >= 14 for c in cards), "a card with no pay keeps the line as blank space (the line is never collapsed)")
+    # cards with and without pay, in the same list, are the same height (titles of one line only)
+    heights = {c["h"] for c in cards if c["lines"] and c["h"] < 160}
+    check(len(heights) <= 3, "cards with and without pay are the same height (give or take a wrapped title)", str(sorted(heights)))
+    ctx.close()
+
+
 def check_alerts_switch_no_js(browser, base, token):
     """Without JavaScript the alerts switch is still a working form button: it posts and the page
     reloads with the switch flipped and its date line updated (no notice banner)."""
@@ -1076,6 +1099,7 @@ def main():
             check_return_ask(browser, base, token)
             check_hide(browser, base, token)
             check_elevated(browser, base, token)
+            check_pay(browser, base, token)
             check_alerts_switch_no_js(browser, base, token)
             header_infos = {}
             for (w, h) in VIEWPORTS:

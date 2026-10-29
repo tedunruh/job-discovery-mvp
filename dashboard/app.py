@@ -16,6 +16,7 @@ from dashboard.auth import (
 )
 from dashboard.elevate import group_by_day, monogram, rows_by_day, scout_line, short_time, tint
 from dashboard.filters import WORK_TYPES, location_line, work_type
+from dashboard.pay_line import pay_line
 from db.db import (
     SESSION_TTL_DAYS,
     create_session,
@@ -385,6 +386,7 @@ def index():
     for rows in (shown, applications, hidden):    # SC-69: the company monogram, the same tint every time for a company
         for r in rows:
             r["mono"], r["tint"] = monogram(r["company_name"]), tint(r["company_name"])
+            r["pay"] = pay_line(r)                # SC-71: the pay range, or "" (a blank line) when none was found
 
     # SC-69: the day groups (counts are true, over every matching job, not just the page shown) and Scout's line
     day_counts = group_by_day(postings, now)
