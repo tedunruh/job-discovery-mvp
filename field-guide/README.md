@@ -111,6 +111,10 @@ Ink on Goldenrod 6.7:1, on Sage 6.7:1, on Clay 4.4:1 (large or bold text only).
 - **Fraunces** (`--fg-font-family-display`, class `.fg-display`): personality.
   Wordmark, editorial headlines, introductions, discovery moments.
   Always with `font-variation-settings: "SOFT" 0, "WONK" 1`.
+  **Always weight 400 (Regular), never Medium.** `.fg-display`, `.fg-voice` and the wordmark set it explicitly; the font
+  request loads only weight 400 (`_field_guide_head.html`), so a weight a serif element inherits cannot render; and
+  `quality_check.py` fails if any Fraunces text computes to anything but 400. A rule that styles every paragraph in a
+  component (`.fg-job p`) must be wrapped in `:where()` so it can never outrank a serif class on one of them.
 - **Albert Sans** (`--fg-font-family-ui`): clarity. Everything else. Self-hosted in
   `fonts/` (`css/fonts.css`), weights 500 and 600 only.
 - **Minimum weight for Albert Sans is Medium** (500). Regular (400) is used only by

@@ -250,13 +250,17 @@ def check_typefaces(page, path):
             if (!allowed.includes(first)) out.add(`${el.tagName.toLowerCase()}.${el.className || ''} -> ${first}`);
             // UI face (Albert Sans) is never lighter than Medium
             else if (first !== 'fraunces' && parseInt(cs.fontWeight, 10) < 500) out.add(`${el.tagName.toLowerCase()}.${el.className || ''} -> ${first} weight ${cs.fontWeight}`);
+            // the serif (Fraunces, Scout's voice) is always regular: 400, never a weight it inherited (SC-68)
+            else if (first === 'fraunces' && parseInt(cs.fontWeight, 10) !== 400) out.add(`${el.tagName.toLowerCase()}.${el.className || ''} -> fraunces weight ${cs.fontWeight}`);
           }
           return [...out].slice(0, 8);
         }
         """,
         sorted(ALLOWED_FONTS),
     )
-    check(not bad, f"only Field Guide typefaces, UI text >= Medium  [{path}]", "; ".join(bad))
+    check(not bad, f"only Field Guide typefaces, UI text >= Medium, serif exactly Regular  [{path}]", "; ".join(bad))
+    faces = page.evaluate("[...document.fonts].filter(f => f.family.replace(/[\"']/g, '') === 'Fraunces').map(f => f.weight)")
+    check(all(w == "400" for w in faces), f"Fraunces is loaded at weight 400 only, so a stray weight cannot render  [{path}]", f"{faces}")
 
 
 def check_gallery_complete(page):
@@ -501,6 +505,7 @@ def check_return_ask(browser, base, token):
           "back from a job, its own row asks 'Did you apply?' with Yes and Not yet (no reload)", row.inner_text()[:140])
     check("Viewed" in row.locator("[data-state]").inner_text() and row.locator("[data-apply]").count() == 0,
           "...the state line says Viewed and the question has taken Apply's place", row.inner_text()[:140])
+    check_typefaces(page, "dashboard, asking Did you apply?")
     focus_after = page.evaluate("document.activeElement.outerHTML.slice(0, 80)")
     check(focus_after == focus_before, "...without taking focus", f"{focus_before!r} -> {focus_after!r}")
     check(page.locator("#return-live").inner_text().startswith("Did you apply for"), "...and announces it to screen readers", page.locator("#return-live").inner_text())
@@ -684,6 +689,7 @@ def check_hide(browser, base, token):
           and "Why are you hiding?" in row(a).inner_text() and row(a).locator("button", has_text="Skip").is_visible(),
           "Hide asks 'Why are you hiding?' with a menu and Skip in place of Apply and Hide", row(a).inner_text()[:120])
     check(page.evaluate("document.activeElement.id") == f"why-{a}", "...and the menu has focus (they just asked for it)")
+    check_typefaces(page, "dashboard, asking Why are you hiding?")
     options = page.evaluate("(id) => [...document.querySelectorAll('#why-' + id + ' option')].map(o => o.textContent.trim())", a)
     check(options == ["Select", "Not my kind of role", "Too junior", "Too senior", "Location or remote setup", "Pay",
                       "Not interested in this company", "Already applied", "Other"], "...with the agreed reasons in order", f"{options}")
