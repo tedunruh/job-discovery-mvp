@@ -1346,3 +1346,31 @@ example it was written for.* Each text rule was first tried on a handful of snip
       breakages caught.
 - [ ] Not done: Workable, Rippling and Workday pay is read from description text only for the roles whose description Scout has stored (the ones that
       pass someone's filters); the others stay blank. Currencies are shown with their sign (CA$, A$, NZ$) or code (SEK 500,000), not converted.
+
+### 2026-10-30 — SC-70: a fit score for each job
+**What shipped:** a 0 to 10 score per job and person, shown as one to five pips on Open roles, and Scout's line counting the jobs at 4 or 5
+pips ("Two look close to what you're after."). The method is the card's: requirements covered 6, the profile's skills the posting mentions 2
+(SC-51's rule), title and level 2 (exact 2, one step off 1). A part that can't be judged (no resume or skills to check against, a title that
+states no level, no level on the profile) is left out and the rest scaled to 10, so missing input is never a miss. 0-2 is one pip, 3-4 two,
+5-6 three, 7-8 four, 9-10 five. No stored text, or requirements not read yet: no score, no pips. Applications and Hidden rows show none.
+**How it runs:** `dashboard/requirements.py` reads a role's top requirements once, with the small model (the resume reader's model and
+rates), on the dashboard in a background thread started by a page load, for the roles on the page being shown only (Ted, 10/29: a role nobody has looked at is never scored or paid for); the collector never holds the key. Every call is
+a row in `posting_reads` (tokens, cost, price version, errors too); a monthly cap (`POSTING_MONTHLY_CAP_USD`, default $5) is checked before each
+call; a service outage stops the rest; a role whose read failed is left alone for six hours. Requirements are `{label, terms}` stored on the
+posting; scoring is plain matching per request, so a changed resume or profile changes the score on the next load. The resume's text is taken
+with pypdf when it is uploaded (and the first time a score needs it, for earlier uploads).
+**Real run (Neon branch, deleted):** 40 real roles read: $0.0148 in all (about $0.0004 a role), no errors; both real resumes gave text;
+scores for the two real profiles spread over 1 to 4 pips (the skills part, hits over all saved skills, keeps most roles at 2 or 3).
+**Not checked in a browser:** the quality check's test user has no profile, so it never shows pips; the pips are the Field Guide component the
+gallery and `check_elevated` already check, and the data-to-page path is covered by tests that render the real template. Look at it on the live
+site after the first reads.
+**Rework count:** 0 reached Ted. **Root causes of rework inside my own checks:** *a rule tested on one wording* (a term "design system" did not
+find "design systems": plural added), and *a check that depended on the data* (see below).
+**Standing checks added:**
+- [x] Automated (`tests/test_fit.py`, 37 tests): matching rule (whole word, plural, no one-letter terms), the three weights and the scaling,
+      level points, pips, the line, normalizing what the model returns, every logged call, the cap (also between calls), outage, failures,
+      one reader at a time, no open transaction during the call, the posting text cap, and the page (pips, line, queue, failure, no profile,
+      changed resume, Applications and Hidden). 30 mutation checks on a copy of the repo, all caught (8 first missed, each led to a test).
+- [x] Fixed a check that depended on the data: "cards with and without pay are the same height" failed when a job's place wrapped to two lines
+      (it only allowed for a wrapped title). It now takes out the lines the title and place wrapped onto before comparing.
+- [ ] Not done: no "what matched" detail, no sort or filter by fit, alerts don't use fit (the card's LATER list).

@@ -424,18 +424,19 @@ def get_week_stats(conn, user_id):
     return {"reached": reached, "opened": opened, "applied": applied}
 
 
-def save_resume(conn, user_id, filename, content):
-    """Store this person's resume PDF, replacing any earlier one. Caller commits."""
+def save_resume(conn, user_id, filename, content, text=None):
+    """Store this person's resume PDF, replacing any earlier one. `text` is what was taken from it for the fit
+    score (SC-70); None leaves it to be taken the first time a score needs it. Caller commits."""
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO user_resumes (user_id, filename, content, size_bytes)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO user_resumes (user_id, filename, content, size_bytes, text)
+            VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (user_id) DO UPDATE SET
                 filename = EXCLUDED.filename, content = EXCLUDED.content,
-                size_bytes = EXCLUDED.size_bytes, uploaded_at = now()
+                size_bytes = EXCLUDED.size_bytes, text = EXCLUDED.text, uploaded_at = now()
             """,
-            (user_id, filename, psycopg2.Binary(content), len(content)),
+            (user_id, filename, psycopg2.Binary(content), len(content), text),
         )
 
 
@@ -509,6 +510,92 @@ def resume_usage(conn, user_id):
         )
         mine, spend = cur.fetchone()
     return mine, float(spend)
+
+
+# --- SC-70: fit score -------------------------------------------------------------------------------------------
+
+def get_resume_text(conn, user_id):
+    """(has a resume, its text or None if not taken yet). Tolerates the text column being absent."""
+    def run():
+        with conn.cursor() as cur:
+            cur.execute("SELECT text FROM user_resumes WHERE user_id = %s", (user_id,))
+            row = cur.fetchone()
+            return (True, row[0]) if row else (False, None)
+    return _optional(conn, run, (False, None))
+
+
+def get_resume_content(conn, user_id):
+    """The resume PDF's bytes, or None."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT content FROM user_resumes WHERE user_id = %s", (user_id,))
+        row = cur.fetchone()
+    return bytes(row[0]) if row else None
+
+
+def set_resume_text(conn, user_id, text):
+    """Keep the text taken from a resume that was stored without it. Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute("UPDATE user_resumes SET text = %s WHERE user_id = %s", (text, user_id))
+
+
+def get_requirements(conn, posting_ids):
+    """{posting id: [{"label", "terms"}]} for these roles whose requirements have been read (an empty list means
+    "read, none found"). Roles not read yet are left out."""
+    if not posting_ids:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, requirements FROM postings WHERE id = ANY(%s) AND requirements IS NOT NULL",
+                    (list(posting_ids),))
+        return {pid: reqs for pid, reqs in cur.fetchall()}
+
+
+def get_unread_postings(conn, posting_ids, limit):
+    """[(id, description)] for up to `limit` of these open roles that have stored text and no requirements yet, in
+    the order given. A role whose last read failed is left alone for six hours, so a broken one is not asked again
+    on every visit."""
+    if not posting_ids:
+        return []
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT p.id, p.description FROM postings p
+            WHERE p.id = ANY(%s) AND p.status = 'open' AND p.requirements IS NULL
+              AND p.description IS NOT NULL AND p.description <> ''
+              AND NOT EXISTS (SELECT 1 FROM posting_reads r WHERE r.posting_id = p.id AND r.status = 'error'
+                              AND r.created_at > now() - interval '6 hours')
+            ORDER BY array_position(%s, p.id) LIMIT %s
+            """,
+            (list(posting_ids), list(posting_ids), limit),
+        )
+        return cur.fetchall()
+
+
+def set_requirements(conn, posting_id, requirements):
+    """Store a role's requirements and when they were read. Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute("UPDATE postings SET requirements = %s, requirements_at = now() WHERE id = %s",
+                    (psycopg2.extras.Json(requirements), posting_id))
+
+
+def log_posting_read(conn, posting_id, *, model, input_tokens, output_tokens, cost_usd, price_version, status,
+                     error_kind=None, request_id=None):
+    """Record one call that read a role's requirements (every call, failed ones too). Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO posting_reads (posting_id, model, input_tokens, output_tokens, cost_usd, price_version,
+                                       status, error_kind, request_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (posting_id, model, input_tokens, output_tokens, cost_usd, price_version, status, error_kind, request_id),
+        )
+
+
+def posting_read_spend(conn):
+    """What requirement reads have cost this month so far, in dollars (UTC months)."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT COALESCE(sum(cost_usd), 0) FROM posting_reads WHERE created_at >= date_trunc('month', now())")
+        return float(cur.fetchone()[0])
 
 
 def set_posting_description(conn, posting_id, text):

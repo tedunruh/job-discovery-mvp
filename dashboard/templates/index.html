@@ -263,7 +263,7 @@
       {{ fg.day(label, count) }}
       <ul class="fg-job-list">
         {% for p in rows %}
-        {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Discovered on " ~ p.ats_type|capitalize, p.when, p.viewed, skills=p.skill_line, mono=p.mono, tint=p.tint, pay=p.pay) %}
+        {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Discovered on " ~ p.ats_type|capitalize, p.when, p.viewed, skills=p.skill_line, mono=p.mono, tint=p.tint, pay=p.pay, fit_score=p.fit) %}
           {%- if p.asking %}{{ ask_actions(p.id) }}{% else %}{{ apply_group(p.id, p.title) }}{% endif %}
         {% endcall %}
         {% endfor %}
