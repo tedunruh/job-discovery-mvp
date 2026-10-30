@@ -201,6 +201,28 @@ def get_open_postings(conn, user_id, since=None, keywords=()):
         return cur.fetchall()
 
 
+def get_postings_by_ids(conn, user_id, posting_ids):
+    """The open postings among these ids, with the same columns as get_open_postings (the Viewed list: jobs they
+    opened, wherever they sit now relative to their Posted and Work type filters). Closed postings are left out."""
+    if not posting_ids:
+        return []
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT p.id, c.name AS company_name, c.ats_type, p.title, p.location, p.remote_type,
+                   p.url, p.first_seen_at, p.is_design,
+                   p.pay_min, p.pay_max, p.pay_currency, p.pay_period,
+                   COALESCE(up.applied, false) AS applied, up.hidden_at
+            FROM postings p
+            JOIN companies c ON c.id = p.company_id
+            LEFT JOIN user_postings up ON up.posting_id = p.id AND up.user_id = %s
+            WHERE p.status = 'open' AND p.id = ANY(%s)
+            """,
+            (user_id, list(posting_ids)),
+        )
+        return cur.fetchall()
+
+
 def set_applied(conn, posting_id, applied, user_id):
     with conn.cursor() as cur:
         cur.execute(

@@ -1374,3 +1374,22 @@ find "design systems": plural added), and *a check that depended on the data* (s
 - [x] Fixed a check that depended on the data: "cards with and without pay are the same height" failed when a job's place wrapped to two lines
       (it only allowed for a wrapped title). It now takes out the lines the title and place wrapped onto before comparing.
 - [ ] Not done: no "what matched" detail, no sort or filter by fit, alerts don't use fit (the card's LATER list).
+
+### 2026-10-30 — Viewed jobs, and "Did you apply?" that stays until answered
+**What shipped:** every job you open keeps asking "Did you apply?" until you answer it (Yes, Not yet, or hide it), however long ago and however
+many jobs you opened since. Before, only the one opened last asked, and only for 24 hours, so earlier questions went away and were hard to
+find. A new "Viewed jobs" link in the Open roles toolbar opens a list of the jobs you opened, last opened first, with "Opened 2 days ago" on
+each, the question still on the ones waiting, and no Posted or Work type filter (a job opened last week still shows). Applied and hidden jobs
+are in their own lists; a job that closed drops off. `/return.json` now returns `asks` (a list) instead of `ask`.
+**Rework count:** 0 reached Ted so far. **Root causes of rework inside my own checks:** *a check written for a state that stopped being true*:
+"no fit line on cards until the fit score exists" and the same-height card check broke the day real fit lines showed up on the test user's
+cards, a release after SC-70 shipped them.
+**Standing checks added:**
+- [x] Automated: `tests/test_return_ask.py` (the rule: every opened job asks, newest first, no window, applied/hidden/Not yet answer it,
+      opening again asks again; the Viewed list: order, filters ignored, applied/hidden/closed left out, the question on it, empty state,
+      way back, tab count; `/return.json` shape) and the browser check (two jobs both ask, also after a reload; the Viewed list; Not yet).
+- [x] Replaced the stale fit check: a fit line, where there is one, is five pips and a label on the text column. The card-height check now
+      compares cards with a fit line among themselves, and cards without one among themselves.
+- [ ] Not done: the question can pile up for someone who opens many jobs without answering (that is the ask); no cap or "answer all"
+      control. Look at how it reads for the first real users after deploy.
+

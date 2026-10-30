@@ -1,6 +1,6 @@
 /* Coming back from a job (SC-63). When the tab comes back into view (you read the posting in another tab, then return)
    this asks the server what is true now and updates the cards in place, with no reload and no change of focus: the cards
-   you have opened get the quiet Viewed marker, and the one you opened last swaps Apply and Hide for "Did you apply?".
+   you have opened get the quiet Viewed marker, and each one still waiting for an answer swaps Apply and Hide for "Did you apply?".
    The cards and their actions are drawn by job.js. */
 (function () {
   "use strict";
@@ -20,7 +20,7 @@
       .then(function (state) {
         if (!state || !window.fgJob) return;
         Object.keys(state.viewed || {}).forEach(function (id) { window.fgJob.showViewed(id); });
-        window.fgJob.showAsk(state.ask);
+        window.fgJob.showAsks(state.asks);
       })
       .catch(function () { /* the page stays as it was */ });
   }
