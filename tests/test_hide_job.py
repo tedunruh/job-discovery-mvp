@@ -261,7 +261,7 @@ class ComingBack(Base):
         self.hidden = [hidden(2, "Product Designer", 1)]
         self.opens = {2: datetime.now(timezone.utc) - timedelta(minutes=5), 1: datetime.now(timezone.utc) - timedelta(minutes=50)}
         body = self.client.get("/return.json").get_json()
-        self.assertIsNone(body["ask"])
+        self.assertEqual(body["asks"], [{"id": 1}])
         self.assertEqual(list(body["viewed"]), ["1"])
 
 

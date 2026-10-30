@@ -5,8 +5,9 @@
      hiding: the job goes to Applications instead.
    - "Yes" (the answer to "Did you apply?") does the same for Applications, with View and Undo in the toast.
    - "Not yet" puts Apply and Hide back and tells the server, so the job is not asked about again unless it is opened again.
+     Until it is answered (Yes, Not yet, hidden), the question stays on every job that was opened.
    - In the hidden list, "Unhide" sends the card back to Open roles ("Back in Open roles." with Undo).
-   - On the hidden list the heading takes focus when the view opens.
+   - On the hidden list and the Viewed list the heading takes focus when the view opens.
 
    Without this script the forms still post and the page reloads: Hide hides with no reason, Yes marks it applied,
    Unhide unhides. Markup comes from the <template>s in the page, never from here. Nothing takes focus on its own except
@@ -244,20 +245,29 @@
     rowFor: rowFor,
     showViewed: function (id) {
       var row = rowFor(id);
-      var when = row && row.querySelector("[data-state-when]");
+      if (!row || row.closest("[data-viewed-list]")) return;   // the Viewed list says when each was opened instead
+      var when = row.querySelector("[data-state-when]");
       if (when && !when.querySelector("[data-viewed]") && viewedTemplate) when.appendChild(viewedTemplate.content.cloneNode(true));
     },
-    showAsk: function (ask) {
+    /* The jobs to ask about, all of them: the question stays on a card until it is answered. A card that is no longer
+       in the list (it was answered somewhere else) gets Apply back. */
+    showAsks: function (asks) {
+      var wanted = {};
+      (asks || []).forEach(function (ask) { wanted[ask.id] = true; });
       Array.prototype.forEach.call(document.querySelectorAll(".fg-job"), function (row) {
-        if (isAsking(row) && (!ask || row.id !== "posting-" + ask.id)) showApply(row);
+        if (isAsking(row) && !wanted[idOf(row)]) showApply(row);
       });
-      if (!ask) return;
-      var row = rowFor(ask.id);
-      if (!row || row.hidden || isAsking(row)) return;
-      setAction(row, askTemplate);
-      if (live) {
-        var title = row.querySelector(".fg-job-title");
-        live.textContent = "Did you apply for " + (title ? title.textContent.trim() : "this one") + "?";
+      var added = [];
+      (asks || []).forEach(function (ask) {
+        var row = rowFor(ask.id);
+        if (!row || row.hidden || isAsking(row)) return;
+        if (setAction(row, askTemplate)) added.push(row);
+      });
+      if (live && added.length) {
+        var title = added[0].querySelector(".fg-job-title");
+        live.textContent = added.length === 1
+          ? "Did you apply for " + (title ? title.textContent.trim() : "this one") + "?"
+          : "Did you apply for the " + added.length + " jobs you opened?";
       }
     }
   };

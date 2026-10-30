@@ -453,8 +453,9 @@ def check_signin_states(browser, base):
 
 def check_return_ask(browser, base, token):
     """Open roles and Applications (SC-63). Open a job in another tab, return, and the job's own row swaps Apply for
-    "Did you apply?" with Yes and Not yet, without a reload and without taking focus; the latest job opened is the one
-    asked about and the others say Viewed; Not yet puts Apply back for good (until the job is opened again). Yes sends
+    "Did you apply?" with Yes and Not yet, without a reload and without taking focus; every job opened keeps asking
+    until it is answered, also after a reload; Not yet puts Apply back for good (until the job is opened again), and
+    the Viewed list shows the jobs opened, newest first, with the question still on the ones waiting. Yes sends
     the row out of Open roles at once, moves the counts and shows a toast with View and Undo that never takes focus,
     stays while pointed at, and goes by itself; Undo puts the row back; View lands on Applications with the job
     there. A phone fits all of it. The job's outside page is stubbed, so nothing leaves the machine."""
@@ -510,40 +511,53 @@ def check_return_ask(browser, base, token):
     check(focus_after == focus_before, "...without taking focus", f"{focus_before!r} -> {focus_after!r}")
     check(page.locator("#return-live").inner_text().startswith("Did you apply for"), "...and announces it to screen readers", page.locator("#return-live").inner_text())
 
-    # a second job: only the latest asks, the first goes back to Apply and says Viewed
+    # a second job: both keep asking, until each is answered
     open_in_new_tab(ids[1])
     page.wait_for_timeout(2200)       # the script waits a moment between asks
     come_back()
     page.wait_for_selector(f"#posting-{ids[1]} [data-ask-yes]", timeout=8000)
     first = page.locator(f"#posting-{ids[0]}")
-    check(asking() == [ids[1]] and first.locator("[data-apply]").count() == 1 and "Viewed" in first.locator("[data-state]").inner_text(),
-          "after a second job only the latest asks; the first has Apply back and says Viewed", f"{asking()} | {first.inner_text()[:100]}")
+    check(sorted(asking()) == sorted([ids[0], ids[1]]) and first.locator("[data-apply]").count() == 0 and "Viewed" in first.locator("[data-state]").inner_text(),
+          "after a second job the first keeps asking too, and both say Viewed", f"{asking()} | {first.inner_text()[:100]}")
 
     # a reload shows it with no script: the server draws it
     page.reload(wait_until="load")
-    check(asking() == [ids[1]], "after a reload the question is still on the latest job", f"{asking()}")
+    check(sorted(asking()) == sorted([ids[0], ids[1]]), "after a reload the question is still on both jobs", f"{asking()}")
+
+    # the Viewed list: the way back to the jobs clicked on, newest first, the question still on them
+    page.locator("[data-viewed-link]").click()
+    page.wait_for_load_state("load")
+    listed = page.evaluate("[...document.querySelectorAll('li.fg-job')].map(li => li.id.replace('posting-', ''))")
+    check(page.url.endswith("view=viewed") and listed[:2] == [ids[1], ids[0]] and sorted(asking()) == sorted([ids[0], ids[1]]),
+          "the Viewed list shows the jobs opened, last opened first, each still asking", f"{listed} | {asking()}")
+    check("Opened" in page.locator(f"#posting-{ids[1]} .fg-job-state").inner_text() and page.locator("[data-viewed]").count() == 0
+          and page.locator(".toolbar .fg-filter-pill").count() == 0,
+          "...a row says when it was opened, and the filters that do not apply here are gone", page.locator(f"#posting-{ids[1]} .fg-job-state").inner_text())
+    check_typefaces(page, "dashboard, Viewed list")
+    page.locator("a", has_text="Back to open roles").click()
+    page.wait_for_load_state("load")
 
     # Not yet: Apply comes back now and after a reload, the row still says Viewed
     page.locator(f"#posting-{ids[1]} [data-ask-dismiss] button").click()
     page.wait_for_timeout(500)
     second = page.locator(f"#posting-{ids[1]}")
-    check(asking() == [] and second.locator("[data-apply]").count() == 1 and "Viewed" in second.locator("[data-state]").inner_text(),
-          "'Not yet' brings Apply back and the row still says Viewed", f"{asking()} | {second.inner_text()[:100]}")
+    check(asking() == [ids[0]] and second.locator("[data-apply]").count() == 1 and "Viewed" in second.locator("[data-state]").inner_text(),
+          "'Not yet' brings Apply back on that job (the other keeps asking) and the row still says Viewed", f"{asking()} | {second.inner_text()[:100]}")
     page.reload(wait_until="load")
-    check(asking() == [], "...and it stays closed after a reload (until that job is opened again)", f"{asking()}")
+    check(asking() == [ids[0]], "...and it stays closed after a reload (until that job is opened again)", f"{asking()}")
 
     # opening it again asks again
     page.wait_for_timeout(2200)
     open_in_new_tab(ids[1])
     come_back()
     page.wait_for_selector(f"#posting-{ids[1]} [data-ask-yes]", timeout=8000)
-    check(asking() == [ids[1]], "opening the job again asks again", f"{asking()}")
+    check(sorted(asking()) == sorted([ids[0], ids[1]]), "opening the job again asks again", f"{asking()}")
 
     # Yes while the server is failing: nothing is claimed. The row stays, still asking, and there is no toast.
     page.route("**/set_applied/*", lambda route: route.fulfill(status=500, body="no"))
     page.locator(f"#posting-{ids[1]} [data-ask-yes] button").click()
     page.wait_for_timeout(1200)
-    check(page.locator(f"#posting-{ids[1]}").is_visible() and asking() == [ids[1]] and page.locator(".fg-toast").count() == 0,
+    check(page.locator(f"#posting-{ids[1]}").is_visible() and ids[1] in asking() and page.locator(".fg-toast").count() == 0,
           "if the server fails, Yes claims nothing: the row stays, still asking, no toast", f"{asking()}")
     page.unroute("**/set_applied/*")
 
@@ -848,7 +862,10 @@ def check_elevated(browser, base, token):
     check(all(len(v) == 1 for v in seen.values()), "a company has the same tint on every card", str({k: v for k, v in seen.items() if len(v) > 1}))
     check(cards and all(c["caps"] == "all-small-caps" and c["title"] == "18px" and "tabular-nums" in c["tab"] for c in cards),
           "type: company in small caps, 18px title, tabular numbers for pay", str(cards[:1]))
-    check(page.locator(".fg-fit, .fg-job-fit").count() == 0, "no fit line on cards until the fit score exists")
+    fits = page.evaluate("""() => [...document.querySelectorAll('.fg-job-fit')].map(f => { const li = f.closest('li.fg-job'), t = li.querySelector('.fg-job-title').getBoundingClientRect(), r = f.getBoundingClientRect();
+        return {pips: f.querySelectorAll('.fg-pip').length, label: f.textContent.trim(), left: Math.abs(r.left - t.left) <= 1} })""")
+    check(all(f["pips"] == 5 and re.fullmatch(r"(Light|Okay|Good|Great|Strong) fit", f["label"]) and f["left"] for f in fits),
+          f"a fit line, where there is one, is five pips and a label on the text column ({len(fits)} cards have one)", str(fits[:2]))
 
     # a card that leaves folds closed; the day's count follows
     first = page.locator("li.fg-job").first
@@ -915,16 +932,19 @@ def check_pay(browser, base, token):
     cards = page.evaluate("""() => [...document.querySelectorAll('li.fg-job')].map(li => {
         const p = li.querySelector('.fg-job-pay'), r = li.getBoundingClientRect(), t = li.querySelector('.fg-job-title').getBoundingClientRect(), pr = p.getBoundingClientRect();
         const sub = li.querySelector('.fg-job-subline').getBoundingClientRect();
-        return {text: p.textContent.trim(), h: Math.round(r.height), extra: Math.round(t.height) + Math.round(sub.height), left: Math.abs(pr.left - t.left) <= 1, tab: getComputedStyle(p).fontVariantNumeric.includes('tabular-nums'), lines: Math.round(pr.height) } })""")
+        return {text: p.textContent.trim(), h: Math.round(r.height), extra: Math.round(t.height) + Math.round(sub.height), fit: !!li.querySelector('.fg-job-fit'), left: Math.abs(pr.left - t.left) <= 1, tab: getComputedStyle(p).fontVariantNumeric.includes('tabular-nums'), lines: Math.round(pr.height) } })""")
     with_pay = [c for c in cards if c["text"]]
     check(all(re.fullmatch(r"(Up to )?[^\s\d]*\s?[\d,.]+(?: - [^\s\d]*\s?[\d,.]+|\+)?(?: / (?:hour|month|week|day))?", c["text"]) for c in with_pay),
           f"every pay line reads as a range, never a dash or a stray word ({len(with_pay)} of {len(cards)} cards have one)", str([c["text"] for c in with_pay][:4]))
     check(all(c["left"] and c["tab"] for c in cards), "pay lines line up with the title and use tabular numbers")
     check(all(c["lines"] >= 14 for c in cards), "a card with no pay keeps the line as blank space (the line is never collapsed)")
     # cards with and without pay, in the same list, are the same height once the lines a long title or place wrapped onto
-    # are taken out (the title and place lines are the only ones whose length depends on the job)
-    heights = {c["h"] - c["extra"] for c in cards if c["lines"]}
-    check(max(heights) - min(heights) <= 2, "cards with and without pay are the same height (a wrapped title or place aside)", str(sorted(heights)))
+    # are taken out (the title and place lines are the only ones whose length depends on the job). A card with a fit
+    # line is one line taller, so cards are compared with others that have (or lack) one.
+    for with_fit in (False, True):
+        heights = {c["h"] - c["extra"] for c in cards if c["lines"] and c["fit"] == with_fit}
+        if heights:
+            check(max(heights) - min(heights) <= 2, f"cards with and without pay are the same height (a wrapped title or place aside; {'with' if with_fit else 'without'} a fit line)", str(sorted(heights)))
     ctx.close()
 
 

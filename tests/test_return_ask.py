@@ -1,12 +1,12 @@
-"""SC-63: coming back from a job. Which job to ask "Did you apply?" about, which rows say Viewed, and the routes behind
-them."""
+"""SC-63: coming back from a job. Which jobs to ask "Did you apply?" about (until answered), which rows say Viewed, the
+Viewed list, and the routes behind them."""
 import re
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 from dashboard import app as dapp
-from dashboard.return_ask import ASK_WINDOW, choose_ask
+from dashboard.return_ask import choose_asks
 
 NOW = datetime(2026, 10, 25, 12, 0, tzinfo=timezone.utc)
 
@@ -17,35 +17,29 @@ def ago(**kw):
 
 class Rule(unittest.TestCase):
     def test_nothing_opened_asks_nothing(self):
-        self.assertIsNone(choose_ask({}, {}, set(), NOW))
+        self.assertEqual(choose_asks({}, {}, set()), [])
 
     def test_the_one_opened_job_asks(self):
-        self.assertEqual(choose_ask({7: ago(minutes=12)}, {}, set(), NOW), 7)
+        self.assertEqual(choose_asks({7: ago(minutes=12)}, {}, set()), [7])
 
-    def test_only_the_latest_opened_job_asks(self):
+    def test_every_opened_job_asks_most_recent_first(self):
         opens = {1: ago(minutes=40), 2: ago(minutes=12), 3: ago(minutes=25)}
-        self.assertEqual(choose_ask(opens, {}, set(), NOW), 2)
+        self.assertEqual(choose_asks(opens, {}, set()), [2, 3, 1])
 
-    def test_the_window_edge(self):
-        self.assertIsNone(choose_ask({7: NOW - ASK_WINDOW - timedelta(minutes=1)}, {}, set(), NOW))
-        self.assertEqual(choose_ask({7: NOW - ASK_WINDOW + timedelta(minutes=1)}, {}, set(), NOW), 7)
+    def test_the_question_sticks_however_long_ago_the_job_was_opened(self):
+        self.assertEqual(choose_asks({7: ago(days=80), 8: ago(days=2)}, {}, set()), [8, 7])
 
-    def test_an_old_job_does_not_step_in_when_the_latest_is_too_old(self):
-        opens = {1: ago(days=3), 2: ago(days=2)}
-        self.assertIsNone(choose_ask(opens, {}, set(), NOW))
+    def test_an_applied_or_hidden_job_is_not_asked_about_but_the_others_still_are(self):
+        self.assertEqual(choose_asks({7: ago(minutes=5), 8: ago(minutes=50)}, {}, {7}), [8])
 
-    def test_an_applied_job_is_not_asked_about_and_the_next_one_does_not_step_in(self):
-        self.assertIsNone(choose_ask({7: ago(minutes=5)}, {}, {7}, NOW))
-        self.assertIsNone(choose_ask({7: ago(minutes=5), 8: ago(minutes=50)}, {}, {7}, NOW))
-
-    def test_not_yet_holds_until_it_is_opened_again(self):
+    def test_not_yet_answers_it_until_it_is_opened_again(self):
         opens = {7: ago(minutes=30)}
-        self.assertIsNone(choose_ask(opens, {7: ago(minutes=20)}, set(), NOW))                       # answered after opening
-        self.assertEqual(choose_ask({7: ago(minutes=5)}, {7: ago(minutes=20)}, set(), NOW), 7)       # opened again since
+        self.assertEqual(choose_asks(opens, {7: ago(minutes=20)}, set()), [])                        # answered after opening
+        self.assertEqual(choose_asks({7: ago(minutes=5)}, {7: ago(minutes=20)}, set()), [7])         # opened again since
 
-    def test_after_not_yet_the_next_older_job_does_not_step_in(self):
+    def test_after_not_yet_the_other_jobs_still_ask(self):
         opens = {1: ago(minutes=50), 2: ago(minutes=30)}
-        self.assertIsNone(choose_ask(opens, {2: ago(minutes=5)}, set(), NOW))
+        self.assertEqual(choose_asks(opens, {2: ago(minutes=5)}, set()), [1])
 
 
 def row(pid, title, hours_ago, applied=False):
@@ -83,6 +77,8 @@ class Base(unittest.TestCase):
             mock.patch.object(dapp, "get_hidden", lambda c, u: [dict(h) for h in self.hidden]),
             mock.patch.object(dapp, "get_hidden_among", lambda c, u, ids: {h["id"] for h in self.hidden if h["id"] in ids}),
             mock.patch.object(dapp, "get_return_events", lambda c, u: (dict(self.opens), dict(self.dismissals))),
+            mock.patch.object(dapp, "apply_fit", lambda conn, uid, profile, postings, shown: (0, [])),
+            mock.patch.object(dapp, "get_postings_by_ids", lambda c, u, ids: [dict(r) for r in self.rows if r["id"] in ids]),
             mock.patch.object(dapp, "get_applied_among", lambda c, u, ids: {r["id"] for r in self.rows if r["applied"] and r["id"] in ids}),
             mock.patch.object(dapp, "get_posting_url", lambda c, pid: "https://jobs.example/x" if pid in self.exists else None),
             mock.patch.object(dapp, "log_event", lambda c, uid, kind, pid=None: self.events.append((kind, pid))),
@@ -116,7 +112,7 @@ class Page(Base):
             self.assertNotIn("Did you apply?", r)
             self.assertNotIn("data-viewed", r)
 
-    def test_the_job_opened_last_asks_in_its_own_action_spot_without_hide(self):
+    def test_an_opened_job_asks_in_its_own_action_spot_without_hide(self):
         self.opens = {2: self.now - timedelta(minutes=12)}
         html = self.live()
         asking = self.row_html(html, 2)
@@ -148,14 +144,15 @@ class Page(Base):
         for gone in ("Welcome back", "If you did, mark it Applied", "posting-viewed", "row-ask", "posting--asking", "Viewed 12 minutes ago"):
             self.assertNotIn(gone, html)
 
-    def test_several_opened_only_the_latest_asks_and_the_rest_say_viewed(self):
-        self.opens = {1: self.now - timedelta(minutes=40), 2: self.now - timedelta(minutes=12), 3: self.now - timedelta(minutes=25)}
+    def test_every_opened_job_keeps_asking_until_it_is_answered(self):
+        self.opens = {1: self.now - timedelta(minutes=40), 3: self.now - timedelta(minutes=25)}
         html = self.live()
-        self.assertEqual(html.count(">Did you apply?</p>"), 1)
-        for pid in (1, 2, 3):
-            self.assertIn("data-viewed", self.row_html(html, pid))
+        self.assertEqual(html.count(">Did you apply?</p>"), 2)
         for pid in (1, 3):
-            self.assertIn("data-apply", self.row_html(html, pid))
+            self.assertIn("data-viewed", self.row_html(html, pid))
+            self.assertNotIn("data-apply", self.row_html(html, pid))
+        self.assertIn("data-apply", self.row_html(html, 2))               # the one never opened has no question
+        self.assertNotIn("data-viewed", self.row_html(html, 2))
 
     def test_the_question_is_in_the_page_without_focus_or_blocking(self):
         self.opens = {2: self.now - timedelta(minutes=12)}
@@ -165,11 +162,11 @@ class Page(Base):
             self.assertNotIn(forbidden, asking)
         self.assertRegex(html, r'<p class="fg-visually-hidden" role="status" aria-live="polite" id="return-live"></p>')
 
-    def test_a_job_opened_long_ago_is_viewed_but_not_asked_about(self):
-        self.opens = {2: self.now - timedelta(days=3)}
+    def test_the_question_is_still_there_days_later(self):
+        self.opens = {2: self.now - timedelta(days=30)}
         html = self.live()
         self.assertIn("data-viewed", self.row_html(html, 2))
-        self.assertNotIn("Did you apply?", html)
+        self.assertIn(">Did you apply?</p>", self.row_html(html, 2))
 
     def test_not_yet_means_no_question_until_it_is_opened_again(self):
         self.opens = {2: self.now - timedelta(minutes=30)}
@@ -213,24 +210,84 @@ class Page(Base):
             self.assertIn(f'<script src="/field-guide/js/{script}" defer></script>', html)
 
 
+class ViewedList(Base):
+    def viewed_page(self):
+        r = self.client.get("/?view=viewed")
+        self.assertEqual(r.status_code, 200)
+        return re.sub(r"<template.*?</template>", "", r.get_data(as_text=True), flags=re.S)
+
+    def test_open_roles_links_to_it(self):
+        self.assertIn('href="/?view=viewed" data-viewed-link>Viewed jobs</a>', self.live())
+
+    def test_it_lists_only_opened_jobs_last_opened_first(self):
+        self.opens = {1: self.now - timedelta(days=2), 3: self.now - timedelta(minutes=5)}
+        html = self.viewed_page()
+        self.assertIn("Jobs you viewed", html)
+        self.assertEqual(re.findall(r'<li class="fg-job" id="posting-(\d+)">', html), ["3", "1"])
+        self.assertIn("Opened 5 minutes ago", html)
+        self.assertIn("Opened 2 days ago", html)
+        self.assertNotIn("data-viewed>", html)                        # the line says when instead of the Viewed marker
+
+    def test_it_ignores_the_posted_and_work_type_filters(self):
+        self.rows[0]["first_seen_at"] = self.now - timedelta(days=40)  # long outside "Past 24 hours"
+        self.rows[0]["location"], self.rows[0]["remote_type"] = "Austin, TX", "onsite"
+        self.client.get("/?range=day")
+        self.client.get("/?work_set=1&work=remote")
+        self.opens = {1: self.now - timedelta(hours=1)}
+        self.assertIn('id="posting-1"', self.viewed_page())
+
+    def test_the_question_sticks_here_too_and_an_answered_job_has_apply(self):
+        self.opens = {1: self.now - timedelta(minutes=40), 2: self.now - timedelta(minutes=10)}
+        self.dismissals = {2: self.now - timedelta(minutes=5)}
+        html = self.viewed_page()
+        self.assertIn(">Did you apply?</p>", self.row_html(html, 1))
+        self.assertIn("data-apply", self.row_html(html, 2))
+        self.assertNotIn("Did you apply?", self.row_html(html, 2))
+
+    def test_applied_and_hidden_jobs_are_not_listed(self):
+        self.rows[0]["applied"] = True
+        self.hidden = [hidden_row(2, "Product Designer")]
+        self.opens = {1: self.now - timedelta(minutes=5), 2: self.now - timedelta(minutes=6), 3: self.now - timedelta(minutes=7)}
+        html = self.viewed_page()
+        self.assertEqual(re.findall(r'<li class="fg-job" id="posting-(\d+)">', html), ["3"])
+
+    def test_a_job_that_closed_is_not_listed(self):
+        self.opens = {3: self.now - timedelta(minutes=7), 77: self.now - timedelta(minutes=2)}
+        self.assertEqual(re.findall(r'<li class="fg-job" id="posting-(\d+)">', self.viewed_page()), ["3"])
+
+    def test_nothing_viewed_says_so(self):
+        html = self.viewed_page()
+        self.assertIn("Nothing viewed yet.", html)
+        self.assertNotIn('class="fg-job"', html)
+
+    def test_it_has_the_way_back_and_keeps_the_script_and_the_tabs(self):
+        html = self.client.get("/?view=viewed").get_data(as_text=True)
+        self.assertIn('<a class="fg-link" href="/">Back to open roles</a>', html)
+        self.assertIn('data-return-url="/return.json"', html)
+        self.assertRegex(html, r"Open roles[^<]*<[^>]*>\s*3")           # the tab still counts the open roles, not the viewed ones
+
+    def test_the_applications_tab_ignores_the_view(self):
+        self.assertNotIn("Jobs you viewed", self.client.get("/?tab=applications&view=viewed").get_data(as_text=True))
+
+
 class State(Base):
-    def test_it_reports_the_question_and_what_was_viewed_as_json_that_is_never_cached(self):
+    def test_it_reports_the_questions_and_what_was_viewed_as_json_that_is_never_cached(self):
         self.opens = {1: self.now - timedelta(minutes=40), 2: self.now - timedelta(minutes=12)}
         r = self.client.get("/return.json")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers["Cache-Control"], "no-store")
         body = r.get_json()
-        self.assertEqual(body["ask"], {"id": 2})
+        self.assertEqual(body["asks"], [{"id": 2}, {"id": 1}])
         self.assertEqual(body["viewed"], {"1": "40 minutes ago", "2": "12 minutes ago"})
 
-    def test_nothing_to_ask_is_null(self):
-        self.assertEqual(self.client.get("/return.json").get_json(), {"ask": None, "viewed": {}})
+    def test_nothing_to_ask_is_an_empty_list(self):
+        self.assertEqual(self.client.get("/return.json").get_json(), {"asks": [], "viewed": {}})
 
     def test_applied_jobs_are_neither_asked_about_nor_listed_as_viewed(self):
         self.rows[1]["applied"] = True
         self.opens = {2: self.now - timedelta(minutes=5), 1: self.now - timedelta(minutes=50)}
         body = self.client.get("/return.json").get_json()
-        self.assertIsNone(body["ask"])
+        self.assertEqual(body["asks"], [{"id": 1}])
         self.assertEqual(list(body["viewed"]), ["1"])
 
     def test_it_needs_a_sign_in(self):

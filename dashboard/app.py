@@ -29,6 +29,7 @@ from db.db import (
     get_hidden_among,
     get_open_postings,
     get_posting_url,
+    get_postings_by_ids,
     get_return_events,
     get_user_keywords,
     get_user_profile,
@@ -46,7 +47,7 @@ from db.db import (
 )
 from dashboard.profile import ask_for_catch_up
 from dashboard.requirements import queue as queue_reads
-from dashboard.return_ask import choose_ask
+from dashboard.return_ask import choose_asks
 from dashboard.skill_filter import apply_skill_cutoff
 from dashboard.profile import register as register_profile_screens
 from dashboard.resume import register as register_resume
@@ -304,6 +305,9 @@ def index():
                 conn.close()
         return redirect(url_for("index"))
 
+    view = request.args.get("view")
+    if view not in ("hidden", "viewed") or request.args.get("tab") == "applications":
+        view = "open"
     posted_range = session.get("posted_range", DEFAULT_RANGE)
     if posted_range not in RANGES:
         posted_range = DEFAULT_RANGE
@@ -329,6 +333,7 @@ def index():
             conn.commit()
         postings = get_open_postings(conn, user_id, since=cutoff, keywords=keywords)
         opens, dismissals = get_return_events(conn, user_id)  # SC-63: what they opened, and what they said "Not yet" to
+        viewed = get_postings_by_ids(conn, user_id, list(opens)) if view == "viewed" else []   # the Viewed list
         applications = get_applications(conn, user_id)
         hidden = get_hidden(conn, user_id)  # SC-59: the jobs they hid (still open), newest first
     finally:
@@ -369,6 +374,11 @@ def index():
     total = len(postings)
     limit = min(max(request.args.get("n", PAGE_SIZE, type=int), PAGE_SIZE), MAX_SHOWN)
     shown = postings[:limit]
+    if view == "viewed":
+        # The jobs they opened, last opened first, whatever the Posted and Work type filters say: this is the way back
+        # to a job they clicked on. Applied and hidden jobs live in their own lists.
+        shown = sorted((p for p in viewed if not p["applied"] and p["id"] not in hidden_ids),
+                       key=lambda p: opens[p["id"]], reverse=True)[:MAX_SHOWN]
 
     # SC-70: fit pips for the roles whose requirements are read. Only the roles on this page are queued to be read in the
     # background: a role nobody has looked at is never scored (and never paid for).
@@ -376,7 +386,7 @@ def index():
     if profile is not None:
         conn = get_conn()
         try:
-            close, unread = apply_fit(conn, user_id, profile, postings, shown)
+            close, unread = apply_fit(conn, user_id, profile, shown if view == "viewed" else postings, shown)
         except Exception:  # noqa: BLE001 - the score is a nicety: the page works without it
             app.logger.exception("fit score failed")
             unread = []
@@ -384,12 +394,14 @@ def index():
             conn.close()
         queue_reads(unread)
 
-    # SC-63: jobs they opened say Viewed, and the job they opened last asks whether they applied (if it is on this page).
-    ask_id = choose_ask(opens, dismissals, applied_ids | hidden_ids, datetime.now(timezone.utc))
+    # SC-63: jobs they opened say Viewed, and every one of them asks whether they applied until they answer.
+    ask_ids = set(choose_asks(opens, dismissals, applied_ids | hidden_ids))
     now = datetime.now(timezone.utc)
     for p in shown:
-        p["viewed"] = p["id"] in opens           # SC-59: a quiet "Viewed" marker, no date of its own
-        p["asking"] = p["id"] == ask_id
+        p["viewed"] = p["id"] in opens and view != "viewed"   # SC-59: a quiet "Viewed" marker, no date of its own
+        p["asking"] = p["id"] in ask_ids
+        if view == "viewed":
+            p["opened_ago"] = humanize_posted_at(opens[p["id"]])
         p["place"] = location_line(p["location"], p["remote_type"])
         p["when"] = short_time(p["first_seen_at"], now)   # SC-69: "9:40 AM", "Mon", "Oct 14"
     for a in applications:
@@ -419,7 +431,7 @@ def index():
         day_groups=day_groups,
         voice=voice,
         caught_up=caught_up,
-        view="hidden" if request.args.get("view") == "hidden" and request.args.get("tab") != "applications" else "open",
+        view=view,
         total=total,
         next_n=limit + PAGE_SIZE if total > limit and limit < MAX_SHOWN else None,
         page_size=PAGE_SIZE,
@@ -491,16 +503,16 @@ def set_range():
 @require_login
 def return_state():
     """What a dashboard that has just come back into view should show (SC-63): which jobs were opened, and which
-    one to ask about. The page asks for this when its tab regains focus, so the question appears without a reload."""
+    ones to ask about. The page asks for this when its tab regains focus, so the question appears without a reload."""
     conn = get_conn()
     try:
         opens, dismissals = get_return_events(conn, g.user_id)
         applied = get_applied_among(conn, g.user_id, list(opens)) | get_hidden_among(conn, g.user_id, list(opens))
     finally:
         conn.close()
-    ask_id = choose_ask(opens, dismissals, applied, datetime.now(timezone.utc))
+    asks = choose_asks(opens, dismissals, applied)
     body = {
-        "ask": ({"id": ask_id} if ask_id else None),
+        "asks": [{"id": pid} for pid in asks],
         "viewed": {str(pid): humanize_posted_at(when) for pid, when in opens.items() if pid not in applied},
     }
     response = jsonify(body)
