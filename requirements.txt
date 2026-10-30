@@ -4,3 +4,4 @@ flask
 python-dotenv
 gunicorn
 anthropic==0.125.0
+pypdf==6.21.4

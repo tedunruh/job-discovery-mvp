@@ -15,6 +15,7 @@ from dashboard.auth import (
     verify_magic_link,
 )
 from dashboard.elevate import group_by_day, monogram, rows_by_day, scout_line, short_time, tint
+from dashboard.fit import apply_fit, close_phrase
 from dashboard.filters import WORK_TYPES, location_line, work_type
 from dashboard.pay_line import pay_line
 from db.db import (
@@ -44,6 +45,7 @@ from db.db import (
     set_user_work_types,
 )
 from dashboard.profile import ask_for_catch_up
+from dashboard.requirements import queue as queue_reads
 from dashboard.return_ask import choose_ask
 from dashboard.skill_filter import apply_skill_cutoff
 from dashboard.profile import register as register_profile_screens
@@ -368,6 +370,20 @@ def index():
     limit = min(max(request.args.get("n", PAGE_SIZE, type=int), PAGE_SIZE), MAX_SHOWN)
     shown = postings[:limit]
 
+    # SC-70: fit pips for the roles whose requirements are read. Only the roles on this page are queued to be read in the
+    # background: a role nobody has looked at is never scored (and never paid for).
+    close = 0
+    if profile is not None:
+        conn = get_conn()
+        try:
+            close, unread = apply_fit(conn, user_id, profile, postings, shown)
+        except Exception:  # noqa: BLE001 - the score is a nicety: the page works without it
+            app.logger.exception("fit score failed")
+            unread = []
+        finally:
+            conn.close()
+        queue_reads(unread)
+
     # SC-63: jobs they opened say Viewed, and the job they opened last asks whether they applied (if it is on this page).
     ask_id = choose_ask(opens, dismissals, applied_ids | hidden_ids, datetime.now(timezone.utc))
     now = datetime.now(timezone.utc)
@@ -392,7 +408,7 @@ def index():
     day_counts = group_by_day(postings, now)
     day_groups = rows_by_day(shown, day_counts, now)
     caught_up = total == 0 and posted_range == "all" and work_type_label(work_types) == "Any"
-    voice = scout_line(day_counts.get("Today", 0), total, caught_up)
+    voice = scout_line(day_counts.get("Today", 0), total, caught_up, close_phrase(close))
 
     return render_template(
         "index.html",

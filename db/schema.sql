@@ -342,3 +342,35 @@ ALTER TABLE postings ADD COLUMN IF NOT EXISTS pay_max NUMERIC(14,2);
 ALTER TABLE postings ADD COLUMN IF NOT EXISTS pay_currency TEXT;
 ALTER TABLE postings ADD COLUMN IF NOT EXISTS pay_period TEXT;
 ALTER TABLE postings ADD COLUMN IF NOT EXISTS pay_source TEXT;
+
+-- ---------------------------------------------------------------------------
+-- SC-70: fit score. Additive migrations (safe to re-run).
+-- ---------------------------------------------------------------------------
+
+-- A role's top requirements, read once from its stored description by a small model call (dashboard only: the
+-- collector never holds the key). A JSON list of {"label": "...", "terms": ["...", ...]}: the terms are the ways
+-- a resume would name the requirement. NULL = not read yet; [] = read, nothing usable found (not asked again).
+-- Scoring against a person is plain matching and is done per request, so nothing here is per person.
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS requirements JSONB;
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS requirements_at TIMESTAMPTZ;
+
+-- The text of a resume PDF, taken when it is uploaded (or the first time a score needs it, for resumes uploaded
+-- before this), so a score can check requirements against it. Replaced with the file, removed with it.
+ALTER TABLE user_resumes ADD COLUMN IF NOT EXISTS text TEXT;
+
+-- One row per call that reads a posting's requirements, failed ones too, like resume_parses: tokens and cost
+-- (computed with price_version's rates when the call was made). The monthly cap sums cost_usd. No text is kept.
+CREATE TABLE IF NOT EXISTS posting_reads (
+    id SERIAL PRIMARY KEY,
+    posting_id INTEGER REFERENCES postings(id) ON DELETE SET NULL,
+    model TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd NUMERIC(10, 6) NOT NULL DEFAULT 0,
+    price_version TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('ok', 'error')),
+    error_kind TEXT,
+    request_id TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_posting_reads_created ON posting_reads (created_at DESC);

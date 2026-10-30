@@ -86,13 +86,12 @@ def tint(company):
     return TINTS[zlib.crc32((company or "").strip().lower().encode("utf-8")) % len(TINTS)]
 
 
-def scout_line(new_today, total, caught_up):
+def scout_line(new_today, total, caught_up, close=""):
     """Scout's line above the board, built from real counts, or "" when there is nothing true to say (a filter has
-    emptied the list). The "close to what you're after" part waits for the fit score (SC-70)."""
+    emptied the list). `close` is the fit sentence (dashboard.fit.close_phrase), added when some jobs score 4 or 5 pips."""
     if caught_up:
         return "You’re caught up. I’ll keep looking."
     if not total:
         return ""
-    if new_today:
-        return f"{new_today} new since yesterday."
-    return "Nothing new since yesterday."
+    first = f"{new_today} new since yesterday." if new_today else "Nothing new since yesterday."
+    return f"{first} {close}" if close else first

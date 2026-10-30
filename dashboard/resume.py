@@ -13,6 +13,7 @@ import os
 from flask import Response, g, redirect, render_template, request, session, url_for
 from werkzeug.utils import secure_filename
 
+from dashboard.fit import pdf_text
 from dashboard.profile import MAX_SKILLS, MAX_TITLES, clean_values
 from db.db import (
     delete_resume,
@@ -225,7 +226,7 @@ def process_upload(conn, user_id, filename, content):
         conn, user_id, model=result.model, input_tokens=result.input_tokens, output_tokens=result.output_tokens,
         cost_usd=cost_usd(result.input_tokens, result.output_tokens), price_version=PRICE_VERSION,
         status="ok", request_id=result.request_id, result=fields)
-    save_resume(conn, user_id, filename, content)
+    save_resume(conn, user_id, filename, content, text=pdf_text(content))   # SC-70: the fit score checks against it
     return parse_id
 
 

@@ -67,7 +67,7 @@ Sprint history, incidents and open items: `docs/SPRINTS.md`. Process lessons: `Q
   (outage watchdog; the collector pings after each completed run and `/fail` on a crash).
 - **Config** is env vars / GitHub secrets, never in the repo: `DATABASE_URL`, `RESEND_API_KEY`,
   `RESEND_FROM`, `SECRET_KEY`, `NTFY_HEALTH_TOPIC`, `HEALTHCHECK_URL`, `ANTHROPIC_API_KEY` (dashboard only: it reads resumes;
-  never put it in the collector or GitHub secrets) and optionally `RESUME_MONTHLY_CAP_USD` (default 5), plus `RENDER_API_KEY` locally.
+  never put it in the collector or GitHub secrets) and optionally `RESUME_MONTHLY_CAP_USD` (default 5) and `POSTING_MONTHLY_CAP_USD` (default 5; the cap on reading postings' requirements for the fit score, SC-70), plus `RENDER_API_KEY` locally.
   Locally they live in `.env.local` (git-ignored); `private/` (git-ignored) holds invite material.
   Never print, commit or paste values. The repo is **public**: no tester names, topics or keys.
 

@@ -156,7 +156,7 @@ class Processing(unittest.TestCase):
         patches = [
             mock.patch.object(rs, "reading_state", return_value=("ok", None)),
             mock.patch.object(rs, "log_resume_parse", side_effect=lambda conn, uid, **kw: self.logged.append(kw) or 41),
-            mock.patch.object(rs, "save_resume", side_effect=lambda conn, uid, name, content: self.saved.append((uid, name, content))),
+            mock.patch.object(rs, "save_resume", side_effect=lambda conn, uid, name, content, text=None: self.saved.append((uid, name, content))),
         ]
         for p in patches:
             p.start()

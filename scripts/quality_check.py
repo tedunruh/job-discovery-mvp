@@ -824,7 +824,7 @@ def check_elevated(browser, base, token):
     page.goto(base + "/", wait_until="load")
     voice = page.locator("[data-voice]")
     text = voice.inner_text() if voice.count() else ""
-    check(re.fullmatch(r"(\d+ new since yesterday\.|Nothing new since yesterday\.)", text) is not None
+    check(re.fullmatch(r"(\d+ new since yesterday\.|Nothing new since yesterday\.)( (One looks|\w+ look) close to what you’re after\.)?", text) is not None
           and page.evaluate("document.querySelector('[data-voice]').getBoundingClientRect().bottom <= document.querySelector('.board').getBoundingClientRect().top + 1"),
           "Scout's line sits above the board and says something true", text)
     heads = page.evaluate("[...document.querySelectorAll('.fg-day')].map(s => ({label: s.querySelector('.fg-day-label').firstChild.textContent.trim(), count: parseInt(s.querySelector('.fg-day-count').textContent.replace(/\\D+/g, ''), 10), shown: s.querySelectorAll('li.fg-job').length, rule: !!s.querySelector('.fg-day-rule')}))")
@@ -914,15 +914,17 @@ def check_pay(browser, base, token):
     page.goto(base + "/", wait_until="load")
     cards = page.evaluate("""() => [...document.querySelectorAll('li.fg-job')].map(li => {
         const p = li.querySelector('.fg-job-pay'), r = li.getBoundingClientRect(), t = li.querySelector('.fg-job-title').getBoundingClientRect(), pr = p.getBoundingClientRect();
-        return {text: p.textContent.trim(), h: Math.round(r.height), left: Math.abs(pr.left - t.left) <= 1, tab: getComputedStyle(p).fontVariantNumeric.includes('tabular-nums'), lines: Math.round(pr.height) } })""")
+        const sub = li.querySelector('.fg-job-subline').getBoundingClientRect();
+        return {text: p.textContent.trim(), h: Math.round(r.height), extra: Math.round(t.height) + Math.round(sub.height), left: Math.abs(pr.left - t.left) <= 1, tab: getComputedStyle(p).fontVariantNumeric.includes('tabular-nums'), lines: Math.round(pr.height) } })""")
     with_pay = [c for c in cards if c["text"]]
     check(all(re.fullmatch(r"(Up to )?[^\s\d]*\s?[\d,.]+(?: - [^\s\d]*\s?[\d,.]+|\+)?(?: / (?:hour|month|week|day))?", c["text"]) for c in with_pay),
           f"every pay line reads as a range, never a dash or a stray word ({len(with_pay)} of {len(cards)} cards have one)", str([c["text"] for c in with_pay][:4]))
     check(all(c["left"] and c["tab"] for c in cards), "pay lines line up with the title and use tabular numbers")
     check(all(c["lines"] >= 14 for c in cards), "a card with no pay keeps the line as blank space (the line is never collapsed)")
-    # cards with and without pay, in the same list, are the same height (titles of one line only)
-    heights = {c["h"] for c in cards if c["lines"] and c["h"] < 160}
-    check(len(heights) <= 3, "cards with and without pay are the same height (give or take a wrapped title)", str(sorted(heights)))
+    # cards with and without pay, in the same list, are the same height once the lines a long title or place wrapped onto
+    # are taken out (the title and place lines are the only ones whose length depends on the job)
+    heights = {c["h"] - c["extra"] for c in cards if c["lines"]}
+    check(max(heights) - min(heights) <= 2, "cards with and without pay are the same height (a wrapped title or place aside)", str(sorted(heights)))
     ctx.close()
 
 
