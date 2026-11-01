@@ -2,7 +2,7 @@
 {#- The things a card's action spot can say (SC-63, SC-59). They are drawn on the server for the rows that need them and also
     sit in <template>s, which the page's scripts copy, so the page and the scripts never disagree on markup. -#}
 {% macro apply_group(id, title) -%}
-<span class="fg-job-group"><a class="fg-button fg-button--secondary" href="/open/{{ id }}" target="_blank" rel="noopener" data-apply>Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a><form method="post" action="/hide/{{ id }}" data-hide><button class="fg-button fg-button--ghost" type="submit">Hide<span class="fg-visually-hidden"> {{ title }}</span></button></form></span>
+<span class="fg-job-group"><a class="fg-button fg-button--suggested" href="/open/{{ id }}" target="_blank" rel="noopener" data-apply>Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a><form method="post" action="/hide/{{ id }}" data-hide><button class="fg-button fg-button--secondary" type="submit">Hide<span class="fg-visually-hidden"> {{ title }}</span></button></form></span>
 {%- endmacro %}
 {% macro ask_actions(id) -%}
 <p class="fg-voice fg-job-question">Did you apply?</p>

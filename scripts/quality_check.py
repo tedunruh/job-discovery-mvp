@@ -1041,6 +1041,36 @@ CONTROL_SELECTORS = (".fg-button, .fg-input, .fg-select select, .fg-check, .fg-s
                      ".fg-chip, .fg-chip-add, .fg-toggle, .fg-switch, .fg-icon-button, .fg-menu-item, button.fg-link")
 
 
+# Every action that has an outline uses the one subtle action outline (Ted, Nov 1): secondary and
+# suggested buttons and menu buttons (selects, filter pills). Text fields are not actions and keep
+# their stronger border.
+OUTLINED_ACTIONS = ".fg-button--secondary, .fg-button--suggested, .fg-select select, .fg-filter-pill"
+
+
+def check_action_outlines(page, where):
+    found = page.evaluate("""(sel) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--fg-color-action-outline)';
+      document.body.appendChild(probe);
+      const want = getComputedStyle(probe).color;
+      probe.remove();
+      const seen = {};
+      for (const el of document.querySelectorAll(sel)) {
+        if (el.disabled || el.closest(':disabled') || !el.getClientRects().length) continue;
+        const cs = getComputedStyle(el);
+        const kind = el.matches('.fg-filter-pill') ? 'filter pill' : el.tagName === 'SELECT' ? 'select'
+          : el.matches('.fg-button--suggested') ? 'suggested button' : 'secondary button';
+        if (cs.borderTopWidth === '0px' || cs.borderTopStyle === 'none') continue;
+        (seen[kind] = seen[kind] || new Set()).add(cs.borderTopColor);
+      }
+      return { want, seen: Object.fromEntries(Object.entries(seen).map(([k, v]) => [k, [...v]])) };
+    }""", OUTLINED_ACTIONS)
+    for kind, colors in sorted(found["seen"].items()):
+        check(colors == [found["want"]], f"{kind} outline is the subtle action outline  [{where}]",
+              f"{colors} vs {found['want']}")
+    return found["seen"]
+
+
 def check_control_heights(page):
     """Controls in the gallery are all >= the touch target (44px)."""
     short = page.evaluate(
@@ -1141,6 +1171,11 @@ def main():
                     if path == "/field-guide" and w == VIEWPORTS[-1][0]:
                         check_gallery_complete(page)
                         check_control_heights(page)
+                        kinds = check_action_outlines(page, path)
+                        check(set(kinds) == {"secondary button", "suggested button", "select", "filter pill"},
+                              "gallery shows every kind of outlined action", sorted(kinds))
+                    if path in ("/profile", "/") and w == VIEWPORTS[-1][0]:
+                        check_action_outlines(page, path)
                     if path == "/profile" and w == VIEWPORTS[-1][0]:
                         check_control_heights(page)
                     if path in ("/", "/profile"):

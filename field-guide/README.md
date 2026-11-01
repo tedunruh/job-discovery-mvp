@@ -142,6 +142,7 @@ is for supporting text only (metadata, hints, counts, section notes).
 | `.fg-check` / `.fg-checkbox` | Checked = Forest |
 | `.fg-message` + `--success` / `--attention` / `--discovery` | Signal color in fill and left rule, text stays Ink |
 | `.fg-link` | Forest |
+| `.fg-button--suggested` | The choice Scout points you to in a quiet pair (Apply beside Hide): the same subtle outline as secondary, light Forest fill, Forest text (6.8:1). One per group; equal answers (Yes / Not yet) stay two secondary buttons |
 | `.fg-button--ghost` | Forest text, no outline (header "Role preferences") |
 | `.fg-button[aria-busy="true"]` + `.fg-spinner` | Working state (SC-62): the button keeps its colors and width, the label says what is happening, a spinner sits before it. `aria-busy` and `aria-disabled`, never `disabled`, so focus stays. Reduced motion slows the spinner |
 | `.fg-radio` | Checked = Forest check-disc |
@@ -186,4 +187,8 @@ Disabled buttons use the secondary fill with secondary text (5.1:1) rather than 
    single-line headings or wordmarks may center.
 5. **Sentence case, always.** Buttons, links, labels and headings capitalize only the
    first word and proper names ("Role preferences"; "Sign out").
-6. Ask: does this feel calm, human, purposeful, like someone looking out for me?
+6. **Outlines on actions are subtle.** A button or menu button that has an outline
+   (secondary, suggested, select, filter pill) uses `--fg-color-action-outline`
+   (Ink 18%, a card's hairline). The label says what it is; the outline only groups it.
+   Text fields keep a stronger border: their edge is how you find them.
+7. Ask: does this feel calm, human, purposeful, like someone looking out for me?

@@ -42,7 +42,8 @@
       "selected":        { "$value": "{color.palette.forest}" },
       "focus-ring":      { "$value": "{color.palette.forest}", "$extensions": { "fieldguide.alpha": 0.35 }  },
       "subtle-text":     { "$value": "{color.palette.forest}", "$extensions": { "fieldguide.alpha": 0.8 }, "$description": "Secondary Forest text, e.g. a filter's current value. Figma draws 70%; 80% is the lightest that clears 4.5:1 on Parchment." },
-      "subtle-border":   { "$value": "{color.palette.forest}", "$extensions": { "fieldguide.alpha": 0.4 }, "$description": "Outline of Forest-led controls such as filter pills." }
+      "subtle-border":   { "$value": "{color.palette.forest}", "$extensions": { "fieldguide.alpha": 0.4 }, "$description": "Outline of Forest-led choices such as segments." },
+      "outline":         { "$value": "{color.palette.ink}", "$extensions": { "fieldguide.alpha": 0.18 }, "$description": "The one outline for actions: secondary and suggested buttons, menu buttons (selects, filter pills). Subtle, the same strength as a card's hairline; the label says what it is (Ted, Nov 1)." }
     },
     "signal": {
       "$type": "color",
