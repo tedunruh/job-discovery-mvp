@@ -1393,3 +1393,26 @@ cards, a release after SC-70 shipped them.
 - [ ] Not done: the question can pile up for someone who opens many jobs without answering (that is the ask); no cap or "answer all"
       control. Look at how it reads for the first real users after deploy.
 
+
+### 2026-11-01 — Suggested button, and one subtle outline for every outlined action
+**Shipped:** New `.fg-button--suggested`: the subtle action outline, a light Forest fill
+(`signal-progress-subtle`) and Forest text (6.8:1; 6.0:1 on hover), for the choice Scout points
+to inside a quiet pair. Job cards: Apply is suggested and Hide is secondary (outlined), as in
+Ted's mock. Yes / Not yet stay two secondary buttons, so the answer isn't nudged. New token
+`--fg-color-action-outline` (Ink 18%, a card's hairline) is the one outline for actions:
+secondary and suggested buttons, selects (profile and the job card's reason menu) and filter
+pills. They used Ink 40%, Ink 60% and Forest 40%. Text fields keep their stronger border. README
+rule 6, gallery row, README row.
+**Rework count:** 1. Hide first stayed a ghost button; Ted wanted it secondary (outlined).
+**Root cause:** *no rule for outlines on actions*: each control picked its own border token, so
+the same kind of edge came in three strengths.
+**Standing checks added:**
+- [x] Automated: on the gallery, profile and dashboard, every visible outlined action (secondary,
+      suggested, select, filter pill) has the action-outline color, and the gallery shows all four
+      kinds. Mutation-tested: the old secondary and filter-pill outlines fail on every page.
+**Figma:** new `Semantic` variable `color/action/outline` (alias of `ink/18`, stroke scope, WEB
+`var(--fg-color-action-outline)`), bound on Secondary buttons, Select, Filter pill and the job card's
+reason menu. Button set gains `Style=Suggested` (Default, Disabled, Working). Job card: Apply is
+Suggested, Hide is Secondary.
+**Note:** the container was reset; the local check DB was rebuilt from `db/schema.sql` and seeded
+with sample postings (local only), so the dashboard checks have rows again.

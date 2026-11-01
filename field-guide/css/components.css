@@ -90,9 +90,20 @@ button.fg-link {
 .fg-button--secondary {
   background: transparent;
   color: var(--fg-color-text-primary);
-  border-color: var(--fg-color-border-default);
+  border-color: var(--fg-color-action-outline);
 }
 .fg-button--secondary:hover { background: var(--fg-color-action-secondary-fill); }
+/* Suggested: the choice Scout points you to inside a quiet pair (Apply beside Hide). Same subtle
+   outline as secondary, a light Forest fill and Forest text. Not a filled gray: gray fill means
+   disabled, and a filled button can read as an answer already given. One per group. */
+.fg-button--suggested {
+  background: var(--fg-color-signal-progress-subtle);
+  color: var(--fg-color-action-primary);
+  border-color: var(--fg-color-action-outline);
+}
+.fg-button--suggested:hover {
+  background: color-mix(in srgb, var(--fg-color-action-primary) 20%, transparent);
+}
 .fg-button--ghost {
   background: transparent;
   color: var(--fg-color-action-primary);
@@ -280,7 +291,7 @@ button.fg-link {
   align-items: center;
   gap: var(--fg-space-2);
   padding: 6px var(--fg-space-3) 6px var(--fg-space-3);
-  border: 1px solid var(--fg-color-action-subtle-border);
+  border: 1px solid var(--fg-color-action-outline);
   border-radius: var(--fg-radius-xl);
   font-family: var(--fg-font-family-ui);
   font-size: var(--fg-font-size-lg);
@@ -632,7 +643,7 @@ button.fg-link {
   font-weight: var(--fg-font-weight-medium);
   color: var(--fg-color-text-primary);
   background: var(--fg-color-surface-field);
-  border: 1px solid var(--fg-color-border-strong);
+  border: 1px solid var(--fg-color-action-outline);
   border-radius: var(--fg-radius-sm);
   cursor: pointer;
 }
@@ -1289,7 +1300,8 @@ button.fg-link {
 /* Answers and actions are one group and never wrap apart (Apply + Hide, Yes + Not yet, the reason menu + Skip). When
    the card is narrow the question takes its own line and the whole group moves to the next one. */
 .fg-job-group { display: inline-flex; flex: none; align-items: center; gap: var(--fg-space-2); }
-/* Hide is quieter than Apply: secondary text, no Forest. */
+/* Apply (suggested) and Hide (secondary) share the subtle outline. A ghost button in a group (Skip)
+   is quieter still: secondary text, no Forest. */
 .fg-job-group .fg-button--ghost { color: var(--fg-color-text-secondary); }
 .fg-job-group .fg-button--ghost:hover { background: var(--fg-color-action-secondary-fill); color: var(--fg-color-text-primary); }
 /* The reason menu in a card: a pill that is only as wide as its text. */
@@ -1298,7 +1310,6 @@ button.fg-link {
   width: auto;
   field-sizing: content;
   border-radius: var(--fg-radius-full);
-  border-color: var(--fg-color-border-default);
   background: var(--fg-color-surface-card);
   padding-left: var(--fg-space-3);
 }

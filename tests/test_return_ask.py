@@ -202,7 +202,7 @@ class Page(Base):
         self.assertRegex(html, r'<template id="return-ask-template">\s*<p class="fg-voice fg-job-question">Did you apply\?</p>')
         self.assertIn('action="/ask/dismiss/__id__"', html)
         self.assertIn('action="/set_applied/__id__"', html)
-        self.assertRegex(html, r'<template id="return-apply-template">\s*<span class="fg-job-group"><a class="fg-button fg-button--secondary" href="/open/__id__"')
+        self.assertRegex(html, r'<template id="return-apply-template">\s*<span class="fg-job-group"><a class="fg-button fg-button--suggested" href="/open/__id__"')
         self.assertIn('action="/hide/__id__" data-hide', html)
         self.assertRegex(html, r'<template id="return-viewed-template">\s*<span class="fg-job-viewed" data-viewed>')
         self.assertIn('data-return-url="/return.json"', html)

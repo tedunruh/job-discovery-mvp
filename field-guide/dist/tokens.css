@@ -37,6 +37,7 @@
   --fg-color-action-focus-ring: rgb(53 84 71 / 0.35);
   --fg-color-action-subtle-text: rgb(53 84 71 / 0.8);
   --fg-color-action-subtle-border: rgb(53 84 71 / 0.4);
+  --fg-color-action-outline: rgb(41 40 36 / 0.18);
 
   /* color.signal */
   --fg-color-signal-discovery: var(--fg-color-palette-goldenrod);
