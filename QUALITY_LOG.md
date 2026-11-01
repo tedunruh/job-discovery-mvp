@@ -1410,5 +1410,9 @@ the same kind of edge came in three strengths.
 - [x] Automated: on the gallery, profile and dashboard, every visible outlined action (secondary,
       suggested, select, filter pill) has the action-outline color, and the gallery shows all four
       kinds. Mutation-tested: the old secondary and filter-pill outlines fail on every page.
+**Figma:** new `Semantic` variable `color/action/outline` (alias of `ink/18`, stroke scope, WEB
+`var(--fg-color-action-outline)`), bound on Secondary buttons, Select, Filter pill and the job card's
+reason menu. Button set gains `Style=Suggested` (Default, Disabled, Working). Job card: Apply is
+Suggested, Hide is Secondary.
 **Note:** the container was reset; the local check DB was rebuilt from `db/schema.sql` and seeded
 with sample postings (local only), so the dashboard checks have rows again.
