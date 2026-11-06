@@ -1495,11 +1495,13 @@ button.fg-link {
   background: var(--fg-color-surface-card);
 }
 .fg-panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--fg-space-2); }
+.fg-panel-actions > form { display: contents; }
+.fg-panel-sec-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--fg-space-2); }
 @media (max-width: 680px) {
   .fg-panel-head { padding-left: var(--fg-space-4); grid-template-columns: var(--fg-size-mono-phone) minmax(0, 1fr) auto; }
   .fg-panel-body { padding: var(--fg-space-4); }
   .fg-panel-foot { padding: var(--fg-space-3) var(--fg-space-4) var(--fg-space-4); }
-  .fg-panel-actions > .fg-button { flex: 1 1 0; }
+  .fg-panel-actions .fg-button { flex: 1 1 0; }
 }
 
 /* ---------- Requirement list (SC-72) ---------- */
@@ -1543,3 +1545,79 @@ button.fg-link {
   .fg-has-panel .fg-job { grid-template-columns: minmax(0, 1fr); }
   .fg-has-panel .fg-job-second { padding-left: calc(var(--fg-size-mono) + var(--fg-space-3)); }
 }
+
+/* ---------- Steps (SC-72) ---------- */
+/* Where the person is in applying: Prep, Tailor, Apply. The current step is Forest with aria-current; steps before it
+   show a Forest outline and say "(done)" for screen readers. A strip under the panel's head, never a navigation. */
+.fg-steps {
+  display: flex;
+  gap: var(--fg-space-6);
+  margin: 0;
+  padding: var(--fg-space-3) var(--fg-space-6);
+  list-style: none;
+  border-bottom: 1px solid var(--fg-color-border-subtle);
+  font-size: var(--fg-font-size-sm);
+  font-weight: var(--fg-font-weight-medium);
+  color: var(--fg-color-text-secondary);
+}
+.fg-step { display: inline-flex; align-items: center; gap: var(--fg-space-2); }
+.fg-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--fg-radius-full);
+  border: 1px solid var(--fg-color-border-default);
+  font-size: var(--fg-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+.fg-step[aria-current="step"] { color: var(--fg-color-text-primary); font-weight: var(--fg-font-weight-demibold); }
+.fg-step[aria-current="step"] .fg-step-num {
+  background: var(--fg-color-action-primary);
+  border-color: var(--fg-color-action-primary);
+  color: var(--fg-color-text-on-action);
+}
+.fg-step.is-done .fg-step-num { border-color: var(--fg-color-action-primary); color: var(--fg-color-action-primary); }
+@media (max-width: 680px) { .fg-steps { padding-inline: var(--fg-space-4); gap: var(--fg-space-4); } }
+
+/* ---------- Change list (SC-72) ---------- */
+/* What tailoring changed in the resume, one card per change: its kind and where, the text before (struck through) and
+   after, why, and Undo. An undone change fades its After and says "Undone" in words; the resume keeps its Before. */
+.fg-changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--fg-space-2); }
+.fg-change {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-2);
+  padding: var(--fg-space-4);
+  background: var(--fg-color-surface-card);
+  border: 1px solid var(--fg-color-border-subtle);
+  border-radius: var(--fg-radius-sm);
+}
+.fg-change.is-undone { background: var(--fg-color-surface-page); }
+.fg-change.is-undone .fg-change-after, .fg-change.is-undone .fg-change-why { opacity: 0.55; }
+.fg-change-head { display: flex; align-items: center; justify-content: space-between; gap: var(--fg-space-3); }
+.fg-change-head > form { margin: 0; }
+.fg-change-kind { margin: 0; font-size: var(--fg-font-size-sm); font-weight: var(--fg-font-weight-demibold); color: var(--fg-color-text-primary); }
+.fg-change-state { font-weight: var(--fg-font-weight-medium); color: var(--fg-color-text-secondary); }
+.fg-change-where { margin: 0; font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
+.fg-change-before, .fg-change-after { margin: 0; line-height: var(--fg-font-line-height-body); }
+.fg-change-before { color: var(--fg-color-text-secondary); font-weight: var(--fg-font-weight-medium); }
+.fg-change-before :is(.fg-change-text, ol) { text-decoration: line-through; text-decoration-color: var(--fg-color-border-default); }
+.fg-change-after { color: var(--fg-color-text-primary); font-weight: var(--fg-font-weight-medium); }
+.fg-change-before ol, .fg-change-after ol { margin: var(--fg-space-1) 0 0; padding-left: var(--fg-space-5); }
+.fg-change-why { margin: 0; font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
+.fg-change-label {
+  display: inline-block;
+  margin-right: var(--fg-space-2);
+  font-size: var(--fg-font-size-xs);
+  font-weight: var(--fg-font-weight-demibold);
+  color: var(--fg-color-text-secondary);
+}
+
+/* While a tailoring runs: grey bars where the changes will appear. */
+.fg-panel-work { display: flex; flex-direction: column; gap: var(--fg-space-3); }
+.fg-panel-work .fg-skeleton:nth-child(1) { width: 90%; }
+.fg-panel-work .fg-skeleton:nth-child(2) { width: 75%; }
+.fg-panel-work .fg-skeleton:nth-child(3) { width: 82%; }
+.fg-panel-work .fg-skeleton:nth-child(4) { width: 60%; }

@@ -1,10 +1,16 @@
 /* The panel beside the job list (SC-72), and the page's scroll fold. Markup comes from the server, never from here:
    opening a card asks for /prep/<id> (the panel's inside, drawn by Jinja) and puts it in <aside id="apply-panel">.
+   Forms inside the panel (Tailor my resume, Cancel, Undo/Redo) post in the background and the answer is the panel's
+   markup again; while a tailoring runs, the page asks /tailor/<id> every couple of seconds until it ends (a 204 means
+   still working) and shows the progress line's wording, which the server wrote, one step at a time.
 
    Rule: Scout never opens or closes anything on the person's behalf. A card opens the panel only when they click its title
    (a modified click, such as Ctrl or Cmd, still opens the posting in a new tab as before); only Close shuts it. Apply in
    the panel opens the posting and the panel stays. Focus:
      - opening a card moves focus to the panel's heading; Close returns it to that card's title link
+     - when the panel's stage changes because the person pressed something (Tailor, Cancel), focus goes to the new
+       stage's first line; when a tailoring finishes by itself, focus moves only if it was inside the panel (on Cancel,
+       which is gone), and the live region says so either way. Undo/Redo keep focus on the same change's button.
      - when a row leaves Open roles (Yes, or hidden), focus goes to the next row's title link (the previous one if it was
        last; the count line if none are left). If the panel was showing that job it stays open and moves to the same next
        job, quietly, and the toast says so once ("Now showing Northwind Health."). A panel showing another job is left alone.
@@ -42,6 +48,12 @@
 
   var current = null;   // the id of the job the panel shows
   var latest = 0;       // the newest request, so a slow answer never replaces a newer one
+  var live = document.getElementById("panel-live");
+  var POLL_MS = 2000;       // how often a running tailoring is asked about
+  var STEP_SECONDS = 6;     // how long each line of the progress text stays up
+  var SETTLE_SECONDS = 40;  // the bar eases toward full over about this long, and never finishes early
+  var CEILING = 92;         // percent: it only completes when the result arrives
+  var timers = [];          // the poll and the progress ticker of the stage on show
 
   function rowFor(id) { return document.getElementById("posting-" + id); }
   function idOf(row) { return row.id.replace("posting-", ""); }
@@ -59,6 +71,73 @@
     }
   }
 
+  function stopWork() {
+    timers.forEach(function (t) { window.clearTimeout(t); window.clearInterval(t); });
+    timers = [];
+  }
+
+  function say(text) {
+    if (!live || !text) return;
+    live.textContent = "";
+    window.setTimeout(function () { live.textContent = text; }, 50);   // an unchanged string is not announced twice
+  }
+
+  /* While a tailoring runs: step the progress text and ask the server until it ends. */
+  function startWork(id) {
+    var work = panel.querySelector("[data-poll]");
+    if (!work) return;
+    var url = work.getAttribute("data-poll");
+    var bar = panel.querySelector(".fg-progress");
+    var steps = [];
+    try { steps = JSON.parse((bar && bar.getAttribute("data-steps")) || "[]"); } catch (e) { /* bar only */ }
+    var text = bar && bar.querySelector(".fg-progress-text");
+    var fill = bar && bar.querySelector(".fg-progress-bar span");
+    var started = Date.now(), shown = 0, failures = 0;
+
+    timers.push(window.setInterval(function () {
+      var seconds = (Date.now() - started) / 1000;
+      if (fill) fill.style.width = (CEILING * (1 - Math.exp(-seconds / SETTLE_SECONDS))).toFixed(1) + "%";
+      if (text && steps.length) {
+        var next = Math.min(steps.length - 1, Math.floor(seconds / STEP_SECONDS));
+        if (next !== shown) { shown = next; text.textContent = steps[next]; }
+      }
+    }, 250));
+
+    function poll() {
+      fetch(url, { credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
+        .then(function (response) {
+          if (response.status === 204) { failures = 0; return again(); }
+          if (!response.ok) throw new Error("no answer");
+          return response.text().then(function (html) {
+            if (current !== id) return;   // closed or moved on: the result waits in the panel for next time
+            var inside = panel.contains(document.activeElement);
+            render(html, id, inside);
+            var voice = panel.querySelector("[data-announce]");
+            say(voice ? voice.getAttribute("data-announce") : "");
+          });
+        })
+        .catch(function () { failures++; if (failures < 5 && current === id) again(); });
+    }
+    function again() { timers.push(window.setTimeout(poll, POLL_MS)); }
+    again();
+  }
+
+  /* Put the server's markup in the panel and start whatever its stage needs. */
+  function render(html, id, focusFirst) {
+    stopWork();
+    panel.innerHTML = html;
+    panel.hidden = false;
+    current = id;
+    workspace.classList.add("fg-has-panel");
+    select(id);
+    sync();
+    if (focusFirst) {
+      var first = panel.querySelector("[data-panel-focus]");
+      if (first) first.focus();
+    }
+    startWork(id);
+  }
+
   /* Show a job in the panel. Resolves once it is shown; rejects if the server could not give it. */
   function load(id, focusHeading) {
     var mine = ++latest;
@@ -69,12 +148,7 @@
       })
       .then(function (html) {
         if (mine !== latest) return;
-        panel.innerHTML = html;
-        panel.hidden = false;
-        current = id;
-        workspace.classList.add("fg-has-panel");
-        select(id);
-        sync();
+        render(html, id, false);
         var heading = panel.querySelector("[data-panel-title]");
         if (focusHeading && heading) heading.focus();
       });
@@ -83,6 +157,7 @@
   function close() {
     var row = current ? rowFor(current) : null;
     latest++;
+    stopWork();
     current = null;
     panel.hidden = true;
     panel.innerHTML = "";
@@ -106,6 +181,53 @@
 
   panel.addEventListener("click", function (event) {
     if (event.target.closest && event.target.closest("[data-panel-close]")) close();
+  });
+
+  /* Forms in the panel post in the background. A plain one (Tailor, Cancel) answers with the panel's new stage. An
+     Undo/Redo form ("change") answers with the whole panel too, but only that card and the count are swapped in, so the
+     scroll position stays and focus lands on the same change's button. Nothing is sent twice: the button waits. */
+  function failedForm(form, button) {
+    if (button) button.disabled = false;
+    var message = panel.querySelector("[data-panel-error]");
+    if (message) { message.hidden = false; say(message.textContent); }
+  }
+
+  function swapChange(html, changeId) {
+    var next = new DOMParser().parseFromString(html, "text/html");
+    var fresh = next.querySelector('[data-change="' + changeId + '"]');
+    var old = panel.querySelector('[data-change="' + changeId + '"]');
+    if (!fresh || !old) return false;
+    old.replaceWith(document.importNode(fresh, true));
+    var lines = next.querySelectorAll("[data-kept-line]");
+    Array.prototype.forEach.call(panel.querySelectorAll("[data-kept-line]"), function (el, i) {
+      if (lines[i]) el.textContent = lines[i].textContent;
+    });
+    var button = panel.querySelector('[data-change="' + changeId + '"] button');
+    if (button) button.focus();
+    return true;
+  }
+
+  panel.addEventListener("submit", function (event) {
+    var form = event.target.closest && event.target.closest("form[data-panel-form]");
+    if (!form || !window.fetch) return;
+    event.preventDefault();
+    var button = form.querySelector("button");
+    var id = current, change = form.getAttribute("data-panel-form") === "change";
+    var changeId = change ? form.querySelector('input[name="change"]').value : "";
+    if (button) button.disabled = true;
+    fetch(form.getAttribute("action"), { method: "POST", body: new FormData(form), credentials: "same-origin",
+                                         headers: { "X-Requested-With": "fetch" } })
+      .then(function (response) {
+        if (!response.ok) throw new Error("no answer");
+        return response.text();
+      })
+      .then(function (html) {
+        if (current !== id) return;   // they opened another job meanwhile: that panel is not ours to change
+        if (change && swapChange(html, changeId)) return;
+        latest++;
+        render(html, id, true);
+      })
+      .catch(function () { failedForm(form, button); });
   });
 
   /* The nearest row still in the list after this one, else the nearest before it. */

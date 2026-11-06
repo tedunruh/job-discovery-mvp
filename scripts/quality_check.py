@@ -38,6 +38,8 @@ load_dotenv(os.path.join(ROOT, ".env.local"))
 from playwright.sync_api import sync_playwright  # noqa: E402
 from werkzeug.serving import make_server  # noqa: E402
 
+from dashboard import resume as resume_module  # noqa: E402
+from dashboard import tailor  # noqa: E402
 from dashboard.app import app  # noqa: E402
 from db.db import create_session, get_conn  # noqa: E402
 
@@ -1173,6 +1175,205 @@ def check_panel(browser, base, token):
         ctx.close()
 
 
+# ---- tailoring (SC-72 slice 2) ----------------------------------------------
+
+TAILOR_COMPANY = "Quality Check Studio"
+TAILOR_STRUCTURE = {
+    "summary": "Product designer with 10 years of experience across B2B and consumer products.",
+    "experience": [{"company": "Northwind Health", "title": "Design Lead", "location": "", "dates": "2022 to now",
+                    "bullets": ["Ran research and shipped a redesign that cut support calls by 20%.",
+                                "Owned the design system in Figma and hired two designers.",
+                                "Worked with developers to keep designs and code in sync."]}],
+    "skills": ["Figma", "Prototyping", "User research", "Accessibility"],
+    "education": [], "other": [],
+}
+
+
+def provision_tailor_fixture(user_id):
+    """One open design role at a made-up company with stored text and requirements, and a resume for the check's user,
+    so the panel can be tailored for without a model call. Returns the posting's id. Removed by remove_tailor_fixture."""
+    text = " ".join([TAILOR_STRUCTURE["summary"]] + [b for r in TAILOR_STRUCTURE["experience"] for b in r["bullets"]] +
+                    TAILOR_STRUCTURE["skills"])
+    reqs = [{"label": "Design systems experience", "terms": ["design system"]},
+            {"label": "Working knowledge of React", "terms": ["react"]}]
+    conn = get_conn()
+    with conn.cursor() as cur:
+        remove_tailor_fixture(conn)
+        cur.execute("INSERT INTO companies (name, ats_type, ats_identifier) VALUES (%s, 'ashby', 'quality-check-fixture') RETURNING id", (TAILOR_COMPANY,))
+        company_id = cur.fetchone()[0]
+        cur.execute(
+            """INSERT INTO postings (company_id, ats_posting_id, title, location, remote_type, url, is_design, description, requirements, requirements_at)
+               VALUES (%s, 'qc-1', 'Staff Product Designer, Design Systems', 'Remote - United States', 'remote',
+                       'https://example.invalid/qc', true, 'We want someone to lead our design system and know React.', %s, now()) RETURNING id""",
+            (company_id, json.dumps(reqs)))
+        posting_id = cur.fetchone()[0]
+        cur.execute("INSERT INTO user_resumes (user_id, filename, content, size_bytes, text) VALUES (%s, 'qc.pdf', %s, 10, %s) "
+                    "ON CONFLICT (user_id) DO UPDATE SET text = EXCLUDED.text, uploaded_at = now()", (user_id, b"%PDF-1.4 qc", text))
+    conn.commit()
+    conn.close()
+    return posting_id
+
+
+def remove_tailor_fixture(conn=None, user_id=None):
+    own = conn is None
+    conn = conn or get_conn()
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM companies WHERE ats_identifier = 'quality-check-fixture'")   # cascades the posting
+        if user_id:
+            cur.execute("DELETE FROM user_resumes WHERE user_id = %s", (user_id,))
+            cur.execute("DELETE FROM resume_structures WHERE user_id = %s", (user_id,))
+            cur.execute("DELETE FROM tailorings WHERE user_id = %s", (user_id,))
+            cur.execute("DELETE FROM tailor_calls WHERE user_id = %s", (user_id,))
+    if own:
+        conn.commit()
+        conn.close()
+
+
+def check_tailor(browser, base, token, user_id):
+    """Tailoring in the panel, end to end with the model calls faked (so nothing is spent) and the real database: the
+    Prep stage offers Tailor with the month's count; clicking it moves focus to the Working stage's first line, whose
+    Cancel returns to Prep; tailoring again ends in Review without any press (the page polls), with every change before
+    and after, Undo that becomes Redo (focus stays on that change's button, the count follows), and the change kept
+    after the panel is closed and opened again. Cancelled calls do not count toward the month's ten."""
+    gate = threading.Event()
+    structure_reads = []
+
+    def fake_read(pdf):
+        structure_reads.append(1)
+        return resume_module.ReadResult(TAILOR_STRUCTURE, 2800, 700)
+
+    def fake_tailor(structure, posting_text, requirements, missing):
+        gate.wait(40)   # hold the call so the Working stage can be looked at
+        return resume_module.ReadResult({
+            "rewrites": [{"id": "e0b1", "after": "Led the design system in Figma and hired two designers.", "why": "Leads with design systems."},
+                         {"id": "e0b2", "after": "Partnered with engineers and React developers to keep designs and code in sync.", "why": "Not allowed: React."}],
+            "bullet_order": [{"role": "e0", "order": ["e0b1", "e0b0", "e0b2"], "why": "Design systems first."}],
+            "skills_order": {"skills": ["Accessibility", "Figma", "Prototyping", "User research"], "why": "Nothing added or removed."},
+        }, 1800, 350, "req_qc", "claude-sonnet-5-5")
+
+    saved = (tailor.READ_PROVIDER, tailor.PROVIDER)
+    tailor.READ_PROVIDER, tailor.PROVIDER = fake_read, fake_tailor
+    posting_id = provision_tailor_fixture(user_id)
+    try:
+        for (w, h) in ((1280, 900), (390, 844)):
+            mobile = w < MOBILE_MAX_WIDTH
+            tag = f"@{w}"
+            gate.clear()
+            del structure_reads[:]
+            conn = get_conn()
+            with conn.cursor() as cur:   # each width starts from nothing tailored
+                for table in ("tailorings", "tailor_calls", "resume_structures"):
+                    cur.execute(f"DELETE FROM {table} WHERE user_id = %s", (user_id,))
+            conn.commit()
+            conn.close()
+            ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=mobile, has_touch=mobile)
+            ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+            page = ctx.new_page()
+            page.goto(base + "/", wait_until="load")
+            row = page.locator(f"li.fg-job:has-text('{TAILOR_COMPANY}')").first
+            check(row.count() == 1, f"the tailoring fixture role is in the list  [{tag}]")
+            if not row.count():
+                ctx.close()
+                continue
+            row.locator(".fg-job-link").click()
+            page.wait_for_selector("#apply-panel:not([hidden]) [data-panel-title]")
+            settle(page)
+            steps = page.evaluate("[...document.querySelectorAll('#apply-panel .fg-step')].map(li => [li.textContent.trim(), li.getAttribute('aria-current')])")
+            check(steps[0][1] == "step" and [x[0][1:] for x in steps][:3] == ["Prep", "Tailor", "Apply"],
+                  f"the steps strip names Prep, Tailor, Apply with Prep current  [{tag}]", str(steps))
+            help_text = page.evaluate("document.querySelector('#apply-panel .fg-panel-foot .fg-panel-help').textContent")
+            check(help_text.startswith("0 of 10 tailored this month."), f"the month's count sits under the Tailor button  [{tag}]", help_text)
+
+            # Tailor: the Working stage
+            page.locator("#apply-panel button:has-text('Tailor my resume')").click()
+            page.wait_for_selector("#apply-panel [data-poll]")
+            if os.environ.get("QC_SHOTS"):
+                page.locator("#apply-panel").screenshot(path=os.path.join(os.environ["QC_SHOTS"], f"tailor-working@{w}.png"))
+            check(page.evaluate("document.activeElement.hasAttribute('data-panel-focus')"), f"Tailor moves focus to the Working stage's first line  [{tag}]")
+            say = page.evaluate("document.activeElement.textContent")
+            check(say.startswith("I’m tailoring your resume for Quality Check Studio"), f"the Working stage says what is happening  [{tag}]", say)
+            check(page.locator("#apply-panel .fg-progress .fg-progress-text").inner_text().strip() != "", f"progress text is showing  [{tag}]")
+            check(page.locator("#apply-panel .fg-step[aria-current='step']").inner_text().strip().endswith("Tailor"), f"the Tailor step is current  [{tag}]")
+            over = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
+            check(over <= 0, f"no horizontal overflow while it works  [{tag}]", f"{over}px")
+
+            # Cancel returns to Prep and the cancelled call does not count
+            page.locator("#apply-panel form[action$='/cancel'] button").click()
+            page.wait_for_selector("#apply-panel button:has-text('Tailor my resume')")
+            check(page.evaluate("document.activeElement.hasAttribute('data-panel-focus')"), f"Cancel puts focus on Prep's first line  [{tag}]")
+            check(page.evaluate("document.querySelector('#apply-panel .fg-panel-foot .fg-panel-help').textContent").startswith("0 of 10"),
+                  f"a cancelled tailoring does not use one of the ten  [{tag}]")
+
+            # Tailor again: no press needed to get from Working to Review
+            gate.set()
+            page.locator("#apply-panel button:has-text('Tailor my resume')").click()
+            page.wait_for_selector("#apply-panel .fg-changes", timeout=30000)
+            check(page.evaluate("document.activeElement.hasAttribute('data-panel-focus')"), f"when it finishes, focus lands on Review's first line  [{tag}]")
+            try:   # the page sets it a moment after drawing Review (so an unchanged sentence is announced again)
+                page.wait_for_function("document.getElementById('panel-live').textContent.includes('Your changes are ready to review.')", timeout=3000)
+                told = True
+            except Exception:  # noqa: BLE001
+                told = False
+            check(told, f"a screen reader is told the changes are ready  [{tag}]")
+            cards = page.evaluate("[...document.querySelectorAll('#apply-panel .fg-change')].map(c => c.querySelector('.fg-change-kind').textContent.trim())")
+            check(cards == ["Bullet, reworded", "Bullets, reordered", "Skills, reordered"],
+                  f"Review lists the changes that passed the accuracy check, in resume order  [{tag}]", str(cards))
+            after_all = page.locator("#apply-panel .fg-changes").inner_text()
+            check("React developers" not in after_all, f"a rewording that adds something the resume lacks never reaches Review  [{tag}]")
+            check(page.locator("#apply-panel .fg-change-before").count() == 3 and page.locator("#apply-panel .fg-change-after").count() == 3,
+                  f"every change shows its before and its after  [{tag}]")
+            note = page.locator("#apply-panel .fg-panel-body .fg-message--attention").inner_text()
+            check(note.startswith("Not added: Working knowledge of React."), f"what the resume lacks is listed as not added  [{tag}]", note)
+            check(page.locator("#apply-panel .fg-panel-foot [data-kept-line]").inner_text() == "3 of 3 changes kept", f"the count starts at all kept  [{tag}]")
+            apply_text = page.evaluate("document.querySelector('#apply-panel .fg-panel-foot a[href^=\"/open/\"]').textContent.trim()")
+            check(apply_text.startswith("Apply"), f"Apply is still there in Review  [{tag}]", apply_text)
+            over = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
+            check(over <= 0, f"no horizontal overflow in Review  [{tag}]", f"{over}px")
+
+            if os.environ.get("QC_SHOTS"):
+                page.locator("#apply-panel").screenshot(path=os.path.join(os.environ["QC_SHOTS"], f"tailor-review@{w}.png"))
+            # Undo, Redo
+            second = page.locator("#apply-panel .fg-change").nth(1)
+            second.locator("button").click()
+            page.wait_for_selector("#apply-panel .fg-change.is-undone")
+            if os.environ.get("QC_SHOTS"):
+                page.locator("#apply-panel").screenshot(path=os.path.join(os.environ["QC_SHOTS"], f"tailor-undone@{w}.png"))
+            check(page.locator("#apply-panel .fg-panel-foot [data-kept-line]").inner_text() == "2 of 3 changes kept", f"Undo lowers the count  [{tag}]")
+            btn = page.locator("#apply-panel .fg-change.is-undone button")
+            check(btn.inner_text().strip().startswith("Redo") and "Undone" in page.locator("#apply-panel .fg-change.is-undone .fg-change-kind").inner_text(),
+                  f"an undone change says Undone and offers Redo  [{tag}]")
+            check(page.evaluate("document.activeElement === document.querySelector('#apply-panel .fg-change.is-undone button')"), f"focus stays on that change's button  [{tag}]")
+            names = page.evaluate("[...document.querySelectorAll('#apply-panel .fg-change button')].map(b => b.textContent.replace(/\\s+/g, ' ').trim())")
+            check(len(set(names)) == 3, f"each Undo/Redo button has its own name  [{tag}]", str(names))
+
+            # Closed and opened again: the change is still undone
+            page.locator("#apply-panel [data-panel-close]").click()
+            page.wait_for_selector("#apply-panel", state="hidden")
+            row.locator(".fg-job-link").click()
+            page.wait_for_selector("#apply-panel .fg-changes")
+            check(page.locator("#apply-panel .fg-change.is-undone").count() == 1 and
+                  page.locator("#apply-panel .fg-panel-foot [data-kept-line]").inner_text() == "2 of 3 changes kept",
+                  f"opening the job again shows the same Review, with the undone change  [{tag}]")
+            page.locator("#apply-panel .fg-change.is-undone button").click()
+            page.wait_for_selector("#apply-panel .fg-change.is-undone", state="detached")
+            check(page.locator("#apply-panel .fg-panel-foot [data-kept-line]").inner_text() == "3 of 3 changes kept", f"Redo brings it back  [{tag}]")
+            ctx.close()
+
+            conn = get_conn()
+            with conn.cursor() as cur:
+                cur.execute("SELECT kind, status FROM tailor_calls WHERE user_id = %s ORDER BY id", (user_id,))
+                calls = cur.fetchall()
+            conn.close()
+            check(calls.count(("tailor", "ok")) == 1 and ("tailor", "cancelled") in calls,
+                  f"a finished tailoring is logged ok and the cancelled one is logged apart, so only one counts  [{tag}]", str(calls))
+            check(len(structure_reads) == 1, f"the resume is read into structure once, not for each tailoring  [{tag}]", f"{len(structure_reads)} reads")
+    finally:
+        tailor.READ_PROVIDER, tailor.PROVIDER = saved
+        gate.set()
+        remove_tailor_fixture(None, user_id)
+
+
+
 def snapshot_styles(page):
     return page.evaluate(
         """
@@ -1217,6 +1418,7 @@ def main():
             check_return_ask(browser, base, token)
             check_hide(browser, base, token)
             check_panel(browser, base, token)
+            check_tailor(browser, base, token, user_id)
             check_elevated(browser, base, token)
             check_pay(browser, base, token)
             check_alerts_switch_no_js(browser, base, token)
@@ -1277,6 +1479,7 @@ def main():
             browser.close()
     finally:
         server.shutdown()
+        remove_tailor_fixture()
         remove_user()
 
     # style drift vs. baseline (informational)

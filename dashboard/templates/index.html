@@ -370,9 +370,11 @@
     {% endif %}
     </div>
   </section>
-  {#- SC-72: the panel for one job (Prep), filled from /prep/<id> when a card is opened. Closed until then. -#}
+  {#- SC-72: the panel for one job (Prep, Tailor, Review), filled from /prep/<id> when a card is opened. Closed until then.
+    #panel-live says, once, that a tailoring finished while the person was elsewhere on the page. -#}
   {%- if tab == "open" and view == "open" %}
   <aside class="fg-panel" id="apply-panel" aria-labelledby="panel-title" data-panel hidden></aside>
+  <p class="fg-visually-hidden" role="status" aria-live="polite" id="panel-live"></p>
   {%- endif %}
   </div>
   <div class="fg-toast-region" role="status" aria-live="polite" id="toast-region"></div>

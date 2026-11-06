@@ -328,6 +328,46 @@
 </li>
 {%- endmacro %}
 
+{#- The three steps of applying (SC-72), under the panel's head: Prep, Tailor, Apply. `current` is 0, 1 or 2; the ones
+    before it are done. The current step is marked with aria-current and Forest, and the done ones say so in words. -#}
+{% macro steps(current=0) -%}
+<ol class="fg-steps" aria-label="Steps">
+  {%- for label in ["Prep", "Tailor", "Apply"] %}
+  <li class="fg-step{% if loop.index0 < current %} is-done{% endif %}"{% if loop.index0 == current %} aria-current="step"{% endif %}><span class="fg-step-num" aria-hidden="true">{{ loop.index }}</span>{{ label }}{% if loop.index0 < current %}<span class="fg-visually-hidden"> (done)</span>{% endif %}</li>
+  {%- endfor %}
+</ol>
+{%- endmacro %}
+
+{#- One change in a review list (inside <ul class="fg-changes">): what it is, where it is in the resume, the text before
+    and after, why, and Undo (Redo once undone). `c` is a change as dashboard/prep.py builds it: label, where, before,
+    after (a text, or a list of lines when `lines`), why, kept, name (what the button is called). The button posts to
+    `action`; the page swaps in the card the answer returns. An undone change says so in words and keeps its before. -#}
+{% macro change(c, action, cid) -%}
+<li class="fg-change{% if not c.kept %} is-undone{% endif %}" data-change="{{ c.id }}" id="change-{{ cid }}-{{ c.id }}">
+  <div class="fg-change-head">
+    <p class="fg-change-kind">{{ c.label }}{% if not c.kept %}<span class="fg-change-state"> · Undone</span>{% endif %}</p>
+    <form method="post" action="{{ action }}" data-panel-form="change">
+      <input type="hidden" name="change" value="{{ c.id }}">
+      <input type="hidden" name="kept" value="{{ 0 if c.kept else 1 }}">
+      <button class="fg-button fg-button--ghost" type="submit">{{ "Undo" if c.kept else "Redo" }}<span class="fg-visually-hidden"> {{ c.name }}</span></button>
+    </form>
+  </div>
+  {%- if c.where %}
+  <p class="fg-change-where">{{ c.where }}</p>
+  {%- endif %}
+  {%- if c.lines %}
+  <div class="fg-change-before"><span class="fg-change-label">Before</span><ol>{% for line in c.before %}<li>{{ line }}</li>{% endfor %}</ol></div>
+  <div class="fg-change-after"><span class="fg-change-label">After</span><ol>{% for line in c.after %}<li>{{ line }}</li>{% endfor %}</ol></div>
+  {%- else %}
+  <p class="fg-change-before"><span class="fg-change-label">Before</span><span class="fg-change-text">{{ c.before }}</span></p>
+  <p class="fg-change-after"><span class="fg-change-label">After</span><span class="fg-change-text">{{ c.after }}</span></p>
+  {%- endif %}
+  {%- if c.why %}
+  <p class="fg-change-why">{{ c.why }}</p>
+  {%- endif %}
+</li>
+{%- endmacro %}
+
 {#- File row: icon, name, meta; call block = actions (View, Replace). -#}
 {% macro file_row(name, meta="") -%}
 <div class="fg-file-row">

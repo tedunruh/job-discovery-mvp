@@ -484,6 +484,10 @@ def delete_resume(conn, user_id):
         cur.execute("DELETE FROM user_resumes WHERE user_id = %s", (user_id,))
         removed = cur.rowcount > 0
         cur.execute("UPDATE resume_parses SET result = NULL WHERE user_id = %s AND result IS NOT NULL", (user_id,))
+        # SC-72: what was made from the resume (its structure and every tailoring, which hold its text) goes with it.
+        # The call rows (tailor_calls) hold no content and stay, so deleting does not reset a month's count.
+        cur.execute("DELETE FROM resume_structures WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM tailorings WHERE user_id = %s", (user_id,))
     return removed
 
 
@@ -1344,3 +1348,167 @@ def set_scan_markers(conn, markers):
             [(cid, m) for cid, m in markers.items()],
             template="(%s::int, %s::text)",
         )
+
+
+# --- SC-72 slice 2: tailoring ------------------------------------------------------------------------------------
+
+def get_resume_structure(conn, user_id):
+    """(structure, resume's uploaded_at) for this person's resume, or None when it has not been read yet or the file has
+    been replaced since (then it must be read again)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT s.structure, r.uploaded_at FROM resume_structures s
+            JOIN user_resumes r ON r.user_id = s.user_id AND r.uploaded_at = s.source_uploaded_at
+            WHERE s.user_id = %s
+            """,
+            (user_id,),
+        )
+        row = cur.fetchone()
+    return (row[0], row[1]) if row else None
+
+
+def save_resume_structure(conn, user_id, structure, source_uploaded_at):
+    """Keep the structure read from the resume uploaded at `source_uploaded_at`, replacing any earlier one. Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO resume_structures (user_id, structure, source_uploaded_at) VALUES (%s, %s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET structure = EXCLUDED.structure,
+                source_uploaded_at = EXCLUDED.source_uploaded_at, created_at = now()
+            """,
+            (user_id, psycopg2.extras.Json(structure), source_uploaded_at),
+        )
+
+
+def get_posting_text(conn, posting_id):
+    """(description, requirements) of one open role for the tailoring call, or None."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT COALESCE(description, ''), requirements FROM postings WHERE id = %s AND status = 'open'",
+                    (posting_id,))
+        row = cur.fetchone()
+    return (row[0], row[1]) if row else None
+
+
+def create_tailoring(conn, user_id, posting_id):
+    """Start a tailoring for this person and role. Returns its id, or None when they already have one working (only one
+    at a time). Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO tailorings (user_id, posting_id, status) VALUES (%s, %s, 'working')
+            ON CONFLICT (user_id) WHERE status = 'working' DO NOTHING RETURNING id
+            """,
+            (user_id, posting_id),
+        )
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
+def finish_tailoring(conn, tailoring_id, *, status, error_kind=None, source=None, resume_uploaded_at=None,
+                     changes=None, not_added=None, rejected=0):
+    """Close a working tailoring as ready or error. Does nothing (returns False) if it was cancelled or removed
+    meanwhile, so a cancelled one never comes back. Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE tailorings SET status = %s, error_kind = %s, source = %s, resume_uploaded_at = %s, changes = %s,
+                   not_added = %s, rejected = %s, finished_at = now()
+            WHERE id = %s AND status = 'working'
+            """,
+            (status, error_kind,
+             psycopg2.extras.Json(source) if source is not None else None, resume_uploaded_at,
+             psycopg2.extras.Json(changes) if changes is not None else None,
+             psycopg2.extras.Json(not_added) if not_added is not None else None,
+             rejected, tailoring_id),
+        )
+        return cur.rowcount > 0
+
+
+def cancel_tailoring(conn, user_id, tailoring_id):
+    """Cancel this person's working tailoring. Returns its posting id (also for one already finished or cancelled), or
+    None when it is not theirs. Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute("UPDATE tailorings SET status = 'cancelled', finished_at = now() "
+                    "WHERE id = %s AND user_id = %s AND status = 'working'", (tailoring_id, user_id))
+        cur.execute("SELECT posting_id FROM tailorings WHERE id = %s AND user_id = %s", (tailoring_id, user_id))
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
+def get_tailoring(conn, user_id, tailoring_id, for_update=False):
+    """One of this person's tailorings as a dict, or None."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT id, posting_id, status, error_kind, source, resume_uploaded_at, changes, not_added, created_at "
+            "FROM tailorings WHERE id = %s AND user_id = %s" + (" FOR UPDATE" if for_update else ""),
+            (tailoring_id, user_id),
+        )
+        return cur.fetchone()
+
+
+def latest_tailoring(conn, user_id, posting_id):
+    """This person's newest working or ready tailoring for a role (a dict as get_tailoring gives), or None."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT id, posting_id, status, error_kind, source, resume_uploaded_at, changes, not_added, created_at
+            FROM tailorings WHERE user_id = %s AND posting_id = %s AND status IN ('working', 'ready')
+            ORDER BY created_at DESC, id DESC LIMIT 1
+            """,
+            (user_id, posting_id),
+        )
+        return cur.fetchone()
+
+
+def expire_stale_tailorings(conn, user_id, minutes=5):
+    """A tailoring still working after this long lost its worker (a restart): close it as an error so the person can
+    try again. Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute("UPDATE tailorings SET status = 'error', error_kind = 'timeout', finished_at = now() "
+                    "WHERE user_id = %s AND status = 'working' AND created_at < now() - %s * interval '1 minute'",
+                    (user_id, minutes))
+
+
+def set_change_kept(conn, user_id, tailoring_id, change_id, kept):
+    """Mark one change of a ready tailoring kept or undone. Returns whether it was found. Caller commits."""
+    row = get_tailoring(conn, user_id, tailoring_id, for_update=True)
+    if row is None or row["status"] != "ready":
+        return False
+    found = False
+    for change in row["changes"] or []:
+        if change.get("id") == change_id:
+            change["kept"], found = bool(kept), True
+    if found:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE tailorings SET changes = %s WHERE id = %s",
+                        (psycopg2.extras.Json(row["changes"]), tailoring_id))
+    return found
+
+
+def log_tailor_call(conn, user_id, *, kind, model, input_tokens, output_tokens, cost_usd, price_version, status,
+                    error_kind=None, request_id=None):
+    """Record one call of the tailoring feature (every call, failed and cancelled ones too). Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO tailor_calls (user_id, kind, model, input_tokens, output_tokens, cost_usd, price_version,
+                                      status, error_kind, request_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (user_id, kind, model, input_tokens, output_tokens, cost_usd, price_version, status, error_kind, request_id),
+        )
+
+
+def tailor_usage(conn, user_id):
+    """(this person's finished tailorings this month, everyone's tailoring spend this month in dollars), UTC months."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT count(*) FILTER (WHERE user_id = %s AND kind = 'tailor' AND status = 'ok'), COALESCE(sum(cost_usd), 0)
+            FROM tailor_calls WHERE created_at >= date_trunc('month', now())
+            """,
+            (user_id,),
+        )
+        mine, spend = cur.fetchone()
+    return mine, float(spend)

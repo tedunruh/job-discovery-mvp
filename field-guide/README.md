@@ -22,7 +22,7 @@ field-guide/
 ├── fonts/             self-hosted Albert Sans woff2 + license
 ├── js/filter.js       closes .fg-filter menus on outside click / Escape
 ├── js/toast.js        shows and hides the one .fg-toast in #toast-region (8 seconds, longer while pointed at)
-├── js/panel.js        opens the panel beside the job list, moves focus, and folds the header when the list or panel scrolls (SC-72)
+├── js/panel.js        opens the panel beside the job list, moves focus, runs its forms and the tailoring poll, and folds the header when the list or panel scrolls (SC-72)
 └── css/components.css hand-written components (.fg-*), semantic tokens only
 ```
 
@@ -174,6 +174,8 @@ is for supporting text only (metadata, hints, counts, section notes).
 | `fg.list_row(title, meta, detail)` · `fg.list_placeholder()` · `.fg-list-empty` | Short records, placeholder shape, empty line |
 | `fg.stat(value, label)` · `.fg-stats` · `fg.compare(before, after, unit)` | Counts are Ink, not Forest: a stat reports, it doesn't ask you to act |
 | `.fg-panel` · `.fg-panel-head` `.fg-panel-body` `.fg-panel-foot` · `_prep_panel.html` · `js/panel.js` | One job's detail beside the list (SC-72). Opens only from a card's title, closes only with Close, Apply keeps it open. The page decides its place (a full screen sheet on a phone) |
+| `fg.steps(current)` · `.fg-steps` | Prep, Tailor, Apply under the panel's head. The current step is Forest with `aria-current`; done steps say "(done)" in words |
+| `fg.change(c, action, id)` · `.fg-changes` `.fg-change` | One edit Scout made to a resume: kind and where, Before (struck through) and After, why, Undo or Redo. An undone change says "Undone" in words |
 | `fg.req(text, mark, state)` · `.fg-reqs` `.fg-req` | What a posting asks for, one per line: in your resume (filled check), not in it (dashed ring), not checked (dot). The words say it too |
 | `.fg-job.is-selected` · `.fg-has-panel` | The card whose panel is open gets the Forest edge; while a panel is open the list is narrower and cards stack |
 | `.fg-row` · `.fg-visually-hidden` · `button.fg-link` | Wrapping action row; screen-reader-only text; link look for an on-page action |

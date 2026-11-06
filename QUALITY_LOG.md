@@ -1447,3 +1447,41 @@ New in Field Guide: Panel, Requirement list, selected Job card (with gallery row
       toast says so once; Undo returns the row and its focus; the toast never takes focus.
 - [ ] Not done: Figma mirror of Panel and Requirement list (code is ahead of Figma until it is synced). "Viewed" still means the posting
       was opened (Apply), so opening a panel does not mark a job viewed. The Applications, Viewed and Hidden lists do not open panels.
+
+### 2026-11-06 — SC-72 slice 2: Tailor and Review
+**What shipped:** in the panel, "Tailor my resume" (with "3 of 10 tailored this month" under it, and a line saying the resume and posting go
+to Claude) starts a tailoring in the background. The panel shows Working (what is happening, a progress line, Cancel) and, when it ends,
+Review without any press: every change with its before and after, why, and Undo (Redo once undone, "Undone" in words); a count, "Not added:
+React…" for what the posting asks for and the resume lacks; Apply stays. The changes and which are kept are saved, so closing the panel or
+opening another job loses nothing. A steps strip (Prep, Tailor, Apply) sits under the head. Limits: 10 per person per month (only finished
+tailorings count: a cancelled or failed one, or one that found nothing to change, does not) and a Scout-wide dollar cap
+(`TAILOR_MONTHLY_CAP_USD`, default 5); each says so in the panel with Apply still there. **How nothing is added:** two calls, both logged in
+`tailor_calls`. Haiku reads the PDF into structure once per file and every line is checked against the PDF's text (any paraphrase throws the
+read away). Sonnet 5.5 then returns *edits* (reword a line, reorder a role's bullets, reorder skills), and code throws away any edit that
+changes a number, names a company or tool the resume doesn't, mentions something the resume lacks, grows the line, or isn't a permutation.
+"Before" always comes from the resume, never the model. **Measured cost** (`scripts/try_tailor.py`, fake resume and posting): about $0.0076
+for the first tailoring, $0.0069 after; effort `medium` cost the same as `low`. A real resume and posting should be about $0.02, so the $5 cap is
+roughly 250 tailorings. New in Field Guide: Steps, Change (gallery rows, README rows), Panel stages. Not in this slice (next PR): cover
+letter, Ready, PDF and Word, the Tailored marker, saving files with the application. Looks good isn't there yet, so Review ends at Apply.
+**Rework count:** 0 reached Ted so far. **Root causes of rework caught by the checks before it got to him:**
+1. *Applying changes in the wrong order.* A kept reorder was rebuilt from the original bullets and silently dropped a kept reword in the
+   same role. Caught by a unit test (`test_kept_changes_are_made_and_the_source_is_left_alone`): rewordings are made first, reorders move the
+   reworded text.
+2. *Pricing by the model name the API echoes back.* Cost was chosen by comparing the response's model string, which can carry a date, so a
+   real Sonnet call could have been billed at Haiku rates and undercounted against the cap. Cost is now chosen by kind of call.
+3. *Counting a no-op as a mistake.* The real model sometimes "rewrites" a line to the same words; that was counted as a rejected edit, which
+   would make the rejection number useless for tuning. Unchanged lines are now ignored.
+4. *A check with an ambiguous selector* (the hidden error line also matched). Fixed in the check, not the app.
+**Standing checks added:**
+- [x] Automated (`check_tailor`, at 1280 and 390, real database, model calls faked so nothing is spent): the steps strip; the count under the
+      button; focus moves to the Working stage's first line, and to Prep's after Cancel, and to Review's when it finishes by itself; a screen
+      reader is told; Review lists only changes that passed the accuracy check (a rewording that adds React never reaches it) with before and
+      after; Not added is listed; Undo lowers the count and keeps focus on that change's button; every button has its own name; reopening the
+      job shows the same Review; a cancelled call is logged apart and doesn't count; the resume is read into structure once.
+- [x] Automated: `tests/test_tailor.py` (numbers, names, the accuracy check, change building, applying kept changes, caps and the reset date,
+      running one tailoring with every outcome: cancelled early and late, failed, nothing to change, a crash) and the stage and route tests in
+      `tests/test_prep.py`.
+- [x] Real model, once, on a fake resume and posting (`scripts/try_tailor.py`): the structure read matched the PDF line for line; the
+      tailoring returned sensible reorders; rewordings were rare on a resume whose lines were already plain. Not yet tried on a real resume.
+- [ ] Not done: Figma mirror of Steps, Change and the Working and Review stages. The `fallbacks` option for a refusal isn't used (a refusal
+      shows the ordinary "couldn't tailor" message and doesn't count). The new tables must be applied to Neon before this is pushed.
