@@ -1485,3 +1485,34 @@ letter, Ready, PDF and Word, the Tailored marker, saving files with the applicat
       tailoring returned sensible reorders; rewordings were rare on a resume whose lines were already plain. Not yet tried on a real resume.
 - [ ] Not done: Figma mirror of Steps, Change and the Working and Review stages. The `fallbacks` option for a refusal isn't used (a refusal
       shows the ordinary "couldn't tailor" message and doesn't count). The new tables must be applied to Neon before this is pushed.
+
+### 2026-11-06 — SC-72 slice 3: the letter, Ready and export
+**What shipped.** The optional cover letter (asked for with Tailor, or later from Review or Ready; Sonnet 5.5; written once per tailoring in the
+background; free of the person's 10 but inside the Scout-wide dollar cap, logged as `tailor_calls.kind = 'letter'`). Code checks a letter before
+it is shown: 60 to 330 words, every number must be in the resume, every name or tool in the resume or the company and role, nothing the posting asks
+for that the resume lacks; what is in [brackets] is left for the person. A failed check writes it once more with the reason, then shows "couldn't
+write one" and counts nothing. The box saves as you leave it. "Looks good" leads to Ready: PDF and Word of the resume with the kept changes, Copy
+cover letter, Apply, Back to the changes; the row says Tailored; Yes saves the files with the application (Applications tab lists them) and undoing
+the Yes lets them go. New in Field Guide: Check macro, Text area, Files to send, Tailored marker, and the Review/Ready letter states.
+**Rework count:** 0 reached Ted so far. **Root causes caught before it got to him:**
+1. *One poll address for two jobs.* The tailoring's status route also waited on the letter, so Review never opened while a letter was still being
+   written. Caught by the first real-database run; the letter has its own status route and the unit test says the two don't wait on each other.
+2. *The files had no name on them.* The structure read had been told to leave out the name and contact lines, so a tailored PDF would have had no
+   masthead. Found by looking at the first PDF; the read now keeps a `header` (each line checked against the PDF's text) and the files use it.
+3. *A letter check that was too eager in a test and too trusting in code.* In a unit test every requirement counted as missing (no resume text
+   given), so a good letter was rejected; the same path in code is fed the real text. Fixed the test, kept the check.
+4. *A schema test that banned the word DROP.* Widening the CHECK on `tailor_calls.kind` needs `DROP CONSTRAINT`; the two old tests now ban
+   `DROP TABLE|COLUMN|INDEX|SCHEMA` instead, which is what they were protecting against.
+**Standing checks added:**
+- [x] Automated (`check_tailor`, 1280 and 390, real database, model calls faked): the letter is offered unticked with Tailor; asked with Tailor
+      at 1280 and from Review at 390; only the letter's section changes while it is written (the changes above keep their element); focus goes to
+      the section's first line; a screen reader is told; an edit is saved as the box is left; written once, no second button; Looks good moves focus
+      to Ready; the PDF and Word downloads are real files with the kept changes in them and say which file and company; Apply is still there; the
+      row says Tailored and loses it on Back to the changes; the files are refused while the person is back in the changes; Yes lists the files on
+      Applications and they still download; undoing the Yes lets them go; the letter call is logged apart from the ten.
+- [x] Automated: `tests/test_letter.py` (the letter check, drafting with a retry, the background run, one letter per tailoring, the caps, PDF and
+      Word files read back, odd characters, file names) and the stage, route and download tests in `tests/test_prep.py`.
+- [ ] Not done: a real model run of the letter (`scripts/try_tailor.py` doesn't write letters yet), so the real-world rate of letters the check
+      throws away is unknown. Figma mirror of the new components. PDF text is Helvetica only: characters outside Latin-1 become "?". The
+      SC-72 board card isn't ticked. The new columns must be applied to Neon before this is pushed.
+

@@ -259,7 +259,7 @@ class Run(unittest.TestCase):
 
     def setUp(self):
         self.uploaded = "t0"
-        self.cached, self.tailoring_status, self.finish_ok = None, "working", True
+        self.cached, self.tailoring_status, self.finish_ok, self.want_letter = None, "working", True, False
         self.finished, self.calls, self.saved, self.read_calls, self.tailor_calls = [], [], [], [], []
         self.raw_edit = edit(rewrites=[{"id": "e0b1", "after": "Led the design system in Figma and hired two designers.", "why": "Leads with design systems."}])
 
@@ -282,7 +282,7 @@ class Run(unittest.TestCase):
             "get_user_profile": lambda c, u: {"skills": [], "titles": []},
             "get_resume_structure": lambda c, u: self.cached,
             "save_resume_structure": lambda c, u, s, up: self.saved.append((s, up)),
-            "get_tailoring": lambda c, u, tid: {"status": self.tailoring_status},
+            "get_tailoring": lambda c, u, tid: {"status": self.tailoring_status, "want_letter": self.want_letter},
             "finish_tailoring": finish,
             "log_tailor_call": lambda c, u, **kw: self.calls.append(kw),
             "READ_PROVIDER": read,
@@ -371,12 +371,12 @@ class Run(unittest.TestCase):
 
     def test_start_creates_one_tailoring_and_runs_it_in_the_background(self):
         ran = []
-        with mock.patch.object(t, "create_tailoring", lambda c, u, p: 9), mock.patch.object(t, "spawn", lambda fn: ran.append(fn)), \
+        with mock.patch.object(t, "create_tailoring", lambda c, u, p, w=False: 9), mock.patch.object(t, "spawn", lambda fn: ran.append(fn)), \
                 mock.patch.object(t, "run", lambda *a: ran.append(a)):
             self.assertEqual(t.start(self.conn, 7, 5), 9)
             ran[0]()
         self.assertEqual(ran[1], (9, 7, 5))
-        with mock.patch.object(t, "create_tailoring", lambda c, u, p: None), mock.patch.object(t, "spawn", lambda fn: self.fail("started twice")):
+        with mock.patch.object(t, "create_tailoring", lambda c, u, p, w=False: None), mock.patch.object(t, "spawn", lambda fn: self.fail("started twice")):
             self.assertIsNone(t.start(self.conn, 7, 5))   # one at a time per person
 
     def test_messages_say_what_happened(self):

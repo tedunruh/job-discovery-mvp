@@ -1390,37 +1390,49 @@ def get_posting_text(conn, posting_id):
     return (row[0], row[1]) if row else None
 
 
-def create_tailoring(conn, user_id, posting_id):
+def get_company_name(conn, posting_id):
+    """The company's name for a posting (open or closed), or None."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT c.name FROM postings p JOIN companies c ON c.id = p.company_id WHERE p.id = %s", (posting_id,))
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
+TAILORING_COLUMNS = ("id, posting_id, status, error_kind, source, resume_uploaded_at, changes, not_added, created_at, "
+                     "want_letter, letter, letter_state, letter_at, ready_at, applied_at")
+
+
+def create_tailoring(conn, user_id, posting_id, want_letter=False):
     """Start a tailoring for this person and role. Returns its id, or None when they already have one working (only one
     at a time). Caller commits."""
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO tailorings (user_id, posting_id, status) VALUES (%s, %s, 'working')
+            INSERT INTO tailorings (user_id, posting_id, status, want_letter) VALUES (%s, %s, 'working', %s)
             ON CONFLICT (user_id) WHERE status = 'working' DO NOTHING RETURNING id
             """,
-            (user_id, posting_id),
+            (user_id, posting_id, want_letter),
         )
         row = cur.fetchone()
     return row[0] if row else None
 
 
 def finish_tailoring(conn, tailoring_id, *, status, error_kind=None, source=None, resume_uploaded_at=None,
-                     changes=None, not_added=None, rejected=0):
-    """Close a working tailoring as ready or error. Does nothing (returns False) if it was cancelled or removed
+                     changes=None, not_added=None, rejected=0, letter_state=None):
+    """Close a working tailoring as ready or error (a ready one starts with its letter 'writing' when one was asked for). Does nothing (returns False) if it was cancelled or removed
     meanwhile, so a cancelled one never comes back. Caller commits."""
     with conn.cursor() as cur:
         cur.execute(
             """
             UPDATE tailorings SET status = %s, error_kind = %s, source = %s, resume_uploaded_at = %s, changes = %s,
-                   not_added = %s, rejected = %s, finished_at = now()
+                   not_added = %s, rejected = %s, letter_state = %s, letter_at = now(), finished_at = now()
             WHERE id = %s AND status = 'working'
             """,
             (status, error_kind,
              psycopg2.extras.Json(source) if source is not None else None, resume_uploaded_at,
              psycopg2.extras.Json(changes) if changes is not None else None,
              psycopg2.extras.Json(not_added) if not_added is not None else None,
-             rejected, tailoring_id),
+             rejected, letter_state, tailoring_id),
         )
         return cur.rowcount > 0
 
@@ -1440,8 +1452,7 @@ def get_tailoring(conn, user_id, tailoring_id, for_update=False):
     """One of this person's tailorings as a dict, or None."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
-            "SELECT id, posting_id, status, error_kind, source, resume_uploaded_at, changes, not_added, created_at "
-            "FROM tailorings WHERE id = %s AND user_id = %s" + (" FOR UPDATE" if for_update else ""),
+            "SELECT " + TAILORING_COLUMNS + " FROM tailorings WHERE id = %s AND user_id = %s" + (" FOR UPDATE" if for_update else ""),
             (tailoring_id, user_id),
         )
         return cur.fetchone()
@@ -1452,7 +1463,7 @@ def latest_tailoring(conn, user_id, posting_id):
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
-            SELECT id, posting_id, status, error_kind, source, resume_uploaded_at, changes, not_added, created_at
+            SELECT """ + TAILORING_COLUMNS + """
             FROM tailorings WHERE user_id = %s AND posting_id = %s AND status IN ('working', 'ready')
             ORDER BY created_at DESC, id DESC LIMIT 1
             """,
@@ -1462,9 +1473,12 @@ def latest_tailoring(conn, user_id, posting_id):
 
 
 def expire_stale_tailorings(conn, user_id, minutes=5):
-    """A tailoring still working after this long lost its worker (a restart): close it as an error so the person can
-    try again. Caller commits."""
+    """A tailoring (or a letter) still working after this long lost its worker (a restart): close it as an error so the
+    person can try again. Caller commits."""
     with conn.cursor() as cur:
+        cur.execute("UPDATE tailorings SET letter_state = 'error', letter_at = now() "
+                    "WHERE user_id = %s AND letter_state = 'writing' AND letter_at < now() - %s * interval '1 minute'",
+                    (user_id, minutes))
         cur.execute("UPDATE tailorings SET status = 'error', error_kind = 'timeout', finished_at = now() "
                     "WHERE user_id = %s AND status = 'working' AND created_at < now() - %s * interval '1 minute'",
                     (user_id, minutes))
@@ -1498,6 +1512,73 @@ def log_tailor_call(conn, user_id, *, kind, model, input_tokens, output_tokens, 
             """,
             (user_id, kind, model, input_tokens, output_tokens, cost_usd, price_version, status, error_kind, request_id),
         )
+
+
+def begin_letter(conn, user_id, tailoring_id):
+    """Mark a ready tailoring's letter as being written. False when it is not theirs, not ready, or already has a
+    letter or one being written (a letter is written once; only an error can be tried again). Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute("UPDATE tailorings SET letter_state = 'writing', letter_at = now() WHERE id = %s AND user_id = %s "
+                    "AND status = 'ready' AND (letter_state IS NULL OR letter_state = 'error')", (tailoring_id, user_id))
+        return cur.rowcount > 0
+
+
+def finish_letter(conn, tailoring_id, letter, state):
+    """Store the written letter (state 'ready') or the failure ('error'). Only a letter still being written is touched."""
+    with conn.cursor() as cur:
+        cur.execute("UPDATE tailorings SET letter = COALESCE(%s, letter), letter_state = %s, letter_at = now() "
+                    "WHERE id = %s AND letter_state = 'writing'", (letter, state, tailoring_id))
+        return cur.rowcount > 0
+
+
+def save_letter(conn, user_id, tailoring_id, text):
+    """The person's own edit of their letter. False when there is no letter of theirs to edit. Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute("UPDATE tailorings SET letter = %s WHERE id = %s AND user_id = %s AND status = 'ready' "
+                    "AND letter_state = 'ready'", (text, tailoring_id, user_id))
+        return cur.rowcount > 0
+
+
+def set_tailoring_ready(conn, user_id, tailoring_id, ready):
+    """"Looks good" (ready) or "Back to the changes" (not). Returns the posting id, or None when it is not theirs or not
+    a ready tailoring. Caller commits."""
+    with conn.cursor() as cur:
+        cur.execute("UPDATE tailorings SET ready_at = CASE WHEN %s THEN COALESCE(ready_at, now()) ELSE NULL END "
+                    "WHERE id = %s AND user_id = %s AND status = 'ready' AND posting_id IS NOT NULL RETURNING posting_id",
+                    (ready, tailoring_id, user_id))
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
+def tailored_among(conn, user_id, posting_ids):
+    """The ids among these that this person has a tailored resume ready for (they pressed "Looks good")."""
+    if not posting_ids:
+        return set()
+    with conn.cursor() as cur:
+        cur.execute("SELECT DISTINCT posting_id FROM tailorings WHERE user_id = %s AND status = 'ready' "
+                    "AND ready_at IS NOT NULL AND posting_id = ANY(%s)", (user_id, list(posting_ids)))
+        return {r[0] for r in cur.fetchall()}
+
+
+def keep_tailoring_with_application(conn, user_id, posting_id, applied):
+    """Yes to "Did you apply?": the role's tailored files (the ready tailoring they said "Looks good" to) are saved with
+    the application. Undoing the Yes lets go of them again. Caller commits."""
+    with conn.cursor() as cur:
+        if applied:
+            cur.execute("UPDATE tailorings SET applied_at = now() WHERE id = (SELECT id FROM tailorings WHERE user_id = %s "
+                        "AND posting_id = %s AND status = 'ready' AND ready_at IS NOT NULL ORDER BY created_at DESC, id DESC "
+                        "LIMIT 1)", (user_id, posting_id))
+        else:
+            cur.execute("UPDATE tailorings SET applied_at = NULL WHERE user_id = %s AND posting_id = %s", (user_id, posting_id))
+
+
+def applied_tailorings(conn, user_id):
+    """{posting id: {"id", "has_letter"}} for the tailored files saved with this person's applications."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT DISTINCT ON (posting_id) posting_id, id, letter_state = 'ready' AND COALESCE(letter, '') <> '' "
+                    "FROM tailorings WHERE user_id = %s AND applied_at IS NOT NULL AND status = 'ready' AND posting_id IS NOT NULL "
+                    "ORDER BY posting_id, applied_at DESC", (user_id,))
+        return {r[0]: {"id": r[1], "has_letter": bool(r[2])} for r in cur.fetchall()}
 
 
 def tailor_usage(conn, user_id):

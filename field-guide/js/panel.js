@@ -3,13 +3,16 @@
    Forms inside the panel (Tailor my resume, Cancel, Undo/Redo) post in the background and the answer is the panel's
    markup again; while a tailoring runs, the page asks /tailor/<id> every couple of seconds until it ends (a 204 means
    still working) and shows the progress line's wording, which the server wrote, one step at a time.
+   A cover letter being written polls the same way, but only its own section is swapped when it is done, so the changes
+   above it keep their place. The letter box saves as you leave it, and Copy puts it on the clipboard.
 
    Rule: Scout never opens or closes anything on the person's behalf. A card opens the panel only when they click its title
    (a modified click, such as Ctrl or Cmd, still opens the posting in a new tab as before); only Close shuts it. Apply in
    the panel opens the posting and the panel stays. Focus:
      - opening a card moves focus to the panel's heading; Close returns it to that card's title link
-     - when the panel's stage changes because the person pressed something (Tailor, Cancel), focus goes to the new
-       stage's first line; when a tailoring finishes by itself, focus moves only if it was inside the panel (on Cancel,
+     - when the panel's stage changes because the person pressed something (Tailor, Cancel, Looks good, Back to the
+       changes), focus goes to the new stage's first line; when only the letter's section changes (Write a cover letter,
+       Try again), focus goes to that section's first line; when a tailoring finishes by itself, focus moves only if it was inside the panel (on Cancel,
        which is gone), and the live region says so either way. Undo/Redo keep focus on the same change's button.
      - when a row leaves Open roles (Yes, or hidden), focus goes to the next row's title link (the previous one if it was
        last; the count line if none are left). If the panel was showing that job it stays open and moves to the same next
@@ -87,6 +90,7 @@
     var work = panel.querySelector("[data-poll]");
     if (!work) return;
     var url = work.getAttribute("data-poll");
+    var swap = work.getAttribute("data-poll-swap");   // when set, only this part of the panel is replaced
     var bar = panel.querySelector(".fg-progress");
     var steps = [];
     try { steps = JSON.parse((bar && bar.getAttribute("data-steps")) || "[]"); } catch (e) { /* bar only */ }
@@ -111,9 +115,14 @@
           return response.text().then(function (html) {
             if (current !== id) return;   // closed or moved on: the result waits in the panel for next time
             var inside = panel.contains(document.activeElement);
-            render(html, id, inside);
-            var voice = panel.querySelector("[data-announce]");
-            say(voice ? voice.getAttribute("data-announce") : "");
+            if (swap) {
+              if (!swapSection(html, swap, false)) render(html, id, false);
+              else { stopWork(); startWork(id); }
+            } else {
+              render(html, id, inside);
+              var voice = panel.querySelector("[data-announce]");
+              say(voice ? voice.getAttribute("data-announce") : "");
+            }
           });
         })
         .catch(function () { failures++; if (failures < 5 && current === id) again(); });
@@ -131,6 +140,7 @@
     workspace.classList.add("fg-has-panel");
     select(id);
     sync();
+    if (window.fgJob && window.fgJob.showTailored) window.fgJob.showTailored(id, !!panel.querySelector("[data-tailored]"));
     if (focusFirst) {
       var first = panel.querySelector("[data-panel-focus]");
       if (first) first.focus();
@@ -207,16 +217,37 @@
     return true;
   }
 
+  /* Replace one part of the panel (the letter's section) with the same part of the server's markup. Focus moves to the
+     new part's first line only when it was in the old part (or `focus` says so). Returns false if either is missing. */
+  function swapSection(html, selector, focus) {
+    var next = new DOMParser().parseFromString(html, "text/html");
+    var fresh = next.querySelector(selector);
+    var old = panel.querySelector(selector);
+    if (!fresh || !old) return false;
+    var had = old.contains(document.activeElement);
+    old.replaceWith(document.importNode(fresh, true));
+    var first = panel.querySelector(selector + " [data-letter-focus]");
+    if (first && (focus || had)) first.focus();
+    var voice = panel.querySelector(selector + " [data-announce]");
+    if (voice) say(voice.getAttribute("data-announce"));
+    return true;
+  }
+
+  var saving = Promise.resolve();   // the letter's latest save: other buttons wait for it, so nothing is lost
+
   panel.addEventListener("submit", function (event) {
     var form = event.target.closest && event.target.closest("form[data-panel-form]");
     if (!form || !window.fetch) return;
     event.preventDefault();
     var button = form.querySelector("button");
-    var id = current, change = form.getAttribute("data-panel-form") === "change";
+    var kind = form.getAttribute("data-panel-form");
+    var id = current, change = kind === "change", section = kind === "letter";
     var changeId = change ? form.querySelector('input[name="change"]').value : "";
     if (button) button.disabled = true;
-    fetch(form.getAttribute("action"), { method: "POST", body: new FormData(form), credentials: "same-origin",
-                                         headers: { "X-Requested-With": "fetch" } })
+    saving.then(function () {
+      return fetch(form.getAttribute("action"), { method: "POST", body: new FormData(form), credentials: "same-origin",
+                                                  headers: { "X-Requested-With": "fetch" } });
+    })
       .then(function (response) {
         if (!response.ok) throw new Error("no answer");
         return response.text();
@@ -224,10 +255,44 @@
       .then(function (html) {
         if (current !== id) return;   // they opened another job meanwhile: that panel is not ours to change
         if (change && swapChange(html, changeId)) return;
+        if (section && swapSection(html, "[data-letter]", true)) { stopWork(); startWork(id); return; }
         latest++;
         render(html, id, true);
       })
       .catch(function () { failedForm(form, button); });
+  });
+
+  /* The letter box saves as the person leaves it (the change event), quietly; Copy puts what is in the box on the
+     clipboard. Both say what happened in words, in the live region and beside the box. */
+  function letterNote(text) {
+    var note = panel.querySelector("[data-letter-saved]");
+    if (note) note.textContent = text;
+    say(text);
+  }
+
+  panel.addEventListener("change", function (event) {
+    var box = event.target;
+    var form = box.closest && box.closest("[data-letter-form]");
+    if (!form || box.tagName !== "TEXTAREA") return;
+    saving = fetch(form.getAttribute("action"), { method: "POST", body: new FormData(form), credentials: "same-origin",
+                                                   headers: { "X-Requested-With": "fetch" } })
+      .then(function (response) { letterNote(response.ok ? "Cover letter saved." : "I couldn’t save your edit. Check your connection and try again."); })
+      .catch(function () { letterNote("I couldn’t save your edit. Check your connection and try again."); });
+  });
+
+  panel.addEventListener("click", function (event) {
+    var copy = event.target.closest && event.target.closest("[data-copy-letter]");
+    if (!copy) return;
+    var box = panel.querySelector("[data-letter-form] textarea");
+    if (!box) return;
+    function done() { letterNote("Cover letter copied."); }
+    function fallback() {
+      box.select();
+      try { document.execCommand("copy") ? done() : letterNote("I couldn’t copy it. Select the text and copy it yourself."); }
+      catch (e) { letterNote("I couldn’t copy it. Select the text and copy it yourself."); }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(box.value).then(done, fallback);
+    else fallback();
   });
 
   /* The nearest row still in the list after this one, else the nearest before it. */

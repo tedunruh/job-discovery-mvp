@@ -39,6 +39,7 @@ from playwright.sync_api import sync_playwright  # noqa: E402
 from werkzeug.serving import make_server  # noqa: E402
 
 from dashboard import resume as resume_module  # noqa: E402
+from dashboard import letter as letter_module  # noqa: E402
 from dashboard import tailor  # noqa: E402
 from dashboard.app import app  # noqa: E402
 from db.db import create_session, get_conn  # noqa: E402
@@ -1179,6 +1180,7 @@ def check_panel(browser, base, token):
 
 TAILOR_COMPANY = "Quality Check Studio"
 TAILOR_STRUCTURE = {
+    "header": ["Ada Lovelace", "ada@example.com"],
     "summary": "Product designer with 10 years of experience across B2B and consumer products.",
     "experience": [{"company": "Northwind Health", "title": "Design Lead", "location": "", "dates": "2022 to now",
                     "bullets": ["Ran research and shipped a redesign that cut support calls by 20%.",
@@ -1192,7 +1194,7 @@ TAILOR_STRUCTURE = {
 def provision_tailor_fixture(user_id):
     """One open design role at a made-up company with stored text and requirements, and a resume for the check's user,
     so the panel can be tailored for without a model call. Returns the posting's id. Removed by remove_tailor_fixture."""
-    text = " ".join([TAILOR_STRUCTURE["summary"]] + [b for r in TAILOR_STRUCTURE["experience"] for b in r["bullets"]] +
+    text = " ".join(TAILOR_STRUCTURE["header"] + [TAILOR_STRUCTURE["summary"]] + [b for r in TAILOR_STRUCTURE["experience"] for b in r["bullets"]] +
                     TAILOR_STRUCTURE["skills"])
     reqs = [{"label": "Design systems experience", "terms": ["design system"]},
             {"label": "Working knowledge of React", "terms": ["react"]}]
@@ -1229,13 +1231,31 @@ def remove_tailor_fixture(conn=None, user_id=None):
         conn.close()
 
 
+TAILOR_LETTER = (
+    "Hello Quality Check Studio team,\n\n"
+    "I have spent 10 years designing products people use every day. At Northwind Health I owned the design system in "
+    "Figma and hired two designers, and I ran the research behind a redesign that cut support calls by 20%.\n\n"
+    "Your Staff Product Designer role leads design systems, which is the work I enjoy most, and I like working "
+    "closely with developers to keep designs and code in sync. [One sentence on why you want to work at Quality Check Studio.]\n\n"
+    "I would love to talk about the role. [Link to your portfolio]\n\nThank you,\n[Your name]")
+
+
+def got_404(ctx, url):
+    return ctx.request.get(url).status == 404
+
+
 def check_tailor(browser, base, token, user_id):
     """Tailoring in the panel, end to end with the model calls faked (so nothing is spent) and the real database: the
     Prep stage offers Tailor with the month's count; clicking it moves focus to the Working stage's first line, whose
     Cancel returns to Prep; tailoring again ends in Review without any press (the page polls), with every change before
     and after, Undo that becomes Redo (focus stays on that change's button, the count follows), and the change kept
-    after the panel is closed and opened again. Cancelled calls do not count toward the month's ten."""
+    after the panel is closed and opened again. Cancelled calls do not count toward the month's ten. Then the optional cover
+    letter (asked for at Tailor time at 1280, from Review at 390: only its own section changes while it is written, edits
+    save as you leave the box), Looks good and Ready (the PDF and Word downloads really are those files, the row says
+    Tailored, Back to the changes takes the marker off), and Yes saving the files with the application (listed on the
+    Applications tab, and let go again when the Yes is undone)."""
     gate = threading.Event()
+    letter_gate = threading.Event()
     structure_reads = []
 
     def fake_read(pdf):
@@ -1251,14 +1271,20 @@ def check_tailor(browser, base, token, user_id):
             "skills_order": {"skills": ["Accessibility", "Figma", "Prototyping", "User research"], "why": "Nothing added or removed."},
         }, 1800, 350, "req_qc", "claude-sonnet-5-5")
 
-    saved = (tailor.READ_PROVIDER, tailor.PROVIDER)
-    tailor.READ_PROVIDER, tailor.PROVIDER = fake_read, fake_tailor
+    def fake_letter(structure, posting_text, company, title, missing, note):
+        letter_gate.wait(40)
+        return resume_module.ReadResult({"letter": TAILOR_LETTER}, 2600, 380, "req_qc_letter", "claude-sonnet-5-5")
+
+    saved = (tailor.READ_PROVIDER, tailor.PROVIDER, letter_module.PROVIDER)
+    tailor.READ_PROVIDER, tailor.PROVIDER, letter_module.PROVIDER = fake_read, fake_tailor, fake_letter
     posting_id = provision_tailor_fixture(user_id)
     try:
         for (w, h) in ((1280, 900), (390, 844)):
             mobile = w < MOBILE_MAX_WIDTH
             tag = f"@{w}"
             gate.clear()
+            letter_gate.clear()
+            ticked = not mobile   # at 1280 the letter is asked for with Tailor; at 390 from Review
             del structure_reads[:]
             conn = get_conn()
             with conn.cursor() as cur:   # each width starts from nothing tailored
@@ -1281,6 +1307,9 @@ def check_tailor(browser, base, token, user_id):
             steps = page.evaluate("[...document.querySelectorAll('#apply-panel .fg-step')].map(li => [li.textContent.trim(), li.getAttribute('aria-current')])")
             check(steps[0][1] == "step" and [x[0][1:] for x in steps][:3] == ["Prep", "Tailor", "Apply"],
                   f"the steps strip names Prep, Tailor, Apply with Prep current  [{tag}]", str(steps))
+            box = page.locator("#apply-panel input[name='letter']")
+            check(box.count() == 1 and page.evaluate("document.querySelector('#apply-panel input[name=letter]').labels[0].textContent.trim()") == "Write a cover letter too",
+                  f"Prep offers an unticked 'Write a cover letter too' beside Tailor  [{tag}]")
             help_text = page.evaluate("document.querySelector('#apply-panel .fg-panel-foot .fg-panel-help').textContent")
             check(help_text.startswith("0 of 10 tailored this month."), f"the month's count sits under the Tailor button  [{tag}]", help_text)
 
@@ -1306,6 +1335,8 @@ def check_tailor(browser, base, token, user_id):
 
             # Tailor again: no press needed to get from Working to Review
             gate.set()
+            if ticked:
+                page.locator("#apply-panel input[name='letter']").check()
             page.locator("#apply-panel button:has-text('Tailor my resume')").click()
             page.wait_for_selector("#apply-panel .fg-changes", timeout=30000)
             check(page.evaluate("document.activeElement.hasAttribute('data-panel-focus')"), f"when it finishes, focus lands on Review's first line  [{tag}]")
@@ -1357,6 +1388,118 @@ def check_tailor(browser, base, token, user_id):
             page.locator("#apply-panel .fg-change.is-undone button").click()
             page.wait_for_selector("#apply-panel .fg-change.is-undone", state="detached")
             check(page.locator("#apply-panel .fg-panel-foot [data-kept-line]").inner_text() == "3 of 3 changes kept", f"Redo brings it back  [{tag}]")
+
+            # The cover letter: only its own section changes while it is written
+            page.evaluate("window.__changes = document.querySelector('#apply-panel .fg-changes')")
+            section = page.locator("#apply-panel [data-letter]")
+            if ticked:
+                check("Writing your cover letter…" in section.inner_text(), f"a letter asked for with Tailor is being written when Review opens  [{tag}]", section.inner_text())
+            else:
+                text = section.inner_text()
+                check("Most applications don’t need one." in text and "doesn’t count toward your 10 this month" in text,
+                      f"Review offers a cover letter and says it does not use one of the ten  [{tag}]", text)
+                section.locator("button:has-text('Write a cover letter')").click()
+                page.wait_for_selector("#apply-panel [data-letter] .fg-progress")
+                check(page.evaluate("document.activeElement.hasAttribute('data-letter-focus')"), f"asking for the letter moves focus to its section's first line  [{tag}]")
+            check(page.evaluate("window.__changes.isConnected"), f"while the letter is written the changes above it stay where they were  [{tag}]")
+            check(page.locator("#apply-panel .fg-panel-foot button:has-text('Looks good')").count() == 1, f"Review has Looks good beside Apply  [{tag}]")
+            letter_gate.set()
+            page.wait_for_selector("#apply-panel [data-letter] textarea", timeout=30000)
+            try:
+                page.wait_for_function("document.getElementById('panel-live').textContent.includes('Your cover letter is ready.')", timeout=3000)
+                told = True
+            except Exception:  # noqa: BLE001
+                told = False
+            check(told, f"a screen reader is told the letter is ready  [{tag}]")
+            check(page.evaluate("window.__changes.isConnected"), f"the finished letter swapped in without redrawing the changes  [{tag}]")
+            box = page.locator("#apply-panel [data-letter] textarea")
+            check(box.input_value().startswith("Hello Quality Check Studio team,") and "[Your name]" in box.input_value(),
+                  f"the letter is a draft with bracketed parts to fill in  [{tag}]")
+            check(page.evaluate("document.querySelector('#apply-panel [data-letter] textarea').labels.length === 0 && "
+                                "document.getElementById(document.querySelector('#apply-panel [data-letter] textarea').getAttribute('aria-labelledby')).textContent.trim()") == "Cover letter",
+                  f"the letter box is named by its heading  [{tag}]")
+            box.fill(box.input_value() + "\n\nP.S. Edited by me.")
+            box.press("Tab")
+            page.wait_for_function("document.querySelector('#apply-panel [data-letter-saved]').textContent.includes('saved')", timeout=5000)
+            conn = get_conn()
+            with conn.cursor() as cur:
+                cur.execute("SELECT letter, letter_state FROM tailorings WHERE user_id = %s AND status = 'ready' ORDER BY id DESC LIMIT 1", (user_id,))
+                saved_letter, state = cur.fetchone()
+            conn.close()
+            check(state == "ready" and saved_letter.endswith("P.S. Edited by me."), f"an edit is saved as the person leaves the box  [{tag}]", repr(saved_letter[-40:]))
+            check(page.locator("#apply-panel [data-letter] button:has-text('Write a cover letter')").count() == 0, f"a letter is written once: no second button  [{tag}]")
+            copy = page.locator("#apply-panel [data-copy-letter]")
+            check(page.evaluate("document.querySelector('#apply-panel [data-copy-letter]').textContent.replace(/\\s+/g, ' ').trim()") == "Copy cover letter",
+                  f"the copy button is named 'Copy cover letter'  [{tag}]")
+            if os.environ.get("QC_SHOTS"):
+                page.locator("#apply-panel").screenshot(path=os.path.join(os.environ["QC_SHOTS"], f"tailor-letter@{w}.png"))
+
+            # Looks good: Ready, with the two files
+            page.locator("#apply-panel .fg-panel-foot button:has-text('Looks good')").click()
+            page.wait_for_selector("#apply-panel [data-tailored]")
+            check(page.evaluate("document.activeElement.hasAttribute('data-panel-focus')"), f"Looks good moves focus to Ready's first line  [{tag}]")
+            check(page.evaluate("document.activeElement.textContent") == "You’re ready. I saved these with the job.", f"Ready says it is ready  [{tag}]")
+            check(page.locator("#apply-panel .fg-step[aria-current='step']").inner_text().strip().endswith("Apply"), f"the Apply step is current  [{tag}]")
+            names = page.evaluate("[...document.querySelectorAll('#apply-panel .fg-files a[download]')].map(a => [a.textContent.replace(/\\s+/g, ' ').trim(), a.getAttribute('href')])")
+            check([n[0] for n in names] == ["Download the PDF of your resume tailored for Quality Check Studio",
+                                            "Download the Word file of your resume tailored for Quality Check Studio"],
+                  f"each download says which file and for which company  [{tag}]", str(names))
+            for (label, href), magic, kind in zip(names, (b"%PDF", b"PK"), ("pdf", "docx")):
+                got = ctx.request.get(base + href)
+                body = got.body()
+                check(got.status == 200 and body[:len(magic)] == magic and got.headers.get("content-disposition", "").endswith(f".{kind}\""),
+                      f"the {kind.upper()} download is a real {kind} file  [{tag}]", f"{got.status} {got.headers.get('content-disposition')}")
+                if kind == "pdf":
+                    import io, pypdf
+                    pdf_text = "\n".join(pg.extract_text() for pg in pypdf.PdfReader(io.BytesIO(body)).pages)
+                    check("Ada Lovelace" in pdf_text and "Partnered with engineers" not in pdf_text and "Led the design system in Figma" in pdf_text,
+                          f"the PDF is the resume with the kept changes in it  [{tag}]")
+            check(page.locator("#apply-panel [data-letter] textarea").input_value().endswith("P.S. Edited by me."), f"Ready shows the letter with the person's edit  [{tag}]")
+            check(page.locator("#apply-panel [data-copy-letter]").count() == 1, f"Ready has Copy cover letter  [{tag}]")
+            check("When you’re back, I’ll ask if you applied." in page.locator("#apply-panel .fg-panel-foot").inner_text(),
+                  f"Ready says what happens after Apply  [{tag}]")
+            check(page.locator("#apply-panel .fg-panel-foot a[href^='/open/']").count() == 1, f"Apply is still there in Ready  [{tag}]")
+            check(row.locator("[data-tailored-mark]").count() == 1, f"the job's row now says Tailored  [{tag}]")
+            over = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
+            check(over <= 0, f"no horizontal overflow in Ready  [{tag}]", f"{over}px")
+            if os.environ.get("QC_SHOTS"):
+                page.locator("#apply-panel").screenshot(path=os.path.join(os.environ["QC_SHOTS"], f"tailor-ready@{w}.png"))
+
+            # Back to the changes takes the marker off; Looks good puts it back
+            page.locator("#apply-panel button:has-text('Back to the changes')").click()
+            page.wait_for_selector("#apply-panel .fg-changes")
+            check(page.evaluate("document.activeElement.hasAttribute('data-panel-focus')"), f"Back to the changes moves focus to Review's first line  [{tag}]")
+            check(row.locator("[data-tailored-mark]").count() == 0, f"Back to the changes takes Tailored off the row  [{tag}]")
+            check(got_404(ctx, base + names[0][1]), f"the files are not offered while the person is back in the changes  [{tag}]")
+            page.locator("#apply-panel .fg-panel-foot button:has-text('Looks good')").click()
+            page.wait_for_selector("#apply-panel [data-tailored]")
+
+            # Yes: the tailored files go with the application
+            posted = ctx.request.post(f"{base}/set_applied/{posting_id}", form={"applied": "true"}, headers={"X-Requested-With": "fetch"})
+            check(posted.status == 204, f"Yes is accepted  [{tag}]", str(posted.status))
+            apps = ctx.new_page()
+            apps.goto(base + "/?tab=applications", wait_until="load")
+            app_row = apps.locator(f"li.fg-job:has-text('{TAILOR_COMPANY}')")
+            links = apps.evaluate(f"[...document.querySelectorAll('li.fg-job')].filter(li => li.textContent.includes('{TAILOR_COMPANY}'))"
+                                  ".flatMap(li => [...li.querySelectorAll('a[download]')].map(a => [a.textContent.trim(), a.getAttribute('href')]))")
+            check([l[0] for l in links] == ["Resume PDF", "Word", "Cover letter"],
+                  f"the application lists the tailored resume and the letter  [{tag}]", str(links))
+            if links:
+                kept = [ctx.request.get(base + l[1]) for l in links]
+                check([k.status for k in kept] == [200, 200, 200] and kept[0].body()[:4] == b"%PDF" and kept[2].text().rstrip().endswith("P.S. Edited by me."),
+                      f"those files still download after the job left Open roles  [{tag}]")
+            over = apps.evaluate("document.documentElement.scrollWidth - window.innerWidth")
+            check(over <= 0, f"no horizontal overflow on Applications with files  [{tag}]", f"{over}px")
+            if os.environ.get("QC_SHOTS"):
+                apps.screenshot(path=os.path.join(os.environ["QC_SHOTS"], f"tailor-applications@{w}.png"))
+            apps.close()
+            undone = ctx.request.post(f"{base}/set_applied/{posting_id}", form={"applied": "false"}, headers={"X-Requested-With": "fetch"})
+            conn = get_conn()
+            with conn.cursor() as cur:
+                cur.execute("SELECT count(*) FROM tailorings WHERE user_id = %s AND applied_at IS NOT NULL", (user_id,))
+                still = cur.fetchone()[0]
+            conn.close()
+            check(undone.status == 204 and still == 0, f"undoing the Yes lets the files go again  [{tag}]", f"{undone.status}, {still} still kept")
             ctx.close()
 
             conn = get_conn()
@@ -1364,12 +1507,14 @@ def check_tailor(browser, base, token, user_id):
                 cur.execute("SELECT kind, status FROM tailor_calls WHERE user_id = %s ORDER BY id", (user_id,))
                 calls = cur.fetchall()
             conn.close()
+            check(calls.count(("letter", "ok")) == 1, f"the cover letter call is logged as a letter, apart from the ten  [{tag}]", str(calls))
             check(calls.count(("tailor", "ok")) == 1 and ("tailor", "cancelled") in calls,
                   f"a finished tailoring is logged ok and the cancelled one is logged apart, so only one counts  [{tag}]", str(calls))
             check(len(structure_reads) == 1, f"the resume is read into structure once, not for each tailoring  [{tag}]", f"{len(structure_reads)} reads")
     finally:
-        tailor.READ_PROVIDER, tailor.PROVIDER = saved
+        tailor.READ_PROVIDER, tailor.PROVIDER, letter_module.PROVIDER = saved
         gate.set()
+        letter_gate.set()
         remove_tailor_fixture(None, user_id)
 
 

@@ -84,8 +84,14 @@ and letter (reading stays on Haiku 5.5); 10 tailorings per person per month as t
    5.5) returning edits that code checks (numbers, names, anything the resume lacks), 10 per person per month plus `TAILOR_MONTHLY_CAP_USD`
    (default 5), every call logged in `tailor_calls`, Working and Review in the panel with Undo and Redo and "Not added". Measured about
    $0.01 to $0.02 per tailoring. **Apply `db/schema.sql`'s SC-72 slice 2 block to Neon before pushing.** Branch `sc-72-tailor-review`.
-3. **Letter, Ready and export:** the optional cover letter (placeholders for unknowns, can be written later without using up the limit),
-   PDF and Word, saved with the job, the Tailored marker, and the files saved with the application when you answer Yes.
+3. **Letter, Ready and export (built, in review):** the optional cover letter (Sonnet 5.5, written once per tailoring in the background,
+   brackets for what Scout can't know, code-checked so it adds no number or name the resume lacks, edited freely and saved as you leave
+   the box; free of the 10 but inside the Scout-wide dollar cap), "Looks good" to Ready, PDF (fpdf2, built-in Helvetica) and Word (written
+   directly as zipped XML, no library) of the resume with the kept changes, the Tailored marker on the row, and Yes saving the files with
+   the application (listed on the Applications tab; undoing the Yes lets them go). The structure read now also keeps the name and contact
+   lines (`header`) so the files have a masthead. **Apply `db/schema.sql`'s SC-72 slice 3 block to Neon before pushing** (it widens
+   `tailor_calls.kind` with a dropped-and-recreated CHECK, no data touched). `requirements.txt` gains `fpdf2==2.8.3` (Render's pip-only
+   build installs it; nothing to change in Render). Branch `sc-72-letter-ready`, stacked on `sc-72-tailor-review`.
 
 ## Open items for the next sprint
 - **Build SC-64** (check-in pushes and the Did you hear back / Should I close it rows). It needs a card of its own and

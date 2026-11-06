@@ -10,14 +10,17 @@ can be undone). The stage is read from the database every time, so closing the p
 
 The page asks for the panel's markup (/prep/<id>, and the /tailor routes below, which answer with the same markup), drawn
 here by Jinja, which escapes everything: requirement labels and the model's wording come from untrusted text."""
-from flask import g, render_template, request
+from flask import Response, g, render_template, request
 
 from dashboard.elevate import monogram, tint
 from dashboard.fit import apply_fit, covered_flags, evidence, resume_text_for
-from dashboard import tailor
+from dashboard import letter, resume_files, tailor
 from dashboard.requirements import queue as queue_reads
 from db.db import (
     cancel_tailoring,
+    get_company_name,
+    save_letter,
+    set_tailoring_ready,
     expire_stale_tailorings,
     get_conn,
     get_posting_prep,
@@ -50,6 +53,7 @@ def say(flags):
     return line if got >= total - 1 else line + " Worth a look before you apply."
 
 
+MAX_LETTER_CHARS = letter.MAX_CHARS
 WORKING_STEPS = [
     "Reading your resume…",
     "Reading the posting…",
@@ -85,9 +89,21 @@ def review_view(tailoring):
             "empty": tailor.message("nothing")}
 
 
+def letter_view(tailoring, can_write):
+    """The Cover letter section of Review and Ready. `state` is none (no letter yet), writing, ready or error;
+    `can_write` is whether the button to write one is shown (nothing written yet, or the last try failed, and cover
+    letters are available); `unavailable` says so when none is written and they are not."""
+    state = tailoring.get("letter_state") or "none"
+    return {"tid": tailoring["id"], "state": state, "text": tailoring.get("letter") or "",
+            "can_write": can_write and state in ("none", "error"),
+            "unavailable": state == "none" and not can_write,
+            "message": letter.message("failed") if state == "error" else letter.message("unavailable"),
+            "chars": MAX_LETTER_CHARS}
+
+
 def stage_for(conn, user_id, posting_id, out, notice):
-    """Which stage the panel is in for this job, set on `out`: working or review when the person has a tailoring for this
-    job (and the same resume file), else prep with what the Tailor button should say."""
+    """Which stage the panel is in for this job, set on `out`: working, review or ready when the person has a tailoring
+    for this job (and the same resume file), else prep with what the Tailor button should say."""
     expire_stale_tailorings(conn, user_id)
     found = latest_tailoring(conn, user_id, posting_id)
     resume = get_resume(conn, user_id)
@@ -96,14 +112,18 @@ def stage_for(conn, user_id, posting_id, out, notice):
                    steps=WORKING_STEPS)
     elif found and found["status"] == "ready" and resume and found["resume_uploaded_at"] == resume["uploaded_at"]:
         review = review_view(found)
-        out.update(stage="review", tid=found["id"], review=review,
-                   say="Here’s what I changed." if review["total"] else "I didn’t find anything worth changing.")
+        can_write = bool(review["total"]) and letter.available(conn, user_id)
+        out.update(stage="ready" if found["ready_at"] and review["total"] else "review", tid=found["id"], review=review,
+                   letter=letter_view(found, can_write) if review["total"] else None,
+                   say="You’re ready. I saved these with the job." if found["ready_at"] and review["total"]
+                   else "Here’s what I changed." if review["total"] else "I didn’t find anything worth changing.")
     else:
         state, used = tailor.availability(conn, user_id)
         out["tailor"] = {"state": state, "used": used, "limit": tailor.MONTHLY_TAILORINGS_PER_PERSON,
                          "message": {"limit": f"You’ve tailored {used} resumes this month, the most for now. It starts over "
                                               f"on {tailor.next_reset()}.",
-                                     "unavailable": tailor.message("unavailable"), "ok": ""}[state]}
+                                     "unavailable": tailor.message("unavailable"), "ok": ""}[state],
+                         "letter": state == "ok" and letter.available(conn, user_id)}
         out["notice"] = notice
 
 
@@ -120,7 +140,7 @@ def build(conn, user_id, posting_id, notice=None):
     out = {"id": posting_id, "company": company, "title": posting["title"], "mono": monogram(company),
            "tint": tint(company), "source": (posting.get("ats_type") or "").capitalize(),
            "state": "ok", "say": "", "message": "", "fit": None, "requirements": [], "lead": [],
-           "stage": "prep", "tid": None, "tailor": None, "review": None, "steps": [], "notice": None}
+           "stage": "prep", "tid": None, "tailor": None, "review": None, "letter": None, "steps": [], "notice": None}
 
     if not has_text or requirements == []:
         out.update(state="no_text", say=MESSAGES["no_text"])
@@ -186,7 +206,7 @@ def register(app, require_login):
             body = build(conn, g.user_id, posting_id)
             conn.commit()
             if body is not None and body["state"] == "ok" and body["stage"] == "prep" and body["tailor"]["state"] == "ok":
-                tailor.start(conn, g.user_id, posting_id)
+                tailor.start(conn, g.user_id, posting_id, request.form.get("letter") == "1" and body["tailor"]["letter"])
             return panel(conn, posting_id)
         finally:
             conn.close()
@@ -235,5 +255,111 @@ def register(app, require_login):
                 conn.rollback()
                 return "", 404
             return panel(conn, row["posting_id"])
+        finally:
+            conn.close()
+
+    @app.route("/tailor/<int:tailoring_id>/ready", methods=["POST"])
+    @require_login
+    def tailor_ready(tailoring_id):
+        """"Looks good" (ready=1) takes the person to Ready, where the files are; "Back to the changes" (ready=0) back."""
+        ready = request.form.get("ready")
+        conn = get_conn()
+        try:
+            posting_id = set_tailoring_ready(conn, g.user_id, tailoring_id, ready == "1") if ready in ("0", "1") else None
+            if posting_id is None:
+                conn.rollback()
+                return "", 404
+            return panel(conn, posting_id)
+        finally:
+            conn.close()
+
+    @app.route("/tailor/<int:tailoring_id>/letter/status", methods=["GET"])
+    @require_login
+    def tailor_letter_status(tailoring_id):
+        """The page asks while a letter is being written: 204 until it is done, then the panel as it now is."""
+        conn = get_conn()
+        try:
+            expire_stale_tailorings(conn, g.user_id)
+            conn.commit()
+            row = get_tailoring(conn, g.user_id, tailoring_id)
+            if row is None or row["posting_id"] is None:
+                return "", 404
+            if row["letter_state"] == "writing":
+                return "", 204
+            return panel(conn, row["posting_id"])
+        finally:
+            conn.close()
+
+    @app.route("/tailor/<int:tailoring_id>/letter", methods=["POST"])
+    @require_login
+    def tailor_letter(tailoring_id):
+        """"Write a cover letter" on Review or Ready: written in the background, once per tailoring, free of the monthly
+        limit. Answers with the panel (the page swaps in only the letter's section)."""
+        conn = get_conn()
+        try:
+            row = get_tailoring(conn, g.user_id, tailoring_id)
+            if row is None or row["posting_id"] is None:
+                return "", 404
+            if letter.available(conn, g.user_id):
+                letter.start(conn, g.user_id, tailoring_id)
+            return panel(conn, row["posting_id"])
+        finally:
+            conn.close()
+
+    @app.route("/tailor/<int:tailoring_id>/letter/save", methods=["POST"])
+    @require_login
+    def tailor_letter_save(tailoring_id):
+        """The person's own edits to their letter, saved as they leave the box."""
+        text = letter.clean_letter(request.form.get("letter", ""))
+        conn = get_conn()
+        try:
+            if not text or not save_letter(conn, g.user_id, tailoring_id, text):
+                conn.rollback()
+                return "", 404
+            conn.commit()
+            return "", 204
+        finally:
+            conn.close()
+
+    def download(tailoring_id, make, mimetype, extension):
+        """A file of this person's ready tailoring (they said "Looks good", or it went with an application)."""
+        conn = get_conn()
+        try:
+            row = get_tailoring(conn, g.user_id, tailoring_id)
+            if row is None or row["status"] != "ready" or not (row["ready_at"] or row["applied_at"]) or row["source"] is None:
+                return "", 404
+            company = get_company_name(conn, row["posting_id"]) if row["posting_id"] else ""
+            structure = tailor.apply_changes(row["source"], row["changes"])
+            body = make(structure, row)
+            response = Response(body, mimetype=mimetype)
+            response.headers["Content-Disposition"] = f'attachment; filename="{resume_files.file_stem(structure, company or "")}.{extension}"'
+            response.headers["Cache-Control"] = "no-store"
+            return response
+        finally:
+            conn.close()
+
+    @app.route("/tailor/<int:tailoring_id>/resume.pdf")
+    @require_login
+    def tailor_pdf(tailoring_id):
+        return download(tailoring_id, lambda structure, row: resume_files.to_pdf(structure), "application/pdf", "pdf")
+
+    @app.route("/tailor/<int:tailoring_id>/resume.docx")
+    @require_login
+    def tailor_docx(tailoring_id):
+        return download(tailoring_id, lambda structure, row: resume_files.to_docx(structure),
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx")
+
+    @app.route("/tailor/<int:tailoring_id>/letter.txt")
+    @require_login
+    def tailor_letter_file(tailoring_id):
+        conn = get_conn()
+        try:
+            row = get_tailoring(conn, g.user_id, tailoring_id)
+            if row is None or row["status"] != "ready" or not (row["ready_at"] or row["applied_at"]) or not row["letter"]:
+                return "", 404
+            response = Response(row["letter"] + "\n", mimetype="text/plain")
+            response.headers["Content-Disposition"] = 'attachment; filename="cover-letter.txt"'
+            response.headers["Cache-Control"] = "no-store"
+            return response
         finally:
             conn.close()

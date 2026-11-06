@@ -431,3 +431,23 @@ CREATE TABLE IF NOT EXISTS tailor_calls (
 );
 CREATE INDEX IF NOT EXISTS idx_tailor_calls_user_month ON tailor_calls (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tailor_calls_created ON tailor_calls (created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- SC-72 slice 3: the cover letter, "Looks good" (Ready) and the files saved with an application. Additive; apply to
+-- Neon before pushing the code.
+--   want_letter  the person ticked "Write a cover letter too" when they started the tailoring
+--   letter       the draft, edited freely by the person afterwards (placeholders in [brackets] for what Scout can't know)
+--   letter_state NULL (none yet), 'writing', 'ready' or 'error'; letter_at is when it last changed
+--   ready_at     the person pressed "Looks good": the tailored files are theirs to download (cleared by "Back to the changes")
+--   applied_at   they answered Yes to "Did you apply?" for this role while it was ready: these files go with the application
+-- A letter is written once per tailoring (again only after an error), doesn't count toward a person's ten, and its
+-- cost counts toward the Scout-wide dollar cap like any other call (tailor_calls.kind 'letter').
+-- ---------------------------------------------------------------------------
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS want_letter BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS letter TEXT;
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS letter_state TEXT;
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS letter_at TIMESTAMPTZ;
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ;
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS applied_at TIMESTAMPTZ;
+ALTER TABLE tailor_calls DROP CONSTRAINT IF EXISTS tailor_calls_kind_check;
+ALTER TABLE tailor_calls ADD CONSTRAINT tailor_calls_kind_check CHECK (kind IN ('structure', 'tailor', 'letter'));

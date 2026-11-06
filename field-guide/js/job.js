@@ -25,6 +25,7 @@
   var askTemplate = document.getElementById("return-ask-template");
   var whyTemplate = document.getElementById("return-why-template");
   var viewedTemplate = document.getElementById("return-viewed-template");
+  var tailoredTemplate = document.getElementById("return-tailored-template");
   var appliedToast = document.getElementById("toast-template");
   var simpleToast = document.getElementById("toast-simple-template");
   var tabCounts = document.querySelectorAll("[data-tab-count]");   // [0] Open roles, [1] Applications
@@ -251,6 +252,15 @@
       if (!row || row.closest("[data-viewed-list]")) return;   // the Viewed list says when each was opened instead
       var when = row.querySelector("[data-state-when]");
       if (when && !when.querySelector("[data-viewed]") && viewedTemplate) when.appendChild(viewedTemplate.content.cloneNode(true));
+    },
+    /* The quiet "Tailored" marker on a card whose resume is ready (the panel's Ready stage), and off again when it is not. */
+    showTailored: function (id, on) {
+      var row = rowFor(id);
+      var when = row && row.querySelector("[data-state-when]");
+      if (!when) return;
+      var mark = when.querySelector("[data-tailored-mark]");
+      if (on && !mark && tailoredTemplate) when.appendChild(tailoredTemplate.content.cloneNode(true));
+      else if (!on && mark) mark.remove();
     },
     /* The jobs to ask about, all of them: the question stays on a card until it is answered. A card that is no longer
        in the list (it was answered somewhere else) gets Apply back. */

@@ -228,6 +228,7 @@
     <template id="return-ask-template">{{ ask_actions("__id__") }}</template>
     <template id="return-why-template">{{ why_actions("__id__") }}</template>
     <template id="return-viewed-template">{{ fg.job_viewed() }}</template>
+    <template id="return-tailored-template">{{ fg.job_tailored() }}</template>
     <template id="toast-template">{% call fg.toast("You've applied to this role. You can find it in Applications.") %}<a class="fg-toast-action" href="/?tab=applications">View</a><button class="fg-toast-action" type="button" data-toast-undo>Undo</button>{% endcall %}</template>
     <template id="toast-simple-template">{% call fg.toast("__text__") %}<button class="fg-toast-action" type="button" data-toast-undo>Undo</button>{% endcall %}</template>
 
@@ -263,7 +264,7 @@
     {% endif %}
     <ul class="fg-job-list" data-viewed-list>
       {% for p in postings %}
-      {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Discovered on " ~ p.ats_type|capitalize, "Opened " ~ p.opened_ago, mono=p.mono, tint=p.tint, pay=p.pay, fit_score=p.fit) %}
+      {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Discovered on " ~ p.ats_type|capitalize, "Opened " ~ p.opened_ago, tailored=p.tailored, mono=p.mono, tint=p.tint, pay=p.pay, fit_score=p.fit) %}
         {%- if p.asking %}{{ ask_actions(p.id) }}{% else %}{{ apply_group(p.id, p.title) }}{% endif %}
       {% endcall %}
       {% endfor %}
@@ -331,7 +332,7 @@
       {{ fg.day(label, count) }}
       <ul class="fg-job-list">
         {% for p in rows %}
-        {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Discovered on " ~ p.ats_type|capitalize, p.when, p.viewed, skills=p.skill_line, mono=p.mono, tint=p.tint, pay=p.pay, fit_score=p.fit, panel=True) %}
+        {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Discovered on " ~ p.ats_type|capitalize, p.when, p.viewed, tailored=p.tailored, skills=p.skill_line, mono=p.mono, tint=p.tint, pay=p.pay, fit_score=p.fit, panel=True) %}
           {%- if p.asking %}{{ ask_actions(p.id) }}{% else %}{{ apply_group(p.id, p.title) }}{% endif %}
         {% endcall %}
         {% endfor %}
@@ -364,7 +365,18 @@
     {% endif %}
     <ul class="fg-job-list">
       {% for p in applications %}
-      {{ fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Applied" ~ ((" " ~ p.applied_ago) if p.applied_ago else ""), mono=p.mono, tint=p.tint, pay=p.pay) }}
+      {%- set applied_line = "Applied" ~ ((" " ~ p.applied_ago) if p.applied_ago else "") %}
+      {%- if p.files %}
+      {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, applied_line, mono=p.mono, tint=p.tint, pay=p.pay) %}
+        <span class="fg-job-group" role="group" aria-label="Tailored files for {{ p.company_name }}">
+          <a class="fg-link" href="/tailor/{{ p.files.id }}/resume.pdf" download>Resume PDF</a>
+          <a class="fg-link" href="/tailor/{{ p.files.id }}/resume.docx" download>Word</a>
+          {%- if p.files.has_letter %}<a class="fg-link" href="/tailor/{{ p.files.id }}/letter.txt" download>Cover letter</a>{% endif %}
+        </span>
+      {% endcall %}
+      {%- else %}
+      {{ fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, applied_line, mono=p.mono, tint=p.tint, pay=p.pay) }}
+      {%- endif %}
       {% endfor %}
     </ul>
     {% endif %}

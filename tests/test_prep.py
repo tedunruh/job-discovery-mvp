@@ -58,7 +58,8 @@ class Build(unittest.TestCase):
             self.addCleanup(p.stop)
 
     def build(self):
-        with mock.patch.object(prep.tailor, "availability", lambda conn, uid: ("ok", 3)):
+        with mock.patch.object(prep.tailor, "availability", lambda conn, uid: ("ok", 3)), \
+                mock.patch.object(prep.letter, "available", lambda conn, uid: True):
             return prep.build(mock.MagicMock(), 7, 5)
 
     def test_a_job_with_a_resume_marks_each_requirement_and_leads_with_what_is_covered(self):
@@ -222,15 +223,17 @@ class Stages(unittest.TestCase):
     """Which stage the panel is in for a job, from the person's tailorings and resume."""
 
     def setUp(self):
-        self.found, self.uploaded, self.avail = None, "t0", ("ok", 3)
+        self.found, self.uploaded, self.avail, self.letters = None, "t0", ("ok", 3), True
         for target, value in {"expire_stale_tailorings": lambda c, u: None, "latest_tailoring": lambda c, u, p: self.found,
                               "get_resume": lambda c, u: {"uploaded_at": self.uploaded}}.items():
             p = mock.patch.object(prep, target, value)
             p.start()
             self.addCleanup(p.stop)
-        p = mock.patch.object(prep.tailor, "availability", lambda conn, uid: self.avail)
-        p.start()
-        self.addCleanup(p.stop)
+        for module, name, value in ((prep.tailor, "availability", lambda conn, uid: self.avail),
+                                    (prep.letter, "available", lambda conn, uid: self.letters)):
+            p = mock.patch.object(module, name, value)
+            p.start()
+            self.addCleanup(p.stop)
 
     def stage(self, notice=None):
         out = {"company": "Co", "stage": "prep", "tid": None, "tailor": None, "review": None, "steps": [], "notice": None, "say": "x"}
@@ -238,7 +241,8 @@ class Stages(unittest.TestCase):
         return out
 
     def ready(self, changes=None, **over):
-        row = {"id": 9, "status": "ready", "resume_uploaded_at": "t0", "not_added": ["React"],
+        row = {"id": 9, "status": "ready", "resume_uploaded_at": "t0", "not_added": ["React"], "ready_at": None,
+               "want_letter": False, "letter": None, "letter_state": None,
                "changes": [change("c1"), change("c2", kept=False)] if changes is None else changes}
         row.update(over)
         return row
@@ -271,6 +275,34 @@ class Stages(unittest.TestCase):
         out = self.stage()
         self.assertEqual((out["stage"], out["say"], out["review"]["total"]), ("review", "I didn’t find anything worth changing.", 0))
 
+    def test_looks_good_makes_it_the_ready_stage_and_the_letter_follows_what_is_allowed(self):
+        self.found = self.ready(ready_at="t", letter_state="ready", letter="Hello")
+        out = self.stage()
+        self.assertEqual((out["stage"], out["say"]), ("ready", "You’re ready. I saved these with the job."))
+        self.assertEqual((out["letter"]["state"], out["letter"]["text"], out["letter"]["can_write"]), ("ready", "Hello", False))
+        self.found = self.ready(letter_state="error")
+        out = self.stage()
+        self.assertEqual((out["stage"], out["letter"]["state"], out["letter"]["can_write"]), ("review", "error", True))
+        self.assertIn("didn’t count toward your 10", out["letter"]["message"])
+        self.letters = False
+        out = self.stage()
+        self.assertEqual((out["letter"]["can_write"], out["letter"]["unavailable"]), (False, False))   # error text, no button
+        self.found = self.ready()
+        out = self.stage()
+        self.assertEqual((out["letter"]["state"], out["letter"]["can_write"], out["letter"]["unavailable"]), ("none", False, True))
+
+    def test_nothing_changed_means_no_ready_stage_and_no_letter(self):
+        self.found = self.ready(changes=[], ready_at="t")
+        out = self.stage()
+        self.assertEqual((out["stage"], out["letter"]), ("review", None))
+
+    def test_the_tailor_offer_includes_the_letter_only_when_they_can_have_one(self):
+        self.assertTrue(self.stage()["tailor"]["letter"])
+        self.letters = False
+        self.assertFalse(self.stage()["tailor"]["letter"])
+        self.letters, self.avail = True, ("limit", 10)
+        self.assertFalse(self.stage()["tailor"]["letter"])   # no tailoring left, so no letter offer beside it
+
     def test_the_limit_and_an_unavailable_service_replace_the_button_with_a_message(self):
         self.avail = ("limit", 10)
         out = self.stage()
@@ -293,8 +325,8 @@ class TailorRoutes(unittest.TestCase):
     def setUp(self):
         self.client = dapp.app.test_client()
         self.signed_in, self.body, self.row, self.found_change, self.started, self.cancelled = True, sample(stage="prep", tailor={"state": "ok", "used": 3, "limit": 10, "message": ""}), \
-            {"id": 9, "posting_id": 5, "status": "working", "error_kind": None}, True, [], []
-        self.builds = []
+            {"id": 9, "posting_id": 5, "status": "working", "error_kind": None, "letter_state": None}, True, [], []
+        self.builds, self.readied, self.saved_letters, self.letter_started, self.letters = [], [], [], [], True
 
         def build(conn, uid, pid, notice=None):
             self.builds.append(notice)
@@ -304,8 +336,12 @@ class TailorRoutes(unittest.TestCase):
             dapp: {"get_conn": lambda: mock.MagicMock(), "get_session_user": lambda c, t: (7, False) if self.signed_in else (None, False)},
             prep: {"get_conn": lambda: mock.MagicMock(), "build": build, "expire_stale_tailorings": lambda c, u: None,
                    "get_tailoring": lambda c, u, tid: self.row, "cancel_tailoring": lambda c, u, tid: self.cancelled.append(tid) or 5,
-                   "set_change_kept": lambda c, u, tid, cid, kept: self.found_change and self.cancelled.append((cid, kept)) or self.found_change},
-            prep.tailor: {"start": lambda c, u, p: self.started.append(p) or 9},
+                   "set_change_kept": lambda c, u, tid, cid, kept: self.found_change and self.cancelled.append((cid, kept)) or self.found_change,
+                   "set_tailoring_ready": lambda c, u, tid, ready: self.readied.append((tid, ready)) or (5 if self.found_change else None),
+                   "save_letter": lambda c, u, tid, text: self.saved_letters.append((tid, text)) or self.found_change,
+                   "get_company_name": lambda c, pid: "Juniper <Labs>"},
+            prep.letter: {"available": lambda c, u: self.letters, "start": lambda c, u, tid: self.letter_started.append(tid) or True},
+            prep.tailor: {"start": lambda c, u, p, want_letter=False: self.started.append(p) or 9},
         }.items():
             for target, value in targets.items():
                 p = mock.patch.object(module, target, value)
@@ -412,7 +448,9 @@ class TailorRoutes(unittest.TestCase):
 
     def test_every_tailor_route_needs_a_sign_in(self):
         self.signed_in = False
-        for method, url in (("post", "/tailor/start/5"), ("get", "/tailor/9"), ("post", "/tailor/9/cancel"), ("post", "/tailor/9/change")):
+        for method, url in (("post", "/tailor/start/5"), ("get", "/tailor/9"), ("get", "/tailor/9/letter/status"), ("post", "/tailor/9/cancel"), ("post", "/tailor/9/change"),
+                            ("post", "/tailor/9/ready"), ("post", "/tailor/9/letter"), ("post", "/tailor/9/letter/save"),
+                            ("get", "/tailor/9/resume.pdf"), ("get", "/tailor/9/resume.docx"), ("get", "/tailor/9/letter.txt")):
             r = getattr(self.client, method)(url)
             self.assertEqual(r.status_code, 302, url)
             self.assertIn("/login", r.headers["Location"])
@@ -420,3 +458,138 @@ class TailorRoutes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    # --- slice 3: the letter, Ready and the files ---
+
+    def test_the_prep_stage_offers_a_cover_letter_beside_tailoring_when_they_can_have_one(self):
+        self.body = sample(stage="prep", tailor={"state": "ok", "used": 3, "limit": 10, "message": "", "letter": True})
+        html = self.client.get("/prep/5").get_data(as_text=True)
+        self.assertIn('<input class="fg-checkbox" type="checkbox" name="letter" value="1" form="tailor-start-5"> Write a cover letter too', html)
+        self.assertIn('<form id="tailor-start-5" method="post" action="/tailor/start/5"', html)
+        self.body = sample(stage="prep", tailor={"state": "ok", "used": 3, "limit": 10, "message": "", "letter": False})
+        self.assertNotIn("cover letter", self.client.get("/prep/5").get_data(as_text=True))
+
+    def test_the_letter_is_asked_for_only_when_ticked_and_allowed(self):
+        asked = []
+        self.body = sample(stage="prep", tailor={"state": "ok", "used": 3, "limit": 10, "message": "", "letter": True})
+        with mock.patch.object(prep.tailor, "start", lambda c, u, p, want_letter=False: asked.append(want_letter) or 9):
+            self.client.post("/tailor/start/5", data={"letter": "1"})
+            self.client.post("/tailor/start/5")
+            self.body = sample(stage="prep", tailor={"state": "ok", "used": 3, "limit": 10, "message": "", "letter": False})
+            self.client.post("/tailor/start/5", data={"letter": "1"})
+        self.assertEqual(asked, [True, False, False])
+
+    def review_body(self, letter, **over):
+        return sample(stage="review", tid=9, say="Here’s what I changed.", letter=dict({
+            "tid": 9, "state": "none", "text": "", "can_write": True, "unavailable": False, "message": "", "chars": 3000}, **letter),
+            review={"tid": 9, "total": 1, "kept": 1, "line": "1 of 1 changes kept", "changes": [dict(change("c1"), name="Summary", lines=False)],
+                    "empty": "", "not_added": None}, **over)
+
+    def test_review_has_looks_good_first_and_apply_second(self):
+        self.body = self.review_body({})
+        html = self.client.get("/prep/5").get_data(as_text=True)
+        self.assertIn('action="/tailor/9/ready" data-panel-form><input type="hidden" name="ready" value="1"><button class="fg-button fg-button--primary" type="submit">Looks good</button>', html)
+        self.assertLess(html.index("Looks good"), html.index('href="/open/5"'))
+        self.assertIn("Most applications don’t need one.", html)
+        self.assertIn("It doesn’t count toward your 10 this month.", html)
+        self.assertIn('action="/tailor/9/letter" data-panel-form="letter"><button class="fg-button fg-button--secondary" type="submit">Write a cover letter</button>', html)
+
+    def test_the_letter_section_in_each_state(self):
+        self.body = self.review_body({"state": "writing"})
+        html = self.client.get("/prep/5").get_data(as_text=True)
+        self.assertIn('data-poll="/tailor/9/letter/status" data-poll-swap="[data-letter]"', html)
+        self.assertIn("Writing your cover letter…", html)
+        self.assertNotIn("Write a cover letter", html)
+        self.body = self.review_body({"state": "ready", "text": "Hello <b>team</b>,\n\n[Your name]", "can_write": False})
+        html = self.client.get("/prep/5").get_data(as_text=True)
+        self.assertIn('aria-labelledby="letter-title-9"', html)                      # the box is named by its heading
+        self.assertIn("Hello &lt;b&gt;team&lt;/b&gt;,", html)                         # the model's words are escaped
+        self.assertIn('data-announce="Your cover letter is ready."', html)
+        self.assertIn('<button class="fg-button fg-button--secondary" type="button" data-copy-letter>Copy<span class="fg-visually-hidden"> cover letter</span></button>', html)
+        self.assertIn("Fill in the bracketed parts; I don’t guess things I don’t know.", html)
+        self.assertNotIn("data-poll", html)
+        self.assertNotIn("Write a cover letter", html)                                # written once: no second button
+        self.body = self.review_body({"state": "error", "message": "I couldn’t write it.", "can_write": True})
+        html = self.client.get("/prep/5").get_data(as_text=True)
+        self.assertIn('role="alert" tabindex="-1" data-letter-focus>I couldn’t write it.', html)
+        self.assertIn(">Try again</button>", html)
+        self.body = self.review_body({"unavailable": True, "can_write": False, "message": "Cover letters aren’t available right now."})
+        html = self.client.get("/prep/5").get_data(as_text=True)
+        self.assertIn("Cover letters aren’t available right now.", html)
+        self.assertNotIn("Write a cover letter</button>", html)
+        self.assertIn('href="/open/5"', html)                                         # apply is always there
+
+    def ready_body(self, **letter):
+        return sample(stage="ready", tid=9, say="You’re ready. I saved these with the job.", letter={
+            "tid": 9, "state": "none", "text": "", "can_write": True, "unavailable": False, "message": "", "chars": 3000, **letter},
+            review={"tid": 9, "total": 1, "kept": 1, "line": "", "changes": [], "empty": "", "not_added": None})
+
+    def test_ready_has_both_files_named_for_the_company_the_letter_and_the_way_back(self):
+        self.body = self.ready_body()
+        html = self.client.get("/prep/5").get_data(as_text=True)
+        self.assertIn("You’re ready. I saved these with the job.", html)
+        self.assertIn('<a class="fg-button fg-button--secondary" href="/tailor/9/resume.pdf" download>Download<span class="fg-visually-hidden"> the PDF of your resume tailored for Juniper &lt;Labs&gt;</span></a>', html)
+        self.assertIn('href="/tailor/9/resume.docx" download>Download<span class="fg-visually-hidden"> the Word file of your resume tailored for Juniper &lt;Labs&gt;</span>', html)
+        self.assertIn('action="/tailor/9/ready" data-panel-form><input type="hidden" name="ready" value="0"><button class="fg-button fg-button--secondary" type="submit">Back to the changes</button>', html)
+        self.assertIn("The posting opens on Ashby in a new tab. When you’re back, I’ll ask if you applied.", html)
+        self.assertIn("data-tailored", html)                                          # the page marks the row Tailored
+        self.assertIn('<li class="fg-step is-done"><span class="fg-step-num" aria-hidden="true">1</span>Prep', html)
+        self.assertIn('aria-current="step"><span class="fg-step-num" aria-hidden="true">3</span>Apply', html)
+        self.assertIn("Write a cover letter</button>", html)                          # a letter can still be asked for here
+        self.assertNotIn("Looks good", html)
+
+    def test_looks_good_and_back_to_the_changes(self):
+        self.assertEqual(self.client.post("/tailor/9/ready", data={"ready": "1"}).status_code, 200)
+        self.assertEqual(self.client.post("/tailor/9/ready", data={"ready": "0"}).status_code, 200)
+        self.assertEqual(self.readied, [(9, True), (9, False)])
+        self.assertEqual(self.client.post("/tailor/9/ready", data={"ready": "x"}).status_code, 404)
+        self.found_change = False
+        self.assertEqual(self.client.post("/tailor/9/ready", data={"ready": "1"}).status_code, 404)
+
+    def test_a_letter_is_started_once_when_allowed(self):
+        self.row["status"] = "ready"
+        self.assertEqual(self.client.post("/tailor/9/letter").status_code, 200)
+        self.assertEqual(self.letter_started, [9])
+        self.letters = False
+        self.assertEqual(self.client.post("/tailor/9/letter").status_code, 200)
+        self.assertEqual(self.letter_started, [9])    # the month's spend is used up: nothing starts, the panel says so
+        self.row = None
+        self.assertEqual(self.client.post("/tailor/9/letter").status_code, 404)
+
+    def test_the_tailoring_status_does_not_wait_for_a_letter_but_the_letter_status_does(self):
+        self.row.update(status="ready", letter_state="writing")
+        self.assertEqual(self.client.get("/tailor/9").status_code, 200)          # Review opens while the letter is still coming
+        self.assertEqual(self.client.get("/tailor/9/letter/status").status_code, 204)
+        self.row.update(letter_state="ready")
+        self.assertEqual(self.client.get("/tailor/9/letter/status").status_code, 200)
+        self.row = None
+        self.assertEqual(self.client.get("/tailor/9/letter/status").status_code, 404)
+
+    def test_edits_to_the_letter_are_saved_cleaned_and_only_for_the_owner(self):
+        self.assertEqual(self.client.post("/tailor/9/letter/save", data={"letter": "Hi \x00 there\r\n\r\n\r\n\r\nBye"}).status_code, 204)
+        self.assertEqual(self.saved_letters, [(9, "Hi  there\n\nBye")])
+        self.assertEqual(self.client.post("/tailor/9/letter/save", data={"letter": "   "}).status_code, 404)   # never saves an empty letter
+        self.found_change = False
+        self.assertEqual(self.client.post("/tailor/9/letter/save", data={"letter": "Hello"}).status_code, 404)
+
+    def test_files_come_only_from_a_ready_tailoring_the_person_said_looks_good_to(self):
+        structure = {"header": ["Ada Lovelace"], "summary": "Designer.", "experience": [], "skills": [], "education": [], "other": []}
+        self.row.update(status="ready", source=structure, changes=[], posting_id=5, ready_at="t", applied_at=None, letter="Hello,\n[Your name]")
+        pdf = self.client.get("/tailor/9/resume.pdf")
+        self.assertEqual((pdf.status_code, pdf.mimetype, pdf.data[:4]), (200, "application/pdf", b"%PDF"))
+        self.assertEqual(pdf.headers["Content-Disposition"], 'attachment; filename="ada-lovelace-resume-juniper-labs.pdf"')
+        self.assertEqual(pdf.headers["Cache-Control"], "no-store")
+        word = self.client.get("/tailor/9/resume.docx")
+        self.assertEqual((word.status_code, word.data[:2]), (200, b"PK"))
+        self.assertTrue(word.headers["Content-Disposition"].endswith('.docx"'))
+        text = self.client.get("/tailor/9/letter.txt")
+        self.assertEqual((text.status_code, text.get_data(as_text=True)), (200, "Hello,\n[Your name]\n"))
+        self.row.update(ready_at=None)                       # back to the changes: nothing to download
+        for url in ("/tailor/9/resume.pdf", "/tailor/9/resume.docx", "/tailor/9/letter.txt"):
+            self.assertEqual(self.client.get(url).status_code, 404, url)
+        self.row.update(applied_at="t")                      # but once it went with an application, it stays
+        self.assertEqual(self.client.get("/tailor/9/resume.pdf").status_code, 200)
+        self.row.update(status="cancelled")
+        self.assertEqual(self.client.get("/tailor/9/resume.pdf").status_code, 404)
+        self.row = None
+        self.assertEqual(self.client.get("/tailor/9/resume.pdf").status_code, 404)

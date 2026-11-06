@@ -1504,6 +1504,24 @@ button.fg-link {
   .fg-panel-actions .fg-button { flex: 1 1 0; }
 }
 
+/* ---------- Text area, files and letter (SC-72) ---------- */
+/* A text area is an input that grows: the same field look, free text left-aligned, taller, resized only up and down. */
+.fg-textarea {
+  display: block;
+  min-height: calc(var(--fg-size-touch-target) * 3);
+  line-height: var(--fg-font-line-height-body);
+  text-align: left;
+  resize: vertical;
+}
+.fg-files { display: flex; flex-direction: column; gap: var(--fg-space-3); }
+.fg-files .fg-file-row {
+  padding: var(--fg-space-3);
+  background: var(--fg-color-surface-card);
+  border: 1px solid var(--fg-color-border-subtle);
+  border-radius: var(--fg-radius-sm);
+}
+.fg-letter { display: flex; flex-direction: column; gap: var(--fg-space-3); }
+
 /* ---------- Requirement list (SC-72) ---------- */
 /* What a posting asks for, one per line, each marked against the person's resume: a filled check (in your resume), a
    dashed ring (not in your resume) or a dot (not checked, because there is no resume yet). The words say it too, so
