@@ -64,14 +64,18 @@ def term_regex(phrase):
 
 def covered(requirements, text):
     """How many of these requirements appear in the text: a requirement counts when any of its terms does."""
-    hit = 0
+    return sum(covered_flags(requirements, text))
+
+
+def covered_flags(requirements, text):
+    """For each requirement, in order, whether the text names it (the same test as `covered`)."""
+    flags = []
     for req in requirements:
-        for term in req.get("terms") or ():
-            phrase = skill_phrase(term)
-            if phrase and re.search(term_regex(phrase), text, re.IGNORECASE):
-                hit += 1
-                break
-    return hit
+        flags.append(any(
+            (phrase := skill_phrase(term)) and re.search(term_regex(phrase), text, re.IGNORECASE)
+            for term in req.get("terms") or ()
+        ))
+    return flags
 
 
 def level_points(posting_title, person_level):

@@ -279,14 +279,14 @@
 {% macro day(label, count) -%}
 <div class="fg-day-head"><h2 class="fg-day-label">{{ label }} <span class="fg-day-count">· {{ count }}</span></h2><span class="fg-day-rule" aria-hidden="true"></span></div>
 {%- endmacro %}
-{% macro job(id, title, href, company, place, state_top, state_bottom="", viewed=False, pay="", skills="", mono="", tint="sage", fit_score=0) -%}
+{% macro job(id, title, href, company, place, state_top, state_bottom="", viewed=False, pay="", skills="", mono="", tint="sage", fit_score=0, panel=False) -%}
 <li class="fg-job" id="{{ id }}">
   <div class="fg-job-lead">
     {%- if mono %}
     <span class="fg-mono fg-mono--{{ tint }}" aria-hidden="true">{{ mono }}</span>
     {%- endif %}
     <p class="fg-job-company">{{ company }}</p>
-    <p class="fg-job-title"><a class="fg-job-link" href="{{ href }}" target="_blank" rel="noopener">{{ title }}</a></p>
+    <p class="fg-job-title"><a class="fg-job-link" href="{{ href }}" target="_blank" rel="noopener"{% if panel %} aria-controls="apply-panel"{% endif %}>{{ title }}</a></p>
     <p class="fg-job-subline">{{ place }}</p>
     <p class="fg-job-pay">{{ pay or "\u00a0" }}</p>
     {%- if skills %}
@@ -307,6 +307,24 @@
     <div class="fg-job-action" data-action>{{ caller() }}</div>
     {%- endif %}
   </div>
+</li>
+{%- endmacro %}
+
+{#- One requirement in a requirement list (inside <ul class="fg-reqs">): mark = yes (in the resume), no (not in it) or
+    unknown (nothing to check against); state = the words for the mark, empty for unknown. -#}
+{% macro req(text, mark, state="") -%}
+<li class="fg-req">
+  {%- if mark == "yes" %}
+  <svg class="fg-req-mark" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor"/><path class="fg-req-tick" d="M6 10.3L8.6 12.9L14 7.3" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  {%- elif mark == "no" %}
+  <svg class="fg-req-mark fg-req-mark--no" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8.25" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2.4"/></svg>
+  {%- else %}
+  <svg class="fg-req-mark fg-req-mark--no" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="3" fill="currentColor"/></svg>
+  {%- endif %}
+  <span>{{ text }}</span>
+  {%- if state %}
+  <span class="fg-req-state">{{ state }}</span>
+  {%- endif %}
 </li>
 {%- endmacro %}
 

@@ -25,6 +25,7 @@
   <script src="/field-guide/js/toast.js" defer></script>
   <script src="/field-guide/js/job.js" defer></script>
   <script src="/field-guide/js/return.js" defer></script>
+  <script src="/field-guide/js/panel.js" defer></script>
   <style>
     /* Layout follows Figma "Scout Job Discovery Dashboard" (226:849): a Sage band
        with topographic contours behind the header, then the list on the page surface inside a raised board. Each
@@ -33,6 +34,45 @@
     body {
       position: relative;
       padding: 0 var(--fg-space-4) var(--fg-space-6); /* the page header sets the top space, as on every page */
+    }
+    /* The page itself never scrolls (SC-72): the list, and the panel when one is open, scroll inside their own panes, tops
+       aligned. The first scroll in either folds Scout's line up and slims the header (body.is-collapsed, set by panel.js);
+       the Sage band shortens but stays behind the tops of the panes. Back at the top, the full header returns. */
+    body.fg-page {
+      box-sizing: border-box;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    body > .fg-header { flex: none; transition: padding 220ms ease; }
+    .fg-wordmark { transition: font-size 220ms ease; }
+    .band { transition: height 220ms ease; }
+    .voice-wrap { flex: none; overflow: hidden; max-height: 160px; transition: max-height 220ms ease, opacity 160ms ease; }
+    .is-collapsed > .fg-header { padding-block: var(--fg-space-2); }
+    .is-collapsed .fg-wordmark { font-size: var(--fg-font-size-2xl); }
+    .is-collapsed .voice-wrap { max-height: 0; opacity: 0; }
+    .is-collapsed .band { height: 120px; }
+    @media (prefers-reduced-motion: reduce) { body > .fg-header, .fg-wordmark, .band, .voice-wrap, .workspace { transition: none; } }
+
+    /* The board and, once a card is opened, the panel beside it. The panel pushes the list: no modal, no scrim. */
+    .workspace {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      align-items: stretch;
+      gap: var(--fg-space-4);
+      margin-top: calc(var(--fg-space-8) + var(--fg-space-1));
+      transition: margin-top 220ms ease;
+    }
+    .voice-wrap + .workspace { margin-top: var(--fg-space-6); }
+    .is-collapsed .workspace, .is-collapsed .voice-wrap + .workspace { margin-top: var(--fg-space-2); }
+    .workspace > .fg-panel { flex: 0 0 480px; max-width: none; animation: fg-slide 220ms ease; }
+    @media (prefers-reduced-motion: reduce) { .workspace > .fg-panel { animation: none; } }
+    /* Phone: the panel is a full screen sheet (below the toast, which stays visible). */
+    @media (max-width: 680px) {
+      .workspace > .fg-panel { position: fixed; inset: 0; z-index: 10; flex: none; border: 0; border-radius: 0; }
     }
     body > :not(.band):not(.fg-toast-region) { position: relative; z-index: 1; }
 
@@ -59,8 +99,10 @@
     body > .fg-header { padding-inline: var(--fg-space-6); }
 
     .board {
-      margin-top: calc(var(--fg-space-8) + var(--fg-space-1));
-      padding: var(--fg-space-2) var(--fg-space-6) var(--fg-space-6);
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: auto;
+      padding: 0 var(--fg-space-6) var(--fg-space-6);
       background: var(--fg-color-surface-page);
       border: 1px solid var(--fg-color-border-default);
       border-radius: var(--fg-radius-xl);
@@ -129,7 +171,8 @@
       font-size: var(--fg-font-size-2xl);
       line-height: var(--fg-font-line-height-snug);
     }
-    .voice-intro + .board { margin-top: var(--fg-space-6); }
+    /* The tabs stay pinned at the top of the list while it scrolls. */
+    .board > .fg-tabs { position: sticky; top: 0; z-index: 2; background: var(--fg-color-surface-page); padding-top: var(--fg-space-2); }
     /* The caught-up state: Scout's words, with a faint piece of the contour line behind them (decorative). */
     .caught-up {
       position: relative;
@@ -157,7 +200,8 @@
 
     @media (max-width: 680px) {
       body > .fg-header { padding-inline: 0; }
-      .board, .voice-intro + .board { margin-top: var(--fg-space-4); padding: var(--fg-space-1) var(--fg-space-3) var(--fg-space-3); }
+      .board { padding: 0 var(--fg-space-3) var(--fg-space-3); }
+      .workspace, .voice-wrap + .workspace { margin-top: var(--fg-space-4); }
       .voice-intro { padding-inline: 0; font-size: var(--fg-font-size-xl); }
       .caught-up .contour { width: 360px; right: -120px; }
       .more { margin-left: var(--fg-space-3); }
@@ -172,10 +216,11 @@
   {% endcall %}
   <h1 class="fg-visually-hidden">Your jobs</h1>
   {%- if voice and tab == "open" and view == "open" %}
-  <p class="fg-voice voice-intro" data-voice>{{ voice }}</p>
+  <div class="voice-wrap"><p class="fg-voice voice-intro" data-voice>{{ voice }}</p></div>
   {%- endif %}
 
-  <section class="board" aria-label="Your jobs"{% if tab == "open" and view != "hidden" %} data-return-url="/return.json"{% endif %}{% if tab == "open" %} data-hide-board{% endif %}>
+  <div class="workspace" data-workspace>
+  <section class="board" aria-label="Your jobs"{% if tab == "open" and view != "hidden" %} data-return-url="/return.json"{% endif %}{% if tab == "open" %} data-hide-board{% endif %}{% if tab == "open" and view == "open" %} data-panels{% endif %}>
     {{ fg.tabs("Your jobs", [("Open roles", total, "/", tab == "open"), ("Applications", applications|length, "/?tab=applications", tab == "applications")]) }}
     {#- A live region that is always in the page, so a screen reader hears the question when it appears. -#}
     <p class="fg-visually-hidden" role="status" aria-live="polite" id="return-live"></p>
@@ -286,7 +331,7 @@
       {{ fg.day(label, count) }}
       <ul class="fg-job-list">
         {% for p in rows %}
-        {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Discovered on " ~ p.ats_type|capitalize, p.when, p.viewed, skills=p.skill_line, mono=p.mono, tint=p.tint, pay=p.pay, fit_score=p.fit) %}
+        {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, "Discovered on " ~ p.ats_type|capitalize, p.when, p.viewed, skills=p.skill_line, mono=p.mono, tint=p.tint, pay=p.pay, fit_score=p.fit, panel=True) %}
           {%- if p.asking %}{{ ask_actions(p.id) }}{% else %}{{ apply_group(p.id, p.title) }}{% endif %}
         {% endcall %}
         {% endfor %}
@@ -325,6 +370,11 @@
     {% endif %}
     </div>
   </section>
+  {#- SC-72: the panel for one job (Prep), filled from /prep/<id> when a card is opened. Closed until then. -#}
+  {%- if tab == "open" and view == "open" %}
+  <aside class="fg-panel" id="apply-panel" aria-labelledby="panel-title" data-panel hidden></aside>
+  {%- endif %}
+  </div>
   <div class="fg-toast-region" role="status" aria-live="polite" id="toast-region"></div>
 </body>
 </html>

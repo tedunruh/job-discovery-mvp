@@ -480,10 +480,11 @@ def check_return_ask(browser, base, token):
           "Open roles is the selected tab, there are two, and the Status filter is gone")
 
     def open_in_new_tab(job):
-        with ctx.expect_page() as popup:
-            page.locator(f"#posting-{job} a.fg-job-link").click()
-        popup.value.wait_for_load_state("load")
-        popup.value.close()
+        # What Apply does: open /open/<id> in a new tab (the title opens the panel now, SC-72). Going to the address
+        # directly also works for a job that is already asking "Did you apply?", whose own Apply button is gone.
+        tab = ctx.new_page()
+        tab.goto(f"{base}/open/{job}", wait_until="load")
+        tab.close()
 
     def come_back():
         page.bring_to_front()
@@ -641,7 +642,7 @@ def check_return_ask(browser, base, token):
     mp.goto(base + "/", wait_until="load")
     other = mp.evaluate("[...document.querySelectorAll('li.fg-job')].map(li => li.id.replace('posting-', '')).find(id => id !== %s && id !== %s)" % (ids[0], ids[1]))
     with mctx.expect_page() as popup:
-        mp.locator(f"#posting-{other} a.fg-job-link").click()
+        mp.locator(f"#posting-{other} [data-apply]").click()   # Apply opens the posting in a new tab
     popup.value.wait_for_load_state("load")
     popup.value.close()
     mp.bring_to_front()
@@ -1107,6 +1108,71 @@ def check_filter_menus(page, w):
         check(closed, f"Escape closes filter menu  [#{fid} @{w}]")
 
 
+def check_panel(browser, base, token):
+    """The panel beside the list (SC-72). The page itself never scrolls: the list and the panel scroll in their own panes,
+    tops aligned. Clicking a card's title opens the panel instead of the posting (nothing else opens), moves focus to its
+    heading and gives the card the Forest edge; the first scroll folds Scout's line and slims the header, and the full
+    header returns at the top; Close (only Close) shuts it and returns focus to that card; on a phone the panel is a
+    full screen sheet that does not overflow."""
+    for (w, h) in ((1280, 900), (390, 844)):
+        mobile = w < MOBILE_MAX_WIDTH
+        tag = f"@{w}"
+        ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=mobile, has_touch=mobile)
+        ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+        page = ctx.new_page()
+        page.goto(base + "/", wait_until="load")
+        rows = page.evaluate("document.querySelectorAll('li.fg-job').length")
+        check(rows > 0, f"the dashboard has jobs to open in a panel  [{tag}]")
+        if not rows:
+            ctx.close()
+            continue
+        scroll_h = page.evaluate("document.documentElement.scrollHeight - innerHeight")
+        check(scroll_h <= 1, f"the page itself does not scroll  [{tag}]", f"{scroll_h}px taller than the window")
+        first = page.locator("li.fg-job").first
+        row_id = first.get_attribute("id")
+        first.locator(".fg-job-link").click()
+        page.wait_for_selector("#apply-panel:not([hidden]) [data-panel-title]")
+        settle(page)   # the panel slides in: measure it where it ends up
+        check(len(ctx.pages) == 1, f"a card's title opens the panel, not the posting in a new tab  [{tag}]", f"{len(ctx.pages)} tabs")
+        check(page.evaluate("document.activeElement.id") == "panel-title", f"opening the panel moves focus to its heading  [{tag}]")
+        check(page.evaluate("[...document.querySelectorAll('.fg-job.is-selected')].map(r => r.id)") == [row_id],
+              f"exactly the open card is selected  [{tag}]")
+        apply_text = page.evaluate("document.querySelector('#apply-panel a[href^=\"/open/\"]').textContent.trim()")
+        check(apply_text.startswith("Apply") and "opens the posting in a new tab" in apply_text,
+              f"the panel has Apply with a full accessible name  [{tag}]", apply_text)
+        over = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
+        check(over <= 0, f"no horizontal overflow with the panel open  [{tag}]", f"{over}px")
+        rect = page.evaluate("(() => { const r = document.getElementById('apply-panel').getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; })()")
+        if mobile:
+            check(abs(rect[0]) <= 1 and abs(rect[1]) <= 1 and abs(rect[2] - w) <= 1 and abs(rect[3] - h) <= 1,
+                  f"on a phone the panel is a full screen sheet  [{tag}]", f"{rect} vs {w}x{h}")
+        else:
+            tops = page.evaluate("[document.querySelector('.board').getBoundingClientRect().top, document.getElementById('apply-panel').getBoundingClientRect().top]")
+            check(abs(tops[0] - tops[1]) <= 1, f"the list and the panel have their tops aligned  [{tag}]", f"{tops}")
+            edge = page.evaluate("[getComputedStyle(document.getElementById('%s')).borderTopColor, getComputedStyle(document.querySelector('#apply-panel .fg-button--primary')).backgroundColor]" % row_id)
+            check(edge[0] == edge[1], f"the open card has the Forest edge  [{tag}]", f"{edge}")
+            # the scroll fold: first scroll folds Scout's line and slims the header; the top brings it all back
+            page.mouse.move(400, 500)
+            page.mouse.wheel(0, 600)
+            page.wait_for_timeout(500)
+            folded = page.evaluate("document.body.classList.contains('is-collapsed')")
+            check(folded, f"the first scroll folds Scout's line and slims the header  [{tag}]")
+            voice = page.evaluate("document.querySelector('.voice-wrap') ? document.querySelector('.voice-wrap').getBoundingClientRect().height : 0")
+            check(voice <= 1, f"...Scout's line is folded away  [{tag}]", f"{voice}px")
+            tops = page.evaluate("[document.querySelector('.board').getBoundingClientRect().top, document.getElementById('apply-panel').getBoundingClientRect().top]")
+            check(abs(tops[0] - tops[1]) <= 1, f"...and the tops are still aligned  [{tag}]", f"{tops}")
+            check(page.evaluate("document.documentElement.scrollHeight - innerHeight") <= 1, f"...and the page still does not scroll  [{tag}]")
+            page.mouse.wheel(0, -2000)
+            page.wait_for_timeout(500)
+            check(not page.evaluate("document.body.classList.contains('is-collapsed')"), f"back at the top the full header returns  [{tag}]")
+        page.locator("#apply-panel [data-panel-close]").click()
+        page.wait_for_selector("#apply-panel", state="hidden")
+        check(page.evaluate("document.activeElement.closest('li.fg-job') && document.activeElement.closest('li.fg-job').id") == row_id,
+              f"Close returns focus to the card  [{tag}]")
+        check(page.evaluate("document.querySelectorAll('.fg-job.is-selected').length") == 0, f"nothing is selected once it is closed  [{tag}]")
+        ctx.close()
+
+
 def snapshot_styles(page):
     return page.evaluate(
         """
@@ -1150,6 +1216,7 @@ def main():
             check_signin_states(browser, base)
             check_return_ask(browser, base, token)
             check_hide(browser, base, token)
+            check_panel(browser, base, token)
             check_elevated(browser, base, token)
             check_pay(browser, base, token)
             check_alerts_switch_no_js(browser, base, token)

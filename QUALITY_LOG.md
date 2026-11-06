@@ -1416,3 +1416,34 @@ reason menu. Button set gains `Style=Suggested` (Default, Disabled, Working). Jo
 Suggested, Hide is Secondary.
 **Note:** the container was reset; the local check DB was rebuilt from `db/schema.sql` and seeded
 with sample postings (local only), so the dashboard checks have rows again.
+
+### 2026-11-06 — SC-72 slice 1: the panel beside the list, and Prep
+**What shipped:** clicking a job's title opens a panel beside the list (it pushes the list; no modal, no scrim; the open card gets the
+Forest edge) that says how you line up: Scout's line ("You cover 3 of the 4 things they list."), the fit pips, what the posting asks for
+marked In your resume / Not in your resume, and What I'd lead with (the top three covered requirements, by name). It is made from what is
+already stored (the SC-70 requirements read, the resume text, skills and titles), so it costs nothing; a role whose requirements are not
+read yet queues the ordinary background read. States: no resume (requirements without marks, Add your resume, Apply), no posting text,
+still reading. Apply on a card and in the panel opens the posting; the panel stays open. The page no longer scrolls: the list and the panel
+scroll in their own panes with their tops aligned, and the first scroll folds Scout's line and slims the header. Focus rules: opening moves
+focus to the panel heading, Close returns it to the card, and when a row leaves (Yes or Hide) focus goes to the next row's title link and an
+open panel moves to that job ("Job hidden. Now showing Evolve."); Undo returns the row and focus. Phone: the panel is a full screen sheet.
+New in Field Guide: Panel, Requirement list, selected Job card (with gallery rows and README rows), `js/panel.js`. Not in this slice
+(next PRs): Tailor my resume, Review, cover letter, Ready, PDF and Word, the Tailored marker, limits.
+**Rework count:** 0 reached Ted so far. **Root causes of rework caught by the checks before it got to him:**
+1. *A behaviour change made two old checks wrong.* A title link used to open the posting in a new tab; it now opens the panel, so the
+   "come back from a job" checks waited for a tab that never came. They now open the posting the way Apply does.
+2. *An entrance animation on a component that is also drawn still in the gallery.* The panel slid in from 24px to the right, so the
+   three static specimens made the page 8px wider than a phone while they loaded, and the "mobile page reports true width" check failed.
+   Only the page's own panel animates now.
+3. *Measured a moving thing.* The new phone-sheet check read the panel's box while it was still sliding in (11px off), so it failed on a
+   panel that was right. It waits for the animation to finish first, like the login artwork check.
+**Standing checks added:**
+- [x] Automated (`check_panel`, at 1280 and 390): the page itself does not scroll; a title opens the panel and not a new tab; focus
+      moves to the heading; exactly the open card is selected and has the Forest edge; Apply has its full accessible name; no horizontal
+      overflow; list and panel tops aligned; the first scroll folds Scout's line and the tops stay aligned; the top brings it back; Close
+      returns focus to the card; a phone's panel fills the screen.
+- [x] Automated: `tests/test_prep.py` (Scout's line, marks, lead-with, every state, escaping of posting text, sign-in).
+- [x] Looked at by hand in the browser against a Neon branch: hiding the card the panel shows moves focus and the panel together and the
+      toast says so once; Undo returns the row and its focus; the toast never takes focus.
+- [ ] Not done: Figma mirror of Panel and Requirement list (code is ahead of Figma until it is synced). "Viewed" still means the posting
+      was opened (Apply), so opening a panel does not mark a job viewed. The Applications, Viewed and Hidden lists do not open panels.

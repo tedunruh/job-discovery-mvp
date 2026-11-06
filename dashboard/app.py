@@ -49,6 +49,7 @@ from dashboard.profile import ask_for_catch_up
 from dashboard.requirements import queue as queue_reads
 from dashboard.return_ask import choose_asks
 from dashboard.skill_filter import apply_skill_cutoff
+from dashboard.prep import register as register_prep
 from dashboard.profile import register as register_profile_screens
 from dashboard.resume import register as register_resume
 from role_categories import (
@@ -170,6 +171,7 @@ def require_login(view):
 
 register_profile_screens(app, require_login)
 register_resume(app, require_login)
+register_prep(app, require_login)
 
 
 def humanize_posted_at(dt):

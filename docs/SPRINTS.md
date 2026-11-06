@@ -74,6 +74,17 @@ lines appeared: both are fixed in `quality_check.py`); a ranking nobody asked fo
 
 Not done / yours: SC-20 (pricing question to users), SC-27 (alpha check-ins).
 
+## Sprint 4 (in progress; chat "Scout — 2026 Q4 Sprint 4")
+**SC-72, Apply with Scout, built in three PRs.** Decisions (Ted, 11/6): three PRs with the panel first; tailored files are PDF and Word
+generated fresh in a Scout style (pure-Python libraries, so the pip-only Render build keeps working); Sonnet 5.5 writes the tailored resume
+and letter (reading stays on Haiku 5.5); 10 tailorings per person per month as the starting number.
+1. **Panel and Prep (built, in review):** the panel beside the list, Prep from stored data with no model call, the scroll fold, the focus
+   rules, the phone sheet, the edge states. Branch `sc-72-panel-prep`.
+2. **Tailor and Review (next):** a structured resume read, the tailor call with a validator that rejects anything not in the resume
+   (numbers, names, skills), per-person and Scout-wide caps, every call logged, Review with Undo and Redo and "Not added".
+3. **Letter, Ready and export:** the optional cover letter (placeholders for unknowns, can be written later without using up the limit),
+   PDF and Word, saved with the job, the Tailored marker, and the files saved with the application when you answer Yes.
+
 ## Open items for the next sprint
 - **Build SC-64** (check-in pushes and the Did you hear back / Should I close it rows). It needs a card of its own and
   the "What did they say?" menu and stages from the pipeline mock (Interview, Offer, Not moving forward) for the Yes

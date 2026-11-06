@@ -1,0 +1,48 @@
+{#- The inside of the panel beside the list (SC-72, Prep). Drawn on the server for one job; the page puts it in
+    <aside id="apply-panel">. `prep` comes from dashboard/prep.py. Every state keeps Apply. -#}
+{% import "_fg.html" as fg %}
+<div class="fg-panel-head">
+  <span class="fg-mono fg-mono--{{ prep.tint }}" aria-hidden="true">{{ prep.mono }}</span>
+  <p class="fg-panel-company">{{ prep.company }}</p>
+  <h2 class="fg-panel-title" id="{{ heading_id|default('panel-title') }}" tabindex="-1" data-panel-title>{{ prep.title }}</h2>
+  <button class="fg-icon-button" type="button" aria-label="Close" data-panel-close><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3.5 3.5l11 11M14.5 3.5l-11 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+</div>
+<div class="fg-panel-body">
+  <p class="fg-voice">{{ prep.say }}</p>
+  {%- if prep.fit %}
+  <div class="fg-panel-fit">{{ fg.fit(prep.fit.pips) }}<span class="fg-panel-help">My estimate from the posting and your resume, not the employer’s screen.</span></div>
+  {%- endif %}
+  {%- if prep.requirements %}
+  <section class="fg-panel-sec" aria-labelledby="panel-reqs-title-{{ prep.id }}">
+    <h3 class="fg-panel-sec-title" id="panel-reqs-title-{{ prep.id }}">What they’re asking for</h3>
+    <ul class="fg-reqs">
+      {%- for r in prep.requirements %}
+      {{ fg.req(r.text, r.mark, r.state) }}
+      {%- endfor %}
+    </ul>
+  </section>
+  {%- endif %}
+  {%- if prep.lead %}
+  <section class="fg-panel-sec" aria-labelledby="panel-lead-title-{{ prep.id }}">
+    <h3 class="fg-panel-sec-title" id="panel-lead-title-{{ prep.id }}">What I’d lead with</h3>
+    <ul class="fg-panel-list">
+      {%- for line in prep.lead %}
+      <li>{{ line }}</li>
+      {%- endfor %}
+    </ul>
+  </section>
+  {%- endif %}
+</div>
+<div class="fg-panel-foot">
+  {%- if prep.message %}
+  <p class="fg-message fg-message--discovery">{{ prep.message }}</p>
+  {%- endif %}
+  <div class="fg-panel-actions">
+    {%- if prep.state == "no_resume" %}
+    <a class="fg-button fg-button--primary" href="/profile">Add your resume</a>
+    <a class="fg-button fg-button--secondary" href="/open/{{ prep.id }}" target="_blank" rel="noopener">Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a>
+    {%- else %}
+    <a class="fg-button fg-button--primary" href="/open/{{ prep.id }}" target="_blank" rel="noopener">Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a>
+    {%- endif %}
+  </div>
+</div>

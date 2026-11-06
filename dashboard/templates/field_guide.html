@@ -639,6 +639,41 @@
     </div>
   </section>
 
+  <section class="spec spec--stack" data-component="job-selected">
+    <div>
+      <h3>Job card: selected, and beside a panel</h3>
+      <p class="spec-use">The card whose panel is open gets the Forest edge (and aria-current), so it is clear which job the panel belongs to. While a panel is open the list is narrower: every card stacks, the job on top and its state and actions in one row under it. Selecting never hides the card's own actions; Apply on the card still opens the posting.</p>
+      <code class="spec-code">.fg-job.is-selected · .fg-has-panel (on the workspace that holds the list and the panel)</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide fg-has-panel" style="max-width: 720px; flex: 0 0 100%"><span class="state-label">Selected, in a narrower list</span><ul class="fg-job-list"><li class="fg-job is-selected" aria-current="true" id="g-job-sel"><div class="fg-job-lead"><span class="fg-mono fg-mono--sage" aria-hidden="true">JL</span><p class="fg-job-company">Juniper Labs</p><p class="fg-job-title"><a class="fg-job-link" href="#layout" aria-controls="g-panel-ok">Staff Product Designer, Design Systems</a></p><p class="fg-job-subline">Hybrid, Denver, CO</p><p class="fg-job-pay">$172,000 - $205,000</p><p class="fg-job-fit">{{ fg.fit(4) }}</p></div><div class="fg-job-second"><div class="fg-job-state"><p>Discovered on Ashby</p><p class="fg-job-when">9:40 AM</p></div><div class="fg-job-action"><span class="fg-job-group"><a class="fg-button fg-button--suggested" href="#layout">Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a><button class="fg-button fg-button--secondary" type="button">Hide</button></span></div></div></li></ul></div>
+    </div>
+  </section>
+
+  <section class="spec spec--stack" data-component="panel">
+    <div>
+      <h3>Panel</h3>
+      <p class="spec-use">Use to show more about one job beside the list, so a person can decide without leaving it. It pushes the list (no modal, no scrim). The head holds the monogram, company, title and Close; the body scrolls on its own; the foot holds the actions and always has Apply. Scout never opens or closes it on a person's behalf: a card's title opens it, only Close shuts it, and Apply keeps it open. Opening moves focus to the title; Close returns it to the card. On a phone the page makes it a full screen sheet. Prep is the first step: how you line up (Scout's line, the fit, what they ask for, what to lead with). It is Scout's estimate, never an employer's screen.</p>
+      <code class="spec-code">.fg-panel .fg-panel-head .fg-panel-company .fg-panel-title .fg-panel-body .fg-panel-fit .fg-panel-help .fg-panel-sec .fg-panel-sec-title .fg-panel-list .fg-panel-foot .fg-panel-actions · inside: _prep_panel.html</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide" style="max-width: 480px; flex: 0 0 100%"><span class="state-label">Prep: you line up</span><div class="fg-panel" id="g-panel-ok">{% with heading_id="g-panel-ok-title", prep={"id": "g1", "company": "Juniper Labs", "title": "Staff Product Designer, Design Systems", "mono": "JL", "tint": "sage", "state": "ok", "say": "You cover 2 of the 3 things they list.", "message": "", "fit": {"pips": 4}, "requirements": [{"text": "Design systems experience", "mark": "yes", "state": "In your resume"}, {"text": "Figma", "mark": "yes", "state": "In your resume"}, {"text": "Working knowledge of React", "mark": "no", "state": "Not in your resume"}], "lead": ["Design systems experience. They list it, and your resume mentions it.", "Figma. They list it, and your resume mentions it."]} %}{% include "_prep_panel.html" %}{% endwith %}</div></div>
+      <div class="state state--wide" style="max-width: 480px; flex: 0 0 100%"><span class="state-label">Prep: no resume yet (requirements shown without marks, Add your resume first, Apply still there)</span><div class="fg-panel">{% with heading_id="g-panel-nr-title", prep={"id": "g2", "company": "Northwind Health", "title": "Senior Product Designer", "mono": "NH", "tint": "forest", "state": "no_resume", "say": "Here’s what they’re asking for.", "message": "I need your resume to check your fit and tailor it. It takes about a minute.", "fit": none, "requirements": [{"text": "5+ years of product design", "mark": "unknown", "state": ""}, {"text": "Prototyping in Figma", "mark": "unknown", "state": ""}], "lead": []} %}{% include "_prep_panel.html" %}{% endwith %}</div></div>
+      <div class="state state--wide" style="max-width: 480px; flex: 0 0 100%"><span class="state-label">Prep: the posting can't be read (no fit, no marks; Apply is the one action)</span><div class="fg-panel">{% with heading_id="g-panel-nt-title", prep={"id": "g3", "company": "Cedar Systems", "title": "Principal Designer", "mono": "CS", "tint": "gold", "state": "no_text", "say": "I couldn’t read this posting, so I can’t check your fit or tailor for it.", "message": "", "fit": none, "requirements": [], "lead": []} %}{% include "_prep_panel.html" %}{% endwith %}</div></div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="requirements">
+    <div>
+      <h3>Requirement list</h3>
+      <p class="spec-use">Use to list what a posting asks for, one line each, marked against the person's resume. A filled check means it is in the resume, a dashed ring means it is not, and a dot means nothing was checked (no resume yet). The words say it too, so a mark is never the only signal. A missing requirement is information, not a failure: say it plainly and don't colour it as an error.</p>
+      <code class="spec-code">{% raw %}{{ fg.req(text, mark, state) }}{% endraw %} · .fg-reqs .fg-req .fg-req-mark .fg-req-mark--no .fg-req-tick .fg-req-state</code>
+    </div>
+    <div class="states">
+      <div class="state state--wide" style="max-width: 480px; flex: 0 0 100%"><span class="state-label">In your resume, not in your resume, and not checked</span><ul class="fg-reqs">{{ fg.req("Built a design system across products", "yes", "In your resume") }}{{ fg.req("Working knowledge of React", "no", "Not in your resume") }}{{ fg.req("Prototyping in Figma", "unknown") }}</ul></div>
+    </div>
+  </section>
+
   <section class="spec" data-component="mono">
     <div>
       <h3>Company monogram</h3>

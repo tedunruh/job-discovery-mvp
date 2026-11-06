@@ -592,6 +592,18 @@ def get_unread_postings(conn, posting_ids, limit):
         return cur.fetchall()
 
 
+def get_posting_prep(conn, posting_id):
+    """(has stored text, requirements) for one open role, or None when there is no such open role. Requirements are
+    None until they are read, and [] when they were read and nothing usable was found (see get_requirements)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT COALESCE(description, '') <> '', requirements FROM postings WHERE id = %s AND status = 'open'",
+            (posting_id,),
+        )
+        row = cur.fetchone()
+    return (row[0], row[1]) if row else None
+
+
 def set_requirements(conn, posting_id, requirements):
     """Store a role's requirements and when they were read. Caller commits."""
     with conn.cursor() as cur:
