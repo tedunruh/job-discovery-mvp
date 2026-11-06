@@ -47,7 +47,9 @@ Shipped (details and root causes in `QUALITY_LOG.md`):
   skills minimum on the profile uses the stored text.
 - **Open roles and Applications (SC-58, SC-63, SC-59, SC-69):** two tabs; "Did you apply?" when you come back
   from a job; Yes moves it to Applications with a toast and Undo; Hide with an optional reason; day groups (Today,
-  Yesterday, Earlier this week, Last week), company monograms, Scout's line, and a warmer empty state.
+  Yesterday, Earlier this week, Last week), company monograms, Scout's line, and a warmer empty state. Added at
+  the close: every opened job keeps asking "Did you apply?" until answered (it used to expire after 24 hours and
+  only the latest asked), and a "Viewed jobs" list of what you opened, last opened first, ignoring the filters.
 - **Pay and fit (SC-71, SC-70):** pay ranges collected from the boards (Ashby, Greenhouse, Lever as data) and read
   from description text elsewhere, with guards for equity, bonus and OTE; a 0 to 10 fit score shown as five pips,
   from the posting's top requirements (read once per role, only for roles on a page someone is shown, capped by
@@ -56,17 +58,19 @@ Shipped (details and root causes in `QUALITY_LOG.md`):
   Neon plan runs out (SC-65); an ATS that starts refusing requests is left alone for the rest of the run (SC-61);
   taps on push alerts are counted (SC-55); the public repo's history no longer names testers (SC-54).
 - **Design system:** Field Guide gained Tabs, Toast, Switch, Progress, Button working, the Job card (desktop and
-  phone), Monogram, Fit and Day heading, all mirrored in Figma; Albert Sans replaced Avenir Next, Parchment became
+  phone), Monogram, Fit and Day heading, a Suggested button and one subtle outline for every outlined action,
+  all mirrored in Figma; Albert Sans replaced Avenir Next, Parchment became
   linen, and Fraunces renders at weight 400 (SC-68).
 - **Designed, not built (SC-64):** how Scout follows a job after you apply: a push on day 5 ("Did you hear back?"),
   a week later again, "Should I close it?" on day 21, never more than one push a day, no weekly digest. Mock on the
   Sprint 3 design canvas; decisions on the SC-64 board card.
 
-Numbers at close: 565 offline tests, 370 browser checks (`scripts/quality_check.py`), about 29k open roles stored, of
-which about 2k have text and the fit score reads more as pages are seen. Collector runs stayed at 8-11 minutes.
+Numbers at close: 575 offline tests, 375 browser checks (`scripts/quality_check.py`), about 29k open roles stored, of
+which about 2k have text and the fit score reads more as pages are seen. Collector runs stayed at 8-12 minutes.
 
 Incidents: Workable refused ~425 requests in one run (SC-61, fixed above); a fit-score check passed or failed with the
-data until it was made independent of wrapped titles and places; a ranking nobody asked for (SC-53) was built and removed.
+data until it was made independent of wrapped titles and places (and its fit-line twin, which went stale the day real fit
+lines appeared: both are fixed in `quality_check.py`); a ranking nobody asked for (SC-53) was built and removed.
 
 Not done / yours: SC-20 (pricing question to users), SC-27 (alpha check-ins).
 
@@ -77,6 +81,8 @@ Not done / yours: SC-20 (pricing question to users), SC-27 (alpha check-ins).
 - **Fit score follow-ups:** sort or filter by fit, a "what matched" detail, use fit to decide alerts. The skills part
   counts hits over all of a person's skills, so people with many skills rarely reach five pips: tune if testers say
   scores run low. A "Pay listed" filter, and Pay as a hide reason, wait on testers.
+- **Viewed jobs / questions:** the question has no cap, so someone who opens many jobs sees many (the heaviest two had
+  about 25 waiting on deploy; Ted: that is how people work, leave it). Watch whether anyone asks for "answer all".
 - Coverage: Lever (thin), ~800 Workable names never validated, the starter-list companies
   that need a manual platform lookup. Workable, Rippling and Workday pay is only read for roles whose text is stored.
 - Alert volume vs. precision: Remote-US Product Design is ~2-4 roles/day; widening Work type
