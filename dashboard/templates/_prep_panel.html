@@ -1,0 +1,188 @@
+{#- The inside of the panel beside the list (SC-72). Drawn on the server for one job; the page puts it in
+    <aside id="apply-panel">. `prep` comes from dashboard/prep.py. prep.stage is prep, working (a tailoring is running)
+    review (its changes, each can be undone) or ready (the files to send). Every stage keeps Apply, and Scout opens or
+    closes nothing itself. -#}
+{% import "_fg.html" as fg %}
+{%- set stage = prep.stage|default("prep") %}
+<div class="fg-panel-head">
+  <span class="fg-mono fg-mono--{{ prep.tint }}" aria-hidden="true">{{ prep.mono }}</span>
+  <p class="fg-panel-company">{{ prep.company }}</p>
+  <h2 class="fg-panel-title" id="{{ heading_id|default('panel-title') }}" tabindex="-1" data-panel-title>{{ prep.title }}</h2>
+  <button class="fg-icon-button" type="button" aria-label="Close" data-panel-close><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3.5 3.5l11 11M14.5 3.5l-11 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+</div>
+{{ fg.steps(0 if stage == "prep" else 2 if stage == "ready" else 1) }}
+{%- macro apply(label_hidden=" (opens the posting in a new tab)", kind="primary") %}
+<a class="fg-button fg-button--{{ kind }}" href="/open/{{ prep.id }}" target="_blank" rel="noopener">Apply<span class="fg-visually-hidden">{{ label_hidden }}</span></a>
+{%- endmacro %}
+{#- The cover letter, in Review and Ready (SC-72). One section whose inside is swapped on its own while it is written, so
+    the changes above it keep their place. -#}
+{%- macro letter_section(l, hint=True) %}
+<section class="fg-panel-sec" aria-labelledby="letter-title-{{ l.tid }}" data-letter
+         {%- if l.state == "writing" %} data-poll="/tailor/{{ l.tid }}/letter/status" data-poll-swap="[data-letter]"{% endif %}>
+  <h3 class="fg-panel-sec-title" id="letter-title-{{ l.tid }}">Cover letter</h3>
+  {%- if l.state == "writing" %}
+  <p class="fg-voice" tabindex="-1" data-letter-focus>Writing your cover letter…</p>
+  {{ fg.progress("letter-progress-" ~ l.tid, ["Writing your cover letter…", "Checking it against your resume…"], shown=True) }}
+  {%- elif l.state == "ready" %}
+  <form class="fg-letter" method="post" action="/tailor/{{ l.tid }}/letter/save" data-letter-form>
+    {{ fg.textarea("letter-text-" ~ l.tid, "letter", l.text, "letter-title-" ~ l.tid, maxlength=l.chars) }}
+    <p class="fg-panel-help" id="letter-help-{{ l.tid }}" tabindex="-1" data-letter-focus data-announce="Your cover letter is ready.">A short draft in plain words. Fill in the bracketed parts; I don’t guess things I don’t know.</p>
+    <p class="fg-panel-help" data-letter-saved></p>
+    <div class="fg-panel-actions">
+      <button class="fg-button fg-button--secondary" type="button" data-copy-letter>Copy<span class="fg-visually-hidden"> cover letter</span></button>
+    </div>
+  </form>
+  {%- else %}
+  {%- if l.state == "error" %}
+  <p class="fg-message fg-message--attention" role="alert" tabindex="-1" data-letter-focus>{{ l.message }}</p>
+  {%- elif l.unavailable %}
+  <p class="fg-panel-help">{{ l.message }}</p>
+  {%- else %}
+  <p class="fg-panel-help" tabindex="-1" data-letter-focus>Most applications don’t need one. If this one does, I’ll write a short draft from the resume changes you kept. It doesn’t count toward your {{ prep.tailor_limit|default(10) }} this month.</p>
+  {%- endif %}
+  {%- if l.can_write %}
+  <div class="fg-panel-actions">
+    <form method="post" action="/tailor/{{ l.tid }}/letter" data-panel-form="letter"><button class="fg-button fg-button--secondary" type="submit">{{ "Try again" if l.state == "error" else "Write a cover letter" }}</button></form>
+  </div>
+  {%- endif %}
+  {%- endif %}
+</section>
+{%- endmacro %}
+{%- macro failed() %}
+<p class="fg-message fg-message--attention" role="alert" data-panel-error hidden>That didn’t work. Check your connection and try again.</p>
+{%- endmacro %}
+
+{%- if stage == "working" %}
+<div class="fg-panel-body" data-poll="/tailor/{{ prep.tid }}">
+  <p class="fg-voice" tabindex="-1" data-panel-focus>{{ prep.say }}</p>
+  {{ fg.progress("tailor-progress-" ~ prep.tid, prep.steps, shown=True) }}
+  <div class="fg-panel-work" aria-hidden="true"><span class="fg-skeleton"></span><span class="fg-skeleton"></span><span class="fg-skeleton"></span><span class="fg-skeleton"></span></div>
+  <p class="fg-panel-help">I only reword and reorder what’s in your resume. You’ll see every change before anything is saved.</p>
+</div>
+<div class="fg-panel-foot">
+  {{ failed() }}
+  <div class="fg-panel-actions">
+    <form method="post" action="/tailor/{{ prep.tid }}/cancel" data-panel-form><button class="fg-button fg-button--secondary" type="submit">Cancel</button></form>
+  </div>
+</div>
+
+{%- elif stage == "review" %}
+{%- set r = prep.review %}
+<div class="fg-panel-body">
+  <p class="fg-voice" tabindex="-1" data-panel-focus data-announce="Your changes are ready to review.">{{ prep.say }}</p>
+  {%- if r.total %}
+  <p class="fg-panel-help">I only reworded and reordered what’s already in your resume. Undo anything you don’t want.</p>
+  <section class="fg-panel-sec" aria-labelledby="changes-title-{{ r.tid }}">
+    <div class="fg-panel-sec-head">
+      <h3 class="fg-panel-sec-title" id="changes-title-{{ r.tid }}">Resume changes</h3>
+      <p class="fg-panel-help" data-kept-line>{{ r.line }}</p>
+    </div>
+    <ul class="fg-changes">
+      {%- for c in r.changes %}
+      {{ fg.change(c, "/tailor/" ~ r.tid ~ "/change", r.tid) }}
+      {%- endfor %}
+    </ul>
+  </section>
+  {%- else %}
+  <p class="fg-panel-help">{{ r.empty }}</p>
+  {%- endif %}
+  {%- if r.not_added %}
+  <p class="fg-message fg-message--attention">{{ r.not_added }}</p>
+  {%- endif %}
+  {%- if prep.letter %}
+  {{ letter_section(prep.letter) }}
+  {%- endif %}
+</div>
+<div class="fg-panel-foot">
+  {{ failed() }}
+  <div class="fg-panel-actions">
+    {%- if r.total %}
+    <form method="post" action="/tailor/{{ r.tid }}/ready" data-panel-form><input type="hidden" name="ready" value="1"><button class="fg-button fg-button--primary" type="submit">Looks good</button></form>
+    {{ apply(kind="secondary") }}
+    {%- else %}
+    {{ apply() }}
+    {%- endif %}
+  </div>
+  {%- if r.total %}
+  <p class="fg-panel-help" role="status" data-kept-line>{{ r.line }}</p>
+  {%- endif %}
+</div>
+
+{%- elif stage == "ready" %}
+<div class="fg-panel-body" data-tailored>
+  <p class="fg-voice" tabindex="-1" data-panel-focus data-announce="Your tailored resume is ready to download.">{{ prep.say }}</p>
+  <section class="fg-panel-sec" aria-labelledby="send-title-{{ prep.tid }}">
+    <h3 class="fg-panel-sec-title" id="send-title-{{ prep.tid }}">What you’ll send</h3>
+    <div class="fg-files">
+      {%- call fg.file_row("Resume, PDF", "Tailored for " ~ prep.company) %}<a class="fg-button fg-button--secondary" href="/tailor/{{ prep.tid }}/resume.pdf" download>Download<span class="fg-visually-hidden"> the PDF of your resume tailored for {{ prep.company }}</span></a>{% endcall %}
+      {%- call fg.file_row("Resume, Word", "Tailored for " ~ prep.company) %}<a class="fg-button fg-button--secondary" href="/tailor/{{ prep.tid }}/resume.docx" download>Download<span class="fg-visually-hidden"> the Word file of your resume tailored for {{ prep.company }}</span></a>{% endcall %}
+    </div>
+  </section>
+  {{ letter_section(prep.letter) }}
+</div>
+<div class="fg-panel-foot">
+  {{ failed() }}
+  <div class="fg-panel-actions">
+    {{ apply() }}
+    <form method="post" action="/tailor/{{ prep.tid }}/ready" data-panel-form><input type="hidden" name="ready" value="0"><button class="fg-button fg-button--secondary" type="submit">Back to the changes</button></form>
+  </div>
+  <p class="fg-panel-help">The posting opens{% if prep.source %} on {{ prep.source }}{% endif %} in a new tab. When you’re back, I’ll ask if you applied.</p>
+</div>
+
+{%- else %}
+<div class="fg-panel-body">
+  <p class="fg-voice" tabindex="-1" data-panel-focus>{{ prep.say }}</p>
+  {%- if prep.fit %}
+  <div class="fg-panel-fit">{{ fg.fit(prep.fit.pips) }}<span class="fg-panel-help">My estimate from the posting and your resume, not the employer’s screen.</span></div>
+  {%- endif %}
+  {%- if prep.requirements %}
+  <section class="fg-panel-sec" aria-labelledby="panel-reqs-title-{{ prep.id }}">
+    <h3 class="fg-panel-sec-title" id="panel-reqs-title-{{ prep.id }}">What they’re asking for</h3>
+    <ul class="fg-reqs">
+      {%- for r in prep.requirements %}
+      {{ fg.req(r.text, r.mark, r.state) }}
+      {%- endfor %}
+    </ul>
+  </section>
+  {%- endif %}
+  {%- if prep.lead %}
+  <section class="fg-panel-sec" aria-labelledby="panel-lead-title-{{ prep.id }}">
+    <h3 class="fg-panel-sec-title" id="panel-lead-title-{{ prep.id }}">What I’d lead with</h3>
+    <ul class="fg-panel-list">
+      {%- for line in prep.lead %}
+      <li>{{ line }}</li>
+      {%- endfor %}
+    </ul>
+  </section>
+  {%- endif %}
+</div>
+<div class="fg-panel-foot">
+  {%- if prep.message %}
+  <p class="fg-message fg-message--discovery">{{ prep.message }}</p>
+  {%- endif %}
+  {%- if prep.notice %}
+  <p class="fg-message fg-message--attention" role="alert">{{ prep.notice }}</p>
+  {%- endif %}
+  {{ failed() }}
+  {%- if prep.state == "no_resume" %}
+  <div class="fg-panel-actions">
+    <a class="fg-button fg-button--primary" href="/profile">Add your resume</a>
+    {{ apply(kind="secondary") }}
+  </div>
+  {%- elif prep.tailor and prep.tailor.state == "ok" %}
+  {%- if prep.tailor.letter %}
+  {{ fg.check("letter", "Write a cover letter too", form="tailor-start-" ~ prep.id) }}
+  {%- endif %}
+  <div class="fg-panel-actions">
+    <form id="tailor-start-{{ prep.id }}" method="post" action="/tailor/start/{{ prep.id }}" data-panel-form><button class="fg-button fg-button--primary" type="submit">Tailor my resume</button></form>
+    {{ apply(" without tailoring (opens the posting in a new tab)", "secondary") }}
+  </div>
+  <p class="fg-panel-help">{{ prep.tailor.used }} of {{ prep.tailor.limit }} tailored this month. To write the changes, I send your resume and this posting to Claude.</p>
+  {%- elif prep.tailor %}
+  <p class="fg-message fg-message--attention">{{ prep.tailor.message }}</p>
+  <div class="fg-panel-actions">{{ apply() }}</div>
+  {%- else %}
+  <div class="fg-panel-actions">{{ apply() }}</div>
+  {%- endif %}
+</div>
+{%- endif %}

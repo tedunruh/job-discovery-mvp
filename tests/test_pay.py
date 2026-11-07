@@ -257,7 +257,8 @@ class Stored(unittest.TestCase):
         tail = schema[schema.index("-- SC-71"):]
         for col in ("pay_min NUMERIC(14,2)", "pay_max NUMERIC(14,2)", "pay_currency TEXT", "pay_period TEXT", "pay_source TEXT"):
             self.assertIn(f"ALTER TABLE postings ADD COLUMN IF NOT EXISTS {col};", tail)
-        self.assertNotIn("DROP", tail)
+        # Nothing destroyed: only a CHECK constraint is dropped (SC-72 slice 3 widens tailor_calls.kind), never data.
+        self.assertNotRegex(tail, r"DROP (TABLE|COLUMN|INDEX|SCHEMA)")
 
     def test_queries_read_the_pay_columns(self):
         for fn in (_db.get_open_postings, _db.get_hidden, _db.get_applications):

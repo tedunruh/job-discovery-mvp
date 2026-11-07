@@ -27,6 +27,7 @@ class Base(unittest.TestCase):
         self.rows = [row(1, "Senior Product Designer", 1), row(2, "Product Designer", 2), row(3, "UX Designer", 3)]
         self.applications, self.hidden = [], []
         self.events, self.applied = [], {}
+        self.saved_files, self.tailored, self.kept = {}, set(), []
         profile = {"titles": ["designer"], "level": None, "one_level_up": False, "city": None, "skills": []}
         patches = [
             mock.patch.object(dapp, "get_conn", lambda: mock.MagicMock()),
@@ -42,6 +43,9 @@ class Base(unittest.TestCase):
             mock.patch.object(dapp, "get_hidden", lambda c, u: [dict(h) for h in self.hidden]),
             mock.patch.object(dapp, "get_return_events", lambda c, u: ({}, {})),
             mock.patch.object(dapp, "set_applied", lambda c, pid, flag, uid: self.applied.__setitem__(pid, flag)),
+            mock.patch.object(dapp, "applied_tailorings", lambda c, u: dict(self.saved_files)),
+            mock.patch.object(dapp, "tailored_among", lambda c, u, ids: {i for i in ids if i in self.tailored}),
+            mock.patch.object(dapp, "keep_tailoring_with_application", lambda c, u, pid, flag: self.kept.append((u, pid, flag))),
             mock.patch.object(dapp, "log_event", lambda c, uid, kind, pid=None: self.events.append((kind, pid))),
         ]
         for p in patches:
@@ -115,6 +119,35 @@ class Applications(Base):
         for gone in ("<button", "<form", "data-apply", "Did you apply", "data-action"):
             self.assertNotIn(gone, li)
         self.assertIn('href="/open/9"', li)
+
+    def test_an_application_with_tailored_files_links_them_and_one_without_has_nothing_extra(self):
+        self.applications = [application(9, "Design Lead", 1), application(8, "Staff Designer", 2)]
+        self.saved_files = {9: {"id": 41, "has_letter": True}}
+        html = self.get("/?tab=applications")
+        first = re.search(r'<li class="fg-job" id="posting-9">.*?</li>', html, re.S).group(0)
+        self.assertIn('href="/tailor/41/resume.pdf" download>Resume PDF</a>', first)
+        self.assertIn('href="/tailor/41/resume.docx" download>Word</a>', first)
+        self.assertIn('href="/tailor/41/letter.txt" download>Cover letter</a>', first)
+        self.assertIn('aria-label="Tailored files for Co"', first)
+        second = re.search(r'<li class="fg-job" id="posting-8">.*?</li>', html, re.S).group(0)
+        self.assertNotIn("/tailor/", second)
+        self.assertNotIn("data-action", second)
+        self.saved_files = {9: {"id": 41, "has_letter": False}}
+        self.assertNotIn("letter.txt", self.get("/?tab=applications"))
+
+    def test_a_job_with_a_tailored_resume_says_tailored_after_the_time(self):
+        self.tailored = {2}
+        html = self.get()
+        rows = {i: re.search(rf'<li class="fg-job" id="posting-{i}">.*?</li>', html, re.S).group(0) for i in (1, 2)}
+        self.assertIn("data-tailored-mark", rows[2])
+        self.assertIn("</svg>Tailored</span>", rows[2])
+        self.assertNotIn("Tailored", rows[1])
+        self.assertIn('id="return-tailored-template"', self.client.get("/").get_data(as_text=True))
+
+    def test_yes_saves_the_tailored_files_with_the_application_and_undoing_lets_them_go(self):
+        self.client.post("/set_applied/2", data={"applied": "true"}, headers={"X-Requested-With": "fetch"})
+        self.client.post("/set_applied/2", data={"applied": "false"}, headers={"X-Requested-With": "fetch"})
+        self.assertEqual(self.kept, [(7, 2, True), (7, 2, False)])
 
     def test_open_roles_are_not_listed_there(self):
         self.applications = [application(9, "Design Lead", 1)]

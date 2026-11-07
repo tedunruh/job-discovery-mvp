@@ -74,6 +74,25 @@ lines appeared: both are fixed in `quality_check.py`); a ranking nobody asked fo
 
 Not done / yours: SC-20 (pricing question to users), SC-27 (alpha check-ins).
 
+## Sprint 4 (in progress; chat "Scout — 2026 Q4 Sprint 4")
+**SC-72, Apply with Scout, built in three PRs.** Decisions (Ted, 11/6): three PRs with the panel first; tailored files are PDF and Word
+generated fresh in a Scout style (pure-Python libraries, so the pip-only Render build keeps working); Sonnet 5.5 writes the tailored resume
+and letter (reading stays on Haiku 5.5); 10 tailorings per person per month as the starting number.
+1. **Panel and Prep (built, in review):** the panel beside the list, Prep from stored data with no model call, the scroll fold, the focus
+   rules, the phone sheet, the edge states. Branch `sc-72-panel-prep`.
+2. **Tailor and Review (built, in review):** a structured resume read (Haiku, checked line by line against the PDF), the tailor call (Sonnet
+   5.5) returning edits that code checks (numbers, names, anything the resume lacks), 10 per person per month plus `TAILOR_MONTHLY_CAP_USD`
+   (default 5), every call logged in `tailor_calls`, Working and Review in the panel with Undo and Redo and "Not added". Measured about
+   $0.01 to $0.02 per tailoring. **Apply `db/schema.sql`'s SC-72 slice 2 block to Neon before pushing.** Branch `sc-72-tailor-review`.
+3. **Letter, Ready and export (built, in review):** the optional cover letter (Sonnet 5.5, written once per tailoring in the background,
+   brackets for what Scout can't know, code-checked so it adds no number or name the resume lacks, edited freely and saved as you leave
+   the box; free of the 10 but inside the Scout-wide dollar cap), "Looks good" to Ready, PDF (fpdf2, built-in Helvetica) and Word (written
+   directly as zipped XML, no library) of the resume with the kept changes, the Tailored marker on the row, and Yes saving the files with
+   the application (listed on the Applications tab; undoing the Yes lets them go). The structure read now also keeps the name and contact
+   lines (`header`) so the files have a masthead. **Apply `db/schema.sql`'s SC-72 slice 3 block to Neon before pushing** (it widens
+   `tailor_calls.kind` with a dropped-and-recreated CHECK, no data touched). `requirements.txt` gains `fpdf2==2.8.3` (Render's pip-only
+   build installs it; nothing to change in Render). Branch `sc-72-letter-ready`, stacked on `sc-72-tailor-review`.
+
 ## Open items for the next sprint
 - **Build SC-64** (check-in pushes and the Did you hear back / Should I close it rows). It needs a card of its own and
   the "What did they say?" menu and stages from the pipeline mock (Interview, Offer, Not moving forward) for the Yes

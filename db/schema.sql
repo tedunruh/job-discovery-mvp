@@ -374,3 +374,80 @@ CREATE TABLE IF NOT EXISTS posting_reads (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_posting_reads_created ON posting_reads (created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- SC-72 slice 2: tailoring a resume to a role. Additive migrations (safe to re-run). Dashboard only: the collector
+-- never reads these.
+-- ---------------------------------------------------------------------------
+
+-- A resume as structure (summary, roles and their bullets, skills, education), read once from the PDF by a small model
+-- call and checked line by line against the PDF's own text. One per person; it is only used while source_uploaded_at
+-- still equals user_resumes.uploaded_at, so a new upload makes it stale without touching this table.
+CREATE TABLE IF NOT EXISTS resume_structures (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    structure JSONB NOT NULL,
+    source_uploaded_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- One row per tailoring a person asked for. status: working (the call is running), ready (the changes are waiting for
+-- review), error, cancelled. `source` is the resume structure the changes were made against, and `changes` the list of
+-- {id, kind, target, label, where, before, after, value, why, kept}: a change is applied only while kept is true.
+-- Only one may be working per person. Deleted with the resume (it holds resume text); the calls stay in tailor_calls.
+CREATE TABLE IF NOT EXISTS tailorings (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    posting_id INTEGER REFERENCES postings(id) ON DELETE SET NULL,
+    status TEXT NOT NULL CHECK (status IN ('working', 'ready', 'error', 'cancelled')),
+    error_kind TEXT,
+    source JSONB,
+    resume_uploaded_at TIMESTAMPTZ,
+    changes JSONB,
+    not_added JSONB,
+    rejected INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_tailorings_user_posting ON tailorings (user_id, posting_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS tailorings_one_working_idx ON tailorings (user_id) WHERE status = 'working';
+
+-- One row per call that read a resume's structure (kind 'structure', Haiku) or tailored it (kind 'tailor', Sonnet),
+-- failed and cancelled ones too, like resume_parses: tokens and cost at price_version's rates. A person's monthly count
+-- is their 'tailor' rows with status 'ok'; the Scout-wide dollar cap sums cost_usd. No content is kept, so deleting a
+-- resume does not reset anyone's count.
+CREATE TABLE IF NOT EXISTS tailor_calls (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('structure', 'tailor')),
+    model TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd NUMERIC(10, 6) NOT NULL DEFAULT 0,
+    price_version TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('ok', 'error', 'cancelled')),
+    error_kind TEXT,
+    request_id TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_tailor_calls_user_month ON tailor_calls (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tailor_calls_created ON tailor_calls (created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- SC-72 slice 3: the cover letter, "Looks good" (Ready) and the files saved with an application. Additive; apply to
+-- Neon before pushing the code.
+--   want_letter  the person ticked "Write a cover letter too" when they started the tailoring
+--   letter       the draft, edited freely by the person afterwards (placeholders in [brackets] for what Scout can't know)
+--   letter_state NULL (none yet), 'writing', 'ready' or 'error'; letter_at is when it last changed
+--   ready_at     the person pressed "Looks good": the tailored files are theirs to download (cleared by "Back to the changes")
+--   applied_at   they answered Yes to "Did you apply?" for this role while it was ready: these files go with the application
+-- A letter is written once per tailoring (again only after an error), doesn't count toward a person's ten, and its
+-- cost counts toward the Scout-wide dollar cap like any other call (tailor_calls.kind 'letter').
+-- ---------------------------------------------------------------------------
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS want_letter BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS letter TEXT;
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS letter_state TEXT;
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS letter_at TIMESTAMPTZ;
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ;
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS applied_at TIMESTAMPTZ;
+ALTER TABLE tailor_calls DROP CONSTRAINT IF EXISTS tailor_calls_kind_check;
+ALTER TABLE tailor_calls ADD CONSTRAINT tailor_calls_kind_check CHECK (kind IN ('structure', 'tailor', 'letter'));

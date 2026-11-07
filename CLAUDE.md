@@ -67,7 +67,7 @@ Sprint history, incidents and open items: `docs/SPRINTS.md`. Process lessons: `Q
   (outage watchdog; the collector pings after each completed run and `/fail` on a crash).
 - **Config** is env vars / GitHub secrets, never in the repo: `DATABASE_URL`, `RESEND_API_KEY`,
   `RESEND_FROM`, `SECRET_KEY`, `NTFY_HEALTH_TOPIC`, `HEALTHCHECK_URL`, `ANTHROPIC_API_KEY` (dashboard only: it reads resumes;
-  never put it in the collector or GitHub secrets) and optionally `RESUME_MONTHLY_CAP_USD` (default 5) and `POSTING_MONTHLY_CAP_USD` (default 5; the cap on reading postings' requirements for the fit score, SC-70), plus `RENDER_API_KEY` locally.
+  never put it in the collector or GitHub secrets) and optionally `RESUME_MONTHLY_CAP_USD` (default 5) and `POSTING_MONTHLY_CAP_USD` (default 5; the cap on reading postings' requirements for the fit score, SC-70) and `TAILOR_MONTHLY_CAP_USD` (default 5; the cap on tailoring resumes, SC-72), plus `RENDER_API_KEY` locally.
   Locally they live in `.env.local` (git-ignored); `private/` (git-ignored) holds invite material.
   Never print, commit or paste values. The repo is **public**: no tester names, topics or keys.
 
@@ -78,8 +78,8 @@ Sprint history, incidents and open items: `docs/SPRINTS.md`. Process lessons: `Q
 | `scheduler/run_collectors.py` | the run: core companies, then discovered boards in batches; alerts; health |
 | `db/db.py`, `db/schema.sql` | all SQL. Schema changes are additive `ALTER ... IF NOT EXISTS` blocks at the end of `schema.sql`; apply them to Neon *before* pushing code that needs them |
 | `role_categories.py` | the one matcher for dashboard and alerts (`matches_profile`, `matches_work_type`) |
-| `dashboard/` | Flask app, templates (Field Guide design system, see above). `profile.py` is the profile screen; `resume.py` reads resumes (Scout pays: Claude Haiku 5.5, per-person and monthly caps, every call logged in `resume_parses`) |
-| `scripts/` | `quality_check.py` (UI checks), `engagement.py`, `actions_usage.py`, `discover_boards.py`, `import_discovered.py`, `add_companies.py`, `try_resume_read.py` (one real resume read: tokens and cost, saves nothing), `convert_profiles.py` |
+| `dashboard/` | Flask app, templates (Field Guide design system, see above). `profile.py` is the profile screen; `resume.py` reads resumes (Scout pays: Claude Haiku 5.5, per-person and monthly caps, every call logged in `resume_parses`); `prep.py` is the panel beside the list (Prep, Working, Review) and its routes; `letter.py` writes the optional cover letter (Sonnet 5.5, once per tailoring, outside the person's 10, inside the dollar cap; calls logged as kind `letter`); `resume_files.py` makes the tailored PDF (fpdf2) and Word (hand-written zip) files; `tailor.py` tailors a resume to a role (Sonnet 5.5 proposes edits, code checks that nothing is added; 10 per person per month; calls logged in `tailor_calls`) |
+| `scripts/` | `quality_check.py` (UI checks), `engagement.py`, `actions_usage.py`, `discover_boards.py`, `import_discovered.py`, `add_companies.py`, `try_resume_read.py` (one real resume read: tokens and cost, saves nothing), `try_tailor.py` (one real tailoring: both calls, cost, what the accuracy check threw away), `convert_profiles.py` |
 | `tests/` | `python -m unittest discover tests` (offline) |
 
 **Data model in brief.** `companies.tier`: `core` (original ~140: every role stored), `hot` /

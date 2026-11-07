@@ -1415,3 +1415,227 @@ button.fg-link {
   @keyframes fg-fade { to { opacity: 0; } }
   .fg-toast { animation: none; }
 }
+
+/* ---------- Panel (SC-72) ---------- */
+/* One job's detail, opened from a card and shown beside the list (it pushes the list: no modal, no scrim). Three parts:
+   the head (monogram, company, title, Close), a body that scrolls on its own, and a foot that holds the actions. The
+   foot always has Apply. The page decides where the panel sits and makes it a full screen sheet on a phone. */
+.fg-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 480px;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--fg-color-surface-page);
+  border: 1px solid var(--fg-color-border-default);
+  border-radius: var(--fg-radius-xl);
+}
+/* The page animates the panel it opens (a specimen on a page that is already there should not slide). */
+@keyframes fg-slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.fg-panel-head {
+  display: grid;
+  grid-template-columns: var(--fg-size-mono) minmax(0, 1fr) auto;
+  column-gap: var(--fg-space-3);
+  align-items: center;
+  padding: var(--fg-space-4) var(--fg-space-4) var(--fg-space-3) var(--fg-space-6);
+  border-bottom: 1px solid var(--fg-color-border-subtle);
+}
+.fg-panel-company {
+  margin: 0;
+  font-size: var(--fg-font-size-sm);
+  color: var(--fg-color-text-secondary);
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.05em;
+}
+.fg-panel-title {
+  margin: 0;
+  font-size: var(--fg-font-size-xl);
+  font-weight: var(--fg-font-weight-demibold);
+  line-height: var(--fg-font-line-height-tight);
+  color: var(--fg-color-text-primary);
+}
+.fg-panel-title:focus { outline: none; }
+.fg-panel-head .fg-icon-button { grid-column: 3; grid-row: 1 / 3; align-self: start; }
+.fg-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-6);
+  padding: var(--fg-space-6);
+}
+.fg-panel-fit { display: flex; flex-wrap: wrap; align-items: center; gap: var(--fg-space-2) var(--fg-space-3); }
+.fg-panel-help { margin: 0; font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
+.fg-panel-sec { display: flex; flex-direction: column; gap: var(--fg-space-3); }
+.fg-panel-sec-title {
+  margin: 0;
+  font-size: var(--fg-font-size-lg);
+  font-weight: var(--fg-font-weight-demibold);
+  color: var(--fg-color-text-primary);
+}
+.fg-panel-list {
+  margin: 0;
+  padding-left: var(--fg-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-2);
+  font-weight: var(--fg-font-weight-medium);
+  line-height: var(--fg-font-line-height-body);
+  color: var(--fg-color-text-primary);
+}
+.fg-panel-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-3);
+  padding: var(--fg-space-4) var(--fg-space-6) var(--fg-space-5);
+  border-top: 1px solid var(--fg-color-border-subtle);
+  background: var(--fg-color-surface-card);
+}
+.fg-panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--fg-space-2); }
+.fg-panel-actions > form { display: contents; }
+.fg-panel-sec-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--fg-space-2); }
+@media (max-width: 680px) {
+  .fg-panel-head { padding-left: var(--fg-space-4); grid-template-columns: var(--fg-size-mono-phone) minmax(0, 1fr) auto; }
+  .fg-panel-body { padding: var(--fg-space-4); }
+  .fg-panel-foot { padding: var(--fg-space-3) var(--fg-space-4) var(--fg-space-4); }
+  .fg-panel-actions .fg-button { flex: 1 1 0; }
+}
+
+/* ---------- Text area, files and letter (SC-72) ---------- */
+/* A text area is an input that grows: the same field look, free text left-aligned, taller, resized only up and down. */
+.fg-textarea {
+  display: block;
+  min-height: calc(var(--fg-size-touch-target) * 3);
+  line-height: var(--fg-font-line-height-body);
+  text-align: left;
+  resize: vertical;
+}
+.fg-files { display: flex; flex-direction: column; gap: var(--fg-space-3); }
+.fg-files .fg-file-row {
+  padding: var(--fg-space-3);
+  background: var(--fg-color-surface-card);
+  border: 1px solid var(--fg-color-border-subtle);
+  border-radius: var(--fg-radius-sm);
+}
+.fg-letter { display: flex; flex-direction: column; gap: var(--fg-space-3); }
+
+/* ---------- Requirement list (SC-72) ---------- */
+/* What a posting asks for, one per line, each marked against the person's resume: a filled check (in your resume), a
+   dashed ring (not in your resume) or a dot (not checked, because there is no resume yet). The words say it too, so
+   the mark is never the only signal. */
+.fg-reqs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--fg-color-surface-card);
+  border: 1px solid var(--fg-color-border-subtle);
+  border-radius: var(--fg-radius-sm);
+}
+.fg-req {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: var(--fg-space-3);
+  align-items: center;
+  padding: var(--fg-space-3) var(--fg-space-4);
+  font-weight: var(--fg-font-weight-medium);
+  color: var(--fg-color-text-primary);
+}
+.fg-req + .fg-req { border-top: 1px solid var(--fg-color-border-subtle); }
+.fg-req-mark { color: var(--fg-color-action-primary); }
+.fg-req-mark--no { color: var(--fg-color-text-secondary); }
+.fg-req-tick { stroke: var(--fg-color-text-on-action); }
+.fg-req-state { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); white-space: nowrap; }
+@media (max-width: 680px) {
+  .fg-req { grid-template-columns: 20px minmax(0, 1fr); }
+  .fg-req-state { grid-column: 2; white-space: normal; }
+}
+
+/* ---------- Selected job card and the list beside a panel (SC-72) ---------- */
+/* The card the panel belongs to gets the Forest edge. While a panel is open the list is narrower, so each card stacks:
+   the job on top, then its state and actions in one row under it. */
+.fg-job.is-selected { border-color: var(--fg-color-action-primary); box-shadow: 0 0 0 1px var(--fg-color-action-primary); }
+@media (min-width: 681px) {
+  .fg-has-panel .fg-job { grid-template-columns: minmax(0, 1fr); }
+  .fg-has-panel .fg-job-second { padding-left: calc(var(--fg-size-mono) + var(--fg-space-3)); }
+}
+
+/* ---------- Steps (SC-72) ---------- */
+/* Where the person is in applying: Prep, Tailor, Apply. The current step is Forest with aria-current; steps before it
+   show a Forest outline and say "(done)" for screen readers. A strip under the panel's head, never a navigation. */
+.fg-steps {
+  display: flex;
+  gap: var(--fg-space-6);
+  margin: 0;
+  padding: var(--fg-space-3) var(--fg-space-6);
+  list-style: none;
+  border-bottom: 1px solid var(--fg-color-border-subtle);
+  font-size: var(--fg-font-size-sm);
+  font-weight: var(--fg-font-weight-medium);
+  color: var(--fg-color-text-secondary);
+}
+.fg-step { display: inline-flex; align-items: center; gap: var(--fg-space-2); }
+.fg-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--fg-radius-full);
+  border: 1px solid var(--fg-color-border-default);
+  font-size: var(--fg-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+.fg-step[aria-current="step"] { color: var(--fg-color-text-primary); font-weight: var(--fg-font-weight-demibold); }
+.fg-step[aria-current="step"] .fg-step-num {
+  background: var(--fg-color-action-primary);
+  border-color: var(--fg-color-action-primary);
+  color: var(--fg-color-text-on-action);
+}
+.fg-step.is-done .fg-step-num { border-color: var(--fg-color-action-primary); color: var(--fg-color-action-primary); }
+@media (max-width: 680px) { .fg-steps { padding-inline: var(--fg-space-4); gap: var(--fg-space-4); } }
+
+/* ---------- Change list (SC-72) ---------- */
+/* What tailoring changed in the resume, one card per change: its kind and where, the text before (struck through) and
+   after, why, and Undo. An undone change fades its After and says "Undone" in words; the resume keeps its Before. */
+.fg-changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--fg-space-2); }
+.fg-change {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-2);
+  padding: var(--fg-space-4);
+  background: var(--fg-color-surface-card);
+  border: 1px solid var(--fg-color-border-subtle);
+  border-radius: var(--fg-radius-sm);
+}
+.fg-change.is-undone { background: var(--fg-color-surface-page); }
+.fg-change.is-undone .fg-change-after, .fg-change.is-undone .fg-change-why { opacity: 0.55; }
+.fg-change-head { display: flex; align-items: center; justify-content: space-between; gap: var(--fg-space-3); }
+.fg-change-head > form { margin: 0; }
+.fg-change-kind { margin: 0; font-size: var(--fg-font-size-sm); font-weight: var(--fg-font-weight-demibold); color: var(--fg-color-text-primary); }
+.fg-change-state { font-weight: var(--fg-font-weight-medium); color: var(--fg-color-text-secondary); }
+.fg-change-where { margin: 0; font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
+.fg-change-before, .fg-change-after { margin: 0; line-height: var(--fg-font-line-height-body); }
+.fg-change-before { color: var(--fg-color-text-secondary); font-weight: var(--fg-font-weight-medium); }
+.fg-change-before :is(.fg-change-text, ol) { text-decoration: line-through; text-decoration-color: var(--fg-color-border-default); }
+.fg-change-after { color: var(--fg-color-text-primary); font-weight: var(--fg-font-weight-medium); }
+.fg-change-before ol, .fg-change-after ol { margin: var(--fg-space-1) 0 0; padding-left: var(--fg-space-5); }
+.fg-change-why { margin: 0; font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
+.fg-change-label {
+  display: inline-block;
+  margin-right: var(--fg-space-2);
+  font-size: var(--fg-font-size-xs);
+  font-weight: var(--fg-font-weight-demibold);
+  color: var(--fg-color-text-secondary);
+}
+
+/* While a tailoring runs: grey bars where the changes will appear. */
+.fg-panel-work { display: flex; flex-direction: column; gap: var(--fg-space-3); }
+.fg-panel-work .fg-skeleton:nth-child(1) { width: 90%; }
+.fg-panel-work .fg-skeleton:nth-child(2) { width: 75%; }
+.fg-panel-work .fg-skeleton:nth-child(3) { width: 82%; }
+.fg-panel-work .fg-skeleton:nth-child(4) { width: 60%; }

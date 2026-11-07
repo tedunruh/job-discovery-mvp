@@ -23,8 +23,11 @@ from db.db import (
     create_session,
     delete_session,
     get_conn,
+    applied_tailorings,
     get_applications,
     get_applied_among,
+    keep_tailoring_with_application,
+    tailored_among,
     get_hidden,
     get_hidden_among,
     get_open_postings,
@@ -49,6 +52,7 @@ from dashboard.profile import ask_for_catch_up
 from dashboard.requirements import queue as queue_reads
 from dashboard.return_ask import choose_asks
 from dashboard.skill_filter import apply_skill_cutoff
+from dashboard.prep import register as register_prep
 from dashboard.profile import register as register_profile_screens
 from dashboard.resume import register as register_resume
 from role_categories import (
@@ -170,6 +174,7 @@ def require_login(view):
 
 register_profile_screens(app, require_login)
 register_resume(app, require_login)
+register_prep(app, require_login)
 
 
 def humanize_posted_at(dt):
@@ -335,6 +340,7 @@ def index():
         opens, dismissals = get_return_events(conn, user_id)  # SC-63: what they opened, and what they said "Not yet" to
         viewed = get_postings_by_ids(conn, user_id, list(opens)) if view == "viewed" else []   # the Viewed list
         applications = get_applications(conn, user_id)
+        saved_files = applied_tailorings(conn, user_id)   # SC-72: the tailored files that went with each application
         hidden = get_hidden(conn, user_id)  # SC-59: the jobs they hid (still open), newest first
     finally:
         conn.close()
@@ -404,7 +410,15 @@ def index():
             p["opened_ago"] = humanize_posted_at(opens[p["id"]])
         p["place"] = location_line(p["location"], p["remote_type"])
         p["when"] = short_time(p["first_seen_at"], now)   # SC-69: "9:40 AM", "Mon", "Oct 14"
+    conn = get_conn()
+    try:
+        tailored_ids = tailored_among(conn, user_id, [p["id"] for p in shown])   # SC-72: a tailored resume is ready
+    finally:
+        conn.close()
+    for p in shown:
+        p["tailored"] = p["id"] in tailored_ids
     for a in applications:
+        a["files"] = saved_files.get(a["id"])
         a["applied_ago"] = humanize_posted_at(a["applied_at"])
         a["place"] = location_line(a["location"], a["remote_type"])
     for h in hidden:
@@ -543,6 +557,7 @@ def set_applied_route(posting_id):
     conn = get_conn()
     try:
         set_applied(conn, posting_id, applied, g.user_id)
+        keep_tailoring_with_application(conn, g.user_id, posting_id, applied)   # SC-72: Yes saves the tailored files with it
         if applied:
             log_event(conn, g.user_id, "applied", posting_id)
         conn.commit()

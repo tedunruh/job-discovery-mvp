@@ -306,7 +306,8 @@ class Storage(unittest.TestCase):
         tail = schema[schema.index("-- SC-59"):]
         self.assertIn("ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMPTZ;", tail)
         self.assertIn("ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS hidden_reason TEXT;", tail)
-        self.assertNotIn("DROP", tail)
+        # Nothing destroyed: only a CHECK constraint is dropped (SC-72 slice 3 widens tailor_calls.kind), never data.
+        self.assertNotRegex(tail, r"DROP (TABLE|COLUMN|INDEX|SCHEMA)")
 
 
 if __name__ == "__main__":

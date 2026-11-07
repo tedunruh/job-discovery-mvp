@@ -25,6 +25,7 @@
   var askTemplate = document.getElementById("return-ask-template");
   var whyTemplate = document.getElementById("return-why-template");
   var viewedTemplate = document.getElementById("return-viewed-template");
+  var tailoredTemplate = document.getElementById("return-tailored-template");
   var appliedToast = document.getElementById("toast-template");
   var simpleToast = document.getElementById("toast-simple-template");
   var tabCounts = document.querySelectorAll("[data-tab-count]");   // [0] Open roles, [1] Applications
@@ -100,7 +101,7 @@
       row.classList.remove("is-leaving");
       row.hidden = true;
       dayCount(row, -1);
-      then();
+      then(window.fgPanel ? window.fgPanel.rowLeft(idOf(row)) : "");   // panel.js: focus moves on; maybe the panel too
     }
     row.classList.add("is-leaving");
     row.addEventListener("animationend", finish, { once: true });
@@ -119,6 +120,8 @@
   function comeBack(row) {
     row.hidden = false;
     dayCount(row, 1);
+    var link = row.querySelector(".fg-job-link");
+    if (link) link.focus();               // Undo puts focus back on the job they just brought back
   }
 
   function post(action, fields) {
@@ -138,9 +141,10 @@
       if (!response.ok) return false;
       adjust({ open: -1, apps: 1 });
       if (live) live.textContent = "";
-      leave(row, function () {
+      leave(row, function (note) {
         if (window.fgToast && appliedToast) {
-          window.fgToast.show(appliedToast, { onUndo: function () {
+          var said = appliedToast.content.querySelector(".fg-toast-text");
+          window.fgToast.show(appliedToast, { text: note && said ? said.textContent + note : "", onUndo: function () {
             post("/set_applied/" + id, { applied: "false" }).then(function (r) {
               if (!r.ok) return;
               comeBack(row);
@@ -159,9 +163,9 @@
     return post("/hide/" + id, reason ? { reason: reason } : {}).then(function (response) {
       if (!response.ok) return;
       adjust({ open: -1, hidden: 1 });
-      leave(row, function () {
+      leave(row, function (note) {
         if (window.fgToast && simpleToast) {
-          window.fgToast.show(simpleToast, { text: "Job hidden.", onUndo: function () {
+          window.fgToast.show(simpleToast, { text: "Job hidden." + (note || ""), onUndo: function () {
             post("/unhide/" + id).then(function (r) {
               if (!r.ok) return;
               comeBack(row);
@@ -248,6 +252,15 @@
       if (!row || row.closest("[data-viewed-list]")) return;   // the Viewed list says when each was opened instead
       var when = row.querySelector("[data-state-when]");
       if (when && !when.querySelector("[data-viewed]") && viewedTemplate) when.appendChild(viewedTemplate.content.cloneNode(true));
+    },
+    /* The quiet "Tailored" marker on a card whose resume is ready (the panel's Ready stage), and off again when it is not. */
+    showTailored: function (id, on) {
+      var row = rowFor(id);
+      var when = row && row.querySelector("[data-state-when]");
+      if (!when) return;
+      var mark = when.querySelector("[data-tailored-mark]");
+      if (on && !mark && tailoredTemplate) when.appendChild(tailoredTemplate.content.cloneNode(true));
+      else if (!on && mark) mark.remove();
     },
     /* The jobs to ask about, all of them: the question stays on a card until it is answered. A card that is no longer
        in the list (it was answered somewhere else) gets Apply back. */

@@ -1,3 +1,4 @@
 # Dev-only tooling (not installed on Render)
 -r requirements.txt
 playwright
+python-docx==1.1.2
