@@ -131,14 +131,14 @@ def resume_text_for(conn, user_id):
     return text
 
 
-def apply_fit(conn, user_id, profile, postings, shown):
+def apply_fit(conn, user_id, profile, postings, shown, resume_text=None):
     """Give each posting its `fit` (0 = no score, else 1 to 5 pips) where its requirements have been read. Returns
     (how many look close, the ids among `shown` still waiting to be read, as given). Only roles on the page being shown
     are ever offered for reading, so a role nobody looks at is never scored or paid for. Reads only; the caller queues them."""
     ids = [p["id"] for p in postings]
     reqs = get_requirements(conn, ids)
     skills = profile.get("skills") or []
-    text = evidence(resume_text_for(conn, user_id), skills, profile.get("titles"))
+    text = evidence(resume_text_for(conn, user_id) if resume_text is None else resume_text, skills, profile.get("titles"))
     matches = get_skill_matches(conn, list(reqs), skills) if reqs else {}
     total_skills = len(skill_phrases(skills))
     close = 0

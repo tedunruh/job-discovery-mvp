@@ -1475,13 +1475,12 @@ def latest_tailoring(conn, user_id, posting_id):
 def expire_stale_tailorings(conn, user_id, minutes=5):
     """A tailoring (or a letter) still working after this long lost its worker (a restart): close it as an error so the
     person can try again. Caller commits."""
-    with conn.cursor() as cur:
+    with conn.cursor() as cur:   # both in one round trip: this runs every time a panel opens
         cur.execute("UPDATE tailorings SET letter_state = 'error', letter_at = now() "
-                    "WHERE user_id = %s AND letter_state = 'writing' AND letter_at < now() - %s * interval '1 minute'",
-                    (user_id, minutes))
-        cur.execute("UPDATE tailorings SET status = 'error', error_kind = 'timeout', finished_at = now() "
+                    "WHERE user_id = %s AND letter_state = 'writing' AND letter_at < now() - %s * interval '1 minute'; "
+                    "UPDATE tailorings SET status = 'error', error_kind = 'timeout', finished_at = now() "
                     "WHERE user_id = %s AND status = 'working' AND created_at < now() - %s * interval '1 minute'",
-                    (user_id, minutes))
+                    (user_id, minutes, user_id, minutes))
 
 
 def set_change_kept(conn, user_id, tailoring_id, change_id, kept):

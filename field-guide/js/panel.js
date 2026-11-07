@@ -148,9 +148,31 @@
     startWork(id);
   }
 
-  /* Show a job in the panel. Resolves once it is shown; rejects if the server could not give it. */
-  function load(id, focusHeading) {
+  /* The moment a card is clicked the panel opens with that job's own monogram, company and title and quiet placeholder
+     lines (markup from the page's <template>, words copied from the card), so nothing waits on the server to answer. */
+  function showOpening(id, row) {
+    var template = document.getElementById("panel-loading-template");
+    if (!template) return;
+    stopWork();
+    panel.textContent = "";
+    panel.appendChild(template.content.cloneNode(true));
+    var mono = row.querySelector(".fg-mono"), mark = panel.querySelector("[data-loading-mono]");
+    if (mono && mark) { mark.className = mono.className; mark.textContent = mono.textContent; }
+    var company = row.querySelector(".fg-job-company"), title = row.querySelector(".fg-job-link");
+    panel.querySelector("[data-loading-company]").textContent = company ? company.textContent.trim() : "";
+    panel.querySelector("[data-loading-title]").textContent = title ? title.textContent.trim() : "";
+    panel.hidden = false;
+    current = id;
+    workspace.classList.add("fg-has-panel");
+    select(id);
+    sync();
+  }
+
+  /* Show a job in the panel. Resolves once it is shown; rejects if the server could not give it. `row` (the card that
+     was clicked) shows the opening state straight away. */
+  function load(id, focusHeading, row) {
     var mine = ++latest;
+    if (row) showOpening(id, row);
     return fetch("/prep/" + id, { credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
       .then(function (response) {
         if (!response.ok) throw new Error("no panel");
@@ -184,7 +206,8 @@
     var row = link.closest(".fg-job");
     if (!row) return;
     event.preventDefault();
-    load(idOf(row), true).catch(function () {
+    load(idOf(row), true, row).catch(function () {
+      if (current === idOf(row) && panel.querySelector("[aria-busy]")) close();   // the opening state: take it away again
       window.open(link.href, "_blank", "noopener");   // the panel could not load: do what the link always did
     });
   });

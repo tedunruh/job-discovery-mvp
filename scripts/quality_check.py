@@ -1301,8 +1301,18 @@ def check_tailor(browser, base, token, user_id):
             if not row.count():
                 ctx.close()
                 continue
+            held = []
+            page.route("**/prep/*", lambda r: held.append(r))   # hold the server's answer: the panel must not wait for it
             row.locator(".fg-job-link").click()
+            page.wait_for_selector("#apply-panel:not([hidden]) [aria-busy='true']", timeout=2000)
+            opening = page.evaluate("[document.querySelector('#apply-panel .fg-panel-company').textContent, document.querySelector('#apply-panel .fg-panel-title').textContent, "
+                                    "document.querySelectorAll('#apply-panel .fg-skeleton').length, document.querySelector('.fg-job.is-selected') !== null]")
+            check(opening[0] == TAILOR_COMPANY and opening[1].startswith("Staff Product Designer") and opening[2] == 4 and opening[3],
+                  f"clicking a card opens the panel at once with its own company and title, before the server answers  [{tag}]", str(opening))
+            held[0].continue_()
+            page.unroute("**/prep/*")
             page.wait_for_selector("#apply-panel:not([hidden]) [data-panel-title]")
+            check(page.locator("#apply-panel [aria-busy]").count() == 0, f"the real panel replaces the opening state  [{tag}]")
             settle(page)
             steps = page.evaluate("[...document.querySelectorAll('#apply-panel .fg-step')].map(li => [li.textContent.trim(), li.getAttribute('aria-current')])")
             check(steps[0][1] == "step" and [x[0][1:] for x in steps][:3] == ["Prep", "Tailor", "Apply"],
