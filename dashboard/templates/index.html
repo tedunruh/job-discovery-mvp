@@ -101,8 +101,9 @@
     .board {
       flex: 1 1 auto;
       min-width: 0;
-      overflow: auto;
-      padding: 0 var(--fg-space-6) var(--fg-space-6);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;   /* the board itself never scrolls: its tabs stay put and only the list below them does, like the panel's body */
       background: var(--fg-color-surface-page);
       border: 1px solid var(--fg-color-border-default);
       border-radius: var(--fg-radius-xl);
@@ -171,8 +172,10 @@
       font-size: var(--fg-font-size-2xl);
       line-height: var(--fg-font-line-height-snug);
     }
-    /* The tabs stay pinned at the top of the list while it scrolls. */
-    .board > .fg-tabs { position: sticky; top: 0; z-index: 2; background: var(--fg-color-surface-page); padding-top: var(--fg-space-2); }
+    /* The tabs stay at the top of the board; the list under them scrolls on its own, so its scrollbar starts below the
+       tabs and never runs through the board's rounded corners. */
+    .board > .fg-tabs { flex: none; margin-inline: var(--fg-space-6); padding-top: var(--fg-space-2); }
+    .board > [role="tabpanel"] { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 var(--fg-space-6) var(--fg-space-6); }
     /* The caught-up state: Scout's words, with a faint piece of the contour line behind them (decorative). */
     .caught-up {
       position: relative;
@@ -200,7 +203,8 @@
 
     @media (max-width: 680px) {
       body > .fg-header { padding-inline: 0; }
-      .board { padding: 0 var(--fg-space-3) var(--fg-space-3); }
+      .board > .fg-tabs { margin-inline: var(--fg-space-3); }
+      .board > [role="tabpanel"] { padding: 0 var(--fg-space-3) var(--fg-space-3); }
       .workspace, .voice-wrap + .workspace { margin-top: var(--fg-space-4); }
       .voice-intro { padding-inline: 0; font-size: var(--fg-font-size-xl); }
       .caught-up .contour { width: 360px; right: -120px; }

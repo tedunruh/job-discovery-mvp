@@ -32,7 +32,7 @@
 
   function sync() {
     var scrolled = 0, range = 0;
-    Array.prototype.forEach.call(workspace.querySelectorAll(".board, .fg-panel-body"), function (pane) {
+    Array.prototype.forEach.call(workspace.querySelectorAll(".board > [role=tabpanel], .fg-panel-body"), function (pane) {
       scrolled = Math.max(scrolled, pane.scrollTop);
       range = Math.max(range, pane.scrollHeight - pane.clientHeight);
     });

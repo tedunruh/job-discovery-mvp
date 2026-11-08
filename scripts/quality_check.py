@@ -1162,6 +1162,11 @@ def check_panel(browser, base, token):
             check(folded, f"the first scroll folds Scout's line and slims the header  [{tag}]")
             voice = page.evaluate("document.querySelector('.voice-wrap') ? document.querySelector('.voice-wrap').getBoundingClientRect().height : 0")
             check(voice <= 1, f"...Scout's line is folded away  [{tag}]", f"{voice}px")
+            # the list scrolls under its tabs, like the panel's body: the board itself never scrolls, so its scrollbar can't
+            # run through the rounded corners (it did once, and looked off beside the panel's)
+            geo = page.evaluate("(() => { const b = document.querySelector('.board'), t = b.querySelector(':scope > .fg-tabs'), l = b.querySelector(':scope > [role=tabpanel]'); return [b.scrollTop, l.scrollTop, t.getBoundingClientRect().bottom, l.getBoundingClientRect().top]; })()")
+            check(geo[0] == 0 and geo[1] > 0, f"the list scrolls under its tabs, not the whole board  [{tag}]", f"{geo}")
+            check(geo[3] >= geo[2] - 1, f"...so its scrollbar starts below the tabs  [{tag}]", f"{geo}")
             tops = page.evaluate("[document.querySelector('.board').getBoundingClientRect().top, document.getElementById('apply-panel').getBoundingClientRect().top]")
             check(abs(tops[0] - tops[1]) <= 1, f"...and the tops are still aligned  [{tag}]", f"{tops}")
             check(page.evaluate("document.documentElement.scrollHeight - innerHeight") <= 1, f"...and the page still does not scroll  [{tag}]")

@@ -1528,3 +1528,12 @@ every check. **Standing check added:** `check_tailor` holds the server's answer 
 title, four placeholder lines and the card selected before it arrives, and to be replaced by the real panel after. Lesson for the next
 panel stage: anything that waits on the server needs an immediate state in the page; count the round trips a route makes.
 Not measured: the delay on the live site itself (only the trip count and the page's behaviour with the answer held).
+
+### 2026-11-07 — SC-72: the list's scrollbar ran through the board's corners
+**What shipped.** Ted pointed out that the roles list scrolled as a whole: the bordered board was the scroll container, so its scrollbar
+ran the full height, over the rounded corners, unlike the panel beside it, whose head stays put and only its body scrolls. Now the board
+holds still (tabs on top) and only the list under the tabs scrolls (`.board > [role=tabpanel]`), so the scrollbar starts below the tabs and
+stops inside the bottom edge. The tabs are no longer sticky (nothing scrolls under them). `panel.js` watches the new scroller for the
+header fold. **Rework count:** 1 (reached Ted). **Root cause:** the panel was built with a fixed head and a scrolling body, but the list it
+sits beside was left as the old whole-board scroll, and no check compared the two panes. **Standing check added:** in the open-panel check,
+after scrolling, the board itself must still be at 0, the list under the tabs must have scrolled, and the list must start below the tabs.
