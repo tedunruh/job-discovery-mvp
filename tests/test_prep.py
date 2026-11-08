@@ -36,7 +36,7 @@ class Build(unittest.TestCase):
         self.profile = {"titles": ["designer"], "skills": [], "level": None}
         self.queued, self.fit_calls = [], []
 
-        def fake_fit(conn, uid, profile, postings, shown):
+        def fake_fit(conn, uid, profile, postings, shown, resume_text=None):
             self.fit_calls.append(profile)
             postings[0]["fit"] = 4
             return 1, []
@@ -297,9 +297,10 @@ class Stages(unittest.TestCase):
         self.assertEqual((out["stage"], out["letter"]), ("review", None))
 
     def test_the_tailor_offer_includes_the_letter_only_when_they_can_have_one(self):
-        self.assertTrue(self.stage()["tailor"]["letter"])
-        self.letters = False
-        self.assertFalse(self.stage()["tailor"]["letter"])
+        with mock.patch.object(prep.letter, "is_configured", lambda: True):
+            self.assertTrue(self.stage()["tailor"]["letter"])
+        with mock.patch.object(prep.letter, "is_configured", lambda: False):
+            self.assertFalse(self.stage()["tailor"]["letter"])
         self.letters, self.avail = True, ("limit", 10)
         self.assertFalse(self.stage()["tailor"]["letter"])   # no tailoring left, so no letter offer beside it
 

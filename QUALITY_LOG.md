@@ -1516,3 +1516,24 @@ the Yes lets them go. New in Field Guide: Check macro, Text area, Files to send,
       throws away is unknown. Figma mirror of the new components. PDF text is Helvetica only: characters outside Latin-1 become "?". The
       SC-72 board card isn't ticked. The new columns must be applied to Neon before this is pushed.
 
+
+### 2026-11-07 — SC-72: the panel's delay on open
+**What shipped.** Ted reported a delay between clicking a row and the panel opening. Two causes: the panel showed nothing until the server
+answered, and the server answered after 17 database round trips (the resume's text was read three times, each read being four statements
+with a savepoint; the monthly usage was counted twice; two UPDATEs ran separately). Now the panel opens the moment a card is clicked with
+that job's own monogram, company and title and placeholder lines (`_prep_loading.html`, filled by `panel.js` from the card), and the build
+makes 9 round trips instead of 17. **Rework count:** 1 (this one, reached Ted on the live site). **Root cause:** slices 1 and 2 were only
+looked at against a database a millisecond away and a server with no network latency, so a click that waits on the server felt instant in
+every check. **Standing check added:** `check_tailor` holds the server's answer and requires the panel to be open with the job's company and
+title, four placeholder lines and the card selected before it arrives, and to be replaced by the real panel after. Lesson for the next
+panel stage: anything that waits on the server needs an immediate state in the page; count the round trips a route makes.
+Not measured: the delay on the live site itself (only the trip count and the page's behaviour with the answer held).
+
+### 2026-11-07 — SC-72: the list's scrollbar ran through the board's corners
+**What shipped.** Ted pointed out that the roles list scrolled as a whole: the bordered board was the scroll container, so its scrollbar
+ran the full height, over the rounded corners, unlike the panel beside it, whose head stays put and only its body scrolls. Now the board
+holds still (tabs on top) and only the list under the tabs scrolls (`.board > [role=tabpanel]`), so the scrollbar starts below the tabs and
+stops inside the bottom edge. The tabs are no longer sticky (nothing scrolls under them). `panel.js` watches the new scroller for the
+header fold. **Rework count:** 1 (reached Ted). **Root cause:** the panel was built with a fixed head and a scrolling body, but the list it
+sits beside was left as the old whole-board scroll, and no check compared the two panes. **Standing check added:** in the open-panel check,
+after scrolling, the board itself must still be at 0, the list under the tabs must have scrolled, and the list must start below the tabs.

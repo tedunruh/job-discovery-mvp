@@ -1162,6 +1162,11 @@ def check_panel(browser, base, token):
             check(folded, f"the first scroll folds Scout's line and slims the header  [{tag}]")
             voice = page.evaluate("document.querySelector('.voice-wrap') ? document.querySelector('.voice-wrap').getBoundingClientRect().height : 0")
             check(voice <= 1, f"...Scout's line is folded away  [{tag}]", f"{voice}px")
+            # the list scrolls under its tabs, like the panel's body: the board itself never scrolls, so its scrollbar can't
+            # run through the rounded corners (it did once, and looked off beside the panel's)
+            geo = page.evaluate("(() => { const b = document.querySelector('.board'), t = b.querySelector(':scope > .fg-tabs'), l = b.querySelector(':scope > [role=tabpanel]'); return [b.scrollTop, l.scrollTop, t.getBoundingClientRect().bottom, l.getBoundingClientRect().top]; })()")
+            check(geo[0] == 0 and geo[1] > 0, f"the list scrolls under its tabs, not the whole board  [{tag}]", f"{geo}")
+            check(geo[3] >= geo[2] - 1, f"...so its scrollbar starts below the tabs  [{tag}]", f"{geo}")
             tops = page.evaluate("[document.querySelector('.board').getBoundingClientRect().top, document.getElementById('apply-panel').getBoundingClientRect().top]")
             check(abs(tops[0] - tops[1]) <= 1, f"...and the tops are still aligned  [{tag}]", f"{tops}")
             check(page.evaluate("document.documentElement.scrollHeight - innerHeight") <= 1, f"...and the page still does not scroll  [{tag}]")
@@ -1301,8 +1306,18 @@ def check_tailor(browser, base, token, user_id):
             if not row.count():
                 ctx.close()
                 continue
+            held = []
+            page.route("**/prep/*", lambda r: held.append(r))   # hold the server's answer: the panel must not wait for it
             row.locator(".fg-job-link").click()
+            page.wait_for_selector("#apply-panel:not([hidden]) [aria-busy='true']", timeout=2000)
+            opening = page.evaluate("[document.querySelector('#apply-panel .fg-panel-company').textContent, document.querySelector('#apply-panel .fg-panel-title').textContent, "
+                                    "document.querySelectorAll('#apply-panel .fg-skeleton').length, document.querySelector('.fg-job.is-selected') !== null]")
+            check(opening[0] == TAILOR_COMPANY and opening[1].startswith("Staff Product Designer") and opening[2] == 4 and opening[3],
+                  f"clicking a card opens the panel at once with its own company and title, before the server answers  [{tag}]", str(opening))
+            held[0].continue_()
+            page.unroute("**/prep/*")
             page.wait_for_selector("#apply-panel:not([hidden]) [data-panel-title]")
+            check(page.locator("#apply-panel [aria-busy]").count() == 0, f"the real panel replaces the opening state  [{tag}]")
             settle(page)
             steps = page.evaluate("[...document.querySelectorAll('#apply-panel .fg-step')].map(li => [li.textContent.trim(), li.getAttribute('aria-current')])")
             check(steps[0][1] == "step" and [x[0][1:] for x in steps][:3] == ["Prep", "Tailor", "Apply"],

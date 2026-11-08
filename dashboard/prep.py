@@ -123,7 +123,8 @@ def stage_for(conn, user_id, posting_id, out, notice):
                          "message": {"limit": f"You’ve tailored {used} resumes this month, the most for now. It starts over "
                                               f"on {tailor.next_reset()}.",
                                      "unavailable": tailor.message("unavailable"), "ok": ""}[state],
-                         "letter": state == "ok" and letter.available(conn, user_id)}
+                         # a letter is available when tailoring is (same key, same month's spend): no second query
+                         "letter": state == "ok" and letter.is_configured()}
         out["notice"] = notice
 
 
@@ -150,7 +151,7 @@ def build(conn, user_id, posting_id, notice=None):
         out.update(state="reading", say=MESSAGES["reading"])
         return out
 
-    has_resume, _ = get_resume_text(conn, user_id)
+    has_resume, stored_text = get_resume_text(conn, user_id)
     if not has_resume:
         out.update(state="no_resume", say="Here’s what they’re asking for.", message=MESSAGES["no_resume"],
                    requirements=[{"text": r["label"], "mark": "unknown", "state": ""} for r in requirements])
@@ -158,7 +159,9 @@ def build(conn, user_id, posting_id, notice=None):
 
     profile = get_user_profile(conn, user_id)
     skills, titles = (profile or {}).get("skills") or [], (profile or {}).get("titles") or []
-    flags = covered_flags(requirements, evidence(resume_text_for(conn, user_id), skills, titles))
+    # The resume's text is read once for the whole panel (each read is a round trip to the database).
+    resume_text = stored_text if stored_text is not None else resume_text_for(conn, user_id)
+    flags = covered_flags(requirements, evidence(resume_text, skills, titles))
     out["say"] = say(flags)
     out["requirements"] = [
         {"text": r["label"], "mark": "yes" if hit else "no", "state": "In your resume" if hit else "Not in your resume"}
@@ -170,7 +173,7 @@ def build(conn, user_id, posting_id, notice=None):
                    for r, hit in zip(requirements, flags) if hit][:MAX_LEAD]
     if profile is not None:
         posting = dict(posting)
-        apply_fit(conn, user_id, profile, [posting], [])
+        apply_fit(conn, user_id, profile, [posting], [], resume_text)
         pips = posting.get("fit") or 0
         if pips:
             out["fit"] = {"pips": pips, "label": FIT_LABELS[pips]}
