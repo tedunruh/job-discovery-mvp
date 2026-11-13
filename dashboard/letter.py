@@ -46,6 +46,18 @@ GREETING_WORDS = {"i", "hello", "hi", "dear", "hiring", "manager", "team", "than
 FRACTION_WORDS = re.compile(r"\b(half|halved|third|thirds|quarter|fifth|fifths|tenth|double|doubled|triple|tripled|twice|"
                             r"thrice|dozen|dozens)\b", re.IGNORECASE)
 
+# Voice rules (see PROMPT): no second person, and no demonstrative pronoun standing alone.
+SECOND_PERSON = re.compile(r"\b(you|your|yours|yourself|yourselves)\b", re.IGNORECASE)
+DEMONSTRATIVE = re.compile(r"\b(this|these|those|that)\b", re.IGNORECASE)
+# A word after a demonstrative that shows it has no noun of its own ("this is", "those who", "that and").
+FOLLOWED_BY = {"is", "are", "was", "were", "shows", "show", "showed", "means", "mean", "helps", "helped", "made", "makes",
+               "lets", "gave", "gives", "will", "would", "can", "could", "did", "does", "has", "have", "had", "and", "or",
+               "but", "as", "to", "for", "with", "of", "in", "at", "on", "by", "so", "because", "which", "who", "when",
+               "where", "also", "too", "too"}
+# Words before "that" that make it a pointing word, not a conjunction or relative pronoun ("a system that is shared").
+BEFORE_THAT = {"did", "do", "does", "done", "like", "than", "from", "of", "at", "with", "in", "to", "for", "by", "on",
+               "about", "after", "before", "through", "and", "but", "so", "because", "as", "is", "was", "all"}
+
 # PROVIDER(structure, posting_text, company, title, missing_labels, note) -> ReadResult whose fields are {"letter": str};
 # tests replace it so no call is made. May raise tailor.TailorError.
 PROVIDER = None
@@ -61,7 +73,7 @@ PROMPT = (
     "You write a cover letter draft for a job applicant, from their resume and one job posting, for a job-alert "
     "service. Return it as {letter}.\n"
     "Format: plain text, first person, three short paragraphs, 150 to 230 words, no markdown. Start with \"Hello \" and "
-    "the company's name and \"team,\" and end with \"Thank you,\" and then \"[Your name]\" on its own line.\n"
+    "the company's name and \"team,\" and end with \"Sincerely,\" and then \"[Name]\" on its own line.\n"
     "How to write it:\n"
     "- Find the through line first: the one thing this role most needs, and the one thread in the resume that speaks to "
     "it. The whole letter tells that one story. It is not a list of strengths. Each paragraph picks up where the last one "
@@ -78,6 +90,14 @@ PROMPT = (
     "beats an empty claim. A skill that only appears in a skills list has no how or result, so do not mention it.\n"
     "- Choose, do not pile up: use two or three things from the resume, the ones closest to what the role needs most, "
     "and leave the rest out.\n"
+    "Voice rules (the draft is rejected if it breaks them):\n"
+    "- Never use the words you, your, yours or yourself. Do not address the reader. Name the company, the team, the "
+    "product or the role instead (\"Koalafi's customer portals\", \"the design system team\").\n"
+    "- Never use this, that, these or those on their own. Each one is followed at once by the noun it points to (\"that "
+    "migration\", \"this design system\"), or the noun is repeated. No sentence opens with \"That is\" or \"This shows\".\n"
+    "- Be specific: every sentence names a concrete thing from the posting (the company, the product, a named tool or "
+    "responsibility) or from the resume (an employer, a project, a result), so it stands on its own and the reader never "
+    "has to guess what it refers to. Cut any sentence that could be pasted into a letter for a different job.\n"
     "Hard rules:\n"
     "- Use only what the resume says about the person. Never add a skill, tool, method, job title, employer, number, date, "
     "result or claim that is not in the resume. Use no number the resume does not state, and that includes numbers from the "
@@ -86,7 +106,7 @@ PROMPT = (
     "or a feeling the resume does not state (\"which is where I learned\", \"I have always\").\n"
     "- Speak to what the posting asks for, in the posting's own words where they mean the same as the resume's.\n"
     "- For anything a good letter would include that you do not know, write a short placeholder in square brackets, such "
-    "as [one sentence on why you want to work at the company], [link to your portfolio] or [name of the hiring manager]. "
+    "as [one sentence on why the company appeals], [link to portfolio] or [name of the hiring manager]. "
     "Never guess these.\n"
     "- The user message lists things the posting asks for that the resume does not mention. Never mention them.\n"
     "- Do not use em dashes. Sound like a person: plain words, no buzzwords, no flattery.\n"
@@ -147,6 +167,25 @@ def clean_letter(text):
     return re.sub(r"\n{3,}", "\n\n", text).strip()[:MAX_CHARS]
 
 
+def vague_demonstrative(text):
+    """True when this, these, those or that stands alone: no noun follows it ("This shows", "I did that.", "That is why").
+    "that" is only counted where it points (a sentence start, or after a verb or preposition), not as a conjunction
+    or relative pronoun ("a system that is shared", "so that teams can")."""
+    for m in DEMONSTRATIVE.finditer(text):
+        word = m.group(1).lower()
+        after = re.match(r"\s*([A-Za-z']+)", text[m.end():])
+        bare = after is None or after.group(1).lower() in FOLLOWED_BY
+        if not bare:
+            continue
+        if word != "that":
+            return True
+        before = text[:m.start()].rstrip()
+        prior = re.search(r"([A-Za-z']+)$", before)
+        if not before or before[-1] in ".!?:;" or (prior and prior.group(1).lower() in BEFORE_THAT):
+            return True
+    return False
+
+
 def check_letter(letter, resume, company, title, missing_patterns):
     """(True, "") when the letter may be shown, else (False, why). Brackets are placeholders for the person to fill in, so
     what is inside them is not checked; everything outside them is."""
@@ -159,6 +198,10 @@ def check_letter(letter, resume, company, title, missing_patterns):
     extra = [value for value, _ in tailor.numbers(core) if value not in allowed_numbers]
     if extra:
         return False, "It stated a number that is not in the resume."
+    if SECOND_PERSON.search(core):
+        return False, "It used \"you\" or \"your\". Name the company, the team, the product or the role instead."
+    if vague_demonstrative(core):
+        return False, "It used this, that, these or those on its own. Follow each with the noun it points to."
     in_resume = set(m.lower() for m in FRACTION_WORDS.findall(resume))
     if any(m.lower() not in in_resume for m in FRACTION_WORDS.findall(core)):
         return False, "It restated a number in words (such as a fifth or doubled). Write numbers as the resume does."

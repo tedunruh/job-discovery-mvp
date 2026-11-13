@@ -1562,3 +1562,15 @@ Two checks the real runs exposed: the model rewrote "20%" as "a fifth", and quot
 real. **Rework count:** 1 (reached Ted). **Root cause:** slice 3 was only judged on whether the letter was accurate (the check), never on whether
 it read well, and no real-model letter had been read before Ted did. **Not done:** each prompt run here used the built-in fake resume, whose
 bullets are thin, so how and result come out sparse; Ted's real resume will show more. Eight real letters at about $0.007 each.
+
+
+### 2026-11-13 — SC-72: voice rules for the cover letter
+**What shipped.** Ted gave a style rule for the letter: no "you", "your" or "yours" (name the company, team, product or role instead), no
+this/that/these/those standing alone (each is followed by its noun), and every sentence specific to the posting or the resume. These are in
+the prompt and enforced by `check_letter`: a draft with a second-person word outside the brackets is refused, and so is a bare
+demonstrative (`vague_demonstrative`: "This shows", "I did that", "That is why"; "that" as a conjunction or relative pronoun
+("a system that is shared") passes). The closing is now "Sincerely, [Name]" and the placeholders have no "your" in them ("Thank you" itself
+contains "you"). **Rework count:** 0 so far (shown to Ted on a real role, Koalafi, before it ships). **Root cause of the fixtures breaking:** the
+test and QC letters used "Your ..." and "Thank you", so they had to change with the rule. **Not done:** the demonstrative check is a heuristic
+(a refused letter is written once more, so a false alarm costs one extra call, not a failure); the gallery specimens still show the old
+"Thank you, [Your name]" wording (they are specimens, not checked).
