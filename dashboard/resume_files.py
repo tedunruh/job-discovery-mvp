@@ -60,52 +60,72 @@ def _latin1(text):
     return unicodedata.normalize("NFC", text).encode("latin-1", "replace").decode("latin-1")
 
 
+# Word lays text out as the font's own line height (Arial: 1.15 x the size) times the style's "auto" spacing (1.1 here),
+# with paragraph gaps from the styles below. The PDF uses the very same numbers (the same sizes, gaps and indents as
+# STYLES and `_p` further down), so the two files break at the same places and have the same number of pages.
+LINE = 1.15 * 1.1
+
+
 def to_pdf(structure):
-    """The resume as PDF bytes."""
+    """The resume as PDF bytes, laid out like `to_docx` (same fonts, sizes, line height, gaps and margins)."""
     pdf = FPDF(unit="pt", format="Letter")
-    pdf.set_margins(54, 50, 54)
+    pdf.set_margins(54, 50, 54)   # 0.75 in at the sides, 50 pt top and bottom, like the Word page margins
     pdf.set_auto_page_break(True, 50)
     pdf.set_title("Resume")
     pdf.add_page()
     width = pdf.w - pdf.l_margin - pdf.r_margin
 
-    def text(value, size=10, style="", gap=3, indent=0, line=None, align="L"):
+    def room(points):
+        """Start a new page when `points` more would not fit (a heading never ends a page alone, as in Word)."""
+        if pdf.get_y() + points > pdf.page_break_trigger:
+            pdf.add_page()
+
+    def para(value, size=10, style="", before=0, after=3, left=0):
+        if before and pdf.get_y() > pdf.t_margin + 1:   # Word drops the space above a paragraph at the top of a page
+            pdf.ln(before)
         pdf.set_font("Helvetica", style, size)
-        pdf.set_x(pdf.l_margin + indent)
-        pdf.multi_cell(width - indent, line or size * 1.35, _latin1(value), align=align, new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(gap)
+        pdf.set_x(pdf.l_margin + left)
+        pdf.multi_cell(width - left, size * LINE, _latin1(value), align="L", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(after)
 
     for n, (heading, blocks) in enumerate(sections(structure)):
         if not blocks:
             continue
         if n == 0:   # the header: name big, then contact lines
             for k, (_, line) in enumerate(blocks):
-                text(line, 18 if k == 0 else 9.5, "B" if k == 0 else "", gap=2 if k else 4, align="L")
-            pdf.ln(4)
+                para(line, 18 if k == 0 else 9.5, "B" if k == 0 else "", after=2 if k == 0 else 3)
             continue
-        pdf.ln(4)
-        text(heading.upper(), 10, "B", gap=1)
+        room(10 + 10 * LINE + 6.5 + 14 * LINE)
+        if pdf.get_y() > pdf.t_margin + 1:
+            pdf.ln(10)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_x(pdf.l_margin)
+        top = pdf.get_y()
+        pdf.cell(width, 10 * LINE, _latin1(heading.upper()), new_x="LMARGIN", new_y="NEXT")
         pdf.set_draw_color(120, 120, 120)
         pdf.set_line_width(0.5)
-        pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
-        pdf.ln(5)
+        rule = top + 10 * LINE   # the rule sits under the heading's line, as Word's paragraph border does
+        pdf.line(pdf.l_margin, rule, pdf.w - pdf.r_margin, rule)
+        pdf.set_y(rule + 0.5 + 5)
         for block in blocks:
             if block[0] == "role":
                 _, head, meta, bullets = block
                 if head:
-                    text(head, 10.5, "B", gap=0)
+                    room(4 + 10.5 * LINE + 9.5 * LINE + 10 * LINE)
+                    para(head, 10.5, "B", before=4, after=0)
                 if meta:
-                    text(meta, 9.5, "", gap=2)
+                    para(meta, 9.5)
                 for bullet in bullets:
+                    room(10 * LINE)
                     pdf.set_font("Helvetica", "", 10)
-                    pdf.set_x(pdf.l_margin + 8)
-                    pdf.cell(10, 13.5, "·")
-                    pdf.set_x(pdf.l_margin + 18)
-                    pdf.multi_cell(width - 18, 13.5, _latin1(bullet), new_x="LMARGIN", new_y="NEXT")
+                    top = pdf.get_y()
+                    pdf.set_fill_color(0, 0, 0)
+                    pdf.ellipse(pdf.l_margin + 6, top + 10 * LINE / 2 - 1.4, 2.8, 2.8, style="F")   # Word's bullet, drawn
+                    pdf.set_xy(pdf.l_margin + 18, top)
+                    pdf.multi_cell(width - 18, 10 * LINE, _latin1(bullet), align="L", new_x="LMARGIN", new_y="NEXT")
                     pdf.ln(1.5)
-                pdf.ln(5)
             else:
-                text(block[1], 10, gap=3)
+                para(block[1])
     return bytes(pdf.output())
 
 

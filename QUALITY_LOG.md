@@ -1537,3 +1537,14 @@ stops inside the bottom edge. The tabs are no longer sticky (nothing scrolls und
 header fold. **Rework count:** 1 (reached Ted). **Root cause:** the panel was built with a fixed head and a scrolling body, but the list it
 sits beside was left as the old whole-board scroll, and no check compared the two panes. **Standing check added:** in the open-panel check,
 after scrolling, the board itself must still be at 0, the list under the tabs must have scrolled, and the list must start below the tabs.
+
+
+### 2026-11-13 — SC-72: the PDF ran longer than the Word file
+**What shipped.** Ted exported both files: the PDF was 3 pages, the Word file 2 (and Word's own PDF export of it 2). The PDF was laid out
+with its own numbers, not the Word file's: lines 1.35 x the size (Word's are Arial's 1.15 x 1.1), bigger gaps, and justified text. Now the
+PDF uses the Word file's numbers (`LINE` in `resume_files.py`, same sizes, gaps, indents and margins), left-aligned text, drawn round
+bullets, a heading never ends a page alone. **Rework count:** 1 (reached Ted). **Root cause:** slice 3's two files were each checked to
+open and to hold the right text, never against each other, so nothing compared their layout. **Check added:** a unit test pins the PDF's
+line pitch to the Word file's. Compared with the same resume exported by Pages (not Word): within a few percent (Pages spaces lines a
+little tighter than Word does, so I can't confirm Word's exact page break). Not done: a look at a real Word export; resumes that fill a page to
+the last line can still break a line or two differently in Word and the PDF.
