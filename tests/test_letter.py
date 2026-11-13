@@ -67,6 +67,22 @@ class CheckLetter(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("posting asks for", why)
 
+    def test_a_number_said_in_words_is_refused_unless_the_resume_says_it_that_way(self):
+        ok, why = self.check(GOOD.replace("cut support calls by 20%", "cut support calls by a fifth"))
+        self.assertFalse(ok)
+        self.assertIn("in words", why)
+        ok, _ = lt.check_letter(GOOD.replace("by 20%", "by a fifth"), plain() + "\ncut calls by a fifth", "Juniper Labs",
+                                "Senior Product Designer", patterns())
+        self.assertTrue(ok)   # the resume itself says it that way
+
+    def test_the_first_word_of_a_paragraph_is_not_read_as_a_name(self):
+        self.assertEqual(lt.check_letter(GOOD.replace("Hello Juniper team,\n\n", "Hello Juniper team,\n\nYour posting caught my eye. ", 1),
+                                         plain(), "Juniper Labs", "Senior Product Designer", patterns()), (True, ""))
+
+    def test_the_prompt_asks_for_a_through_line_and_for_how_and_result(self):
+        for phrase in ("through line", "how and result", "bare claim", "skills list"):
+            self.assertIn(phrase, lt.PROMPT.replace("how and its result", "how and result"))
+
     def test_the_company_and_role_are_not_made_up_facts(self):
         self.assertTrue(self.check(GOOD.replace("Hello Juniper team", "Hello Juniper Labs team"))[0])
 

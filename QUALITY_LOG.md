@@ -1548,3 +1548,17 @@ open and to hold the right text, never against each other, so nothing compared t
 line pitch to the Word file's. Compared with the same resume exported by Pages (not Word): within a few percent (Pages spaces lines a
 little tighter than Word does, so I can't confirm Word's exact page break). Not done: a look at a real Word export; resumes that fill a page to
 the last line can still break a line or two differently in Word and the PDF.
+
+
+### 2026-11-13 — SC-72: the cover letter read like a list of strengths
+**What shipped.** Ted, after applying with the letters: strong attributes, but they read as a series of bullet points with no through line, and
+claims like "I mentor designers" did nothing; they wanted the how and the result. The prompt (`letter.PROMPT`) now has the model find one
+through line (what the role needs, and the thread in the resume that answers it) and tell that, with each paragraph linked by the role's
+need; it gives one or two examples as what they did, how, and what changed in the resume's own numbers; it bans bare claims (a claim stays
+only with its how and result, and a skill that appears only in a skills list isn't mentioned) and bans invented reasons or lessons.
+Two checks the real runs exposed: the model rewrote "20%" as "a fifth", and quoted the posting's numbers ("four product teams"), so
+`check_letter` now refuses a number said in words unless the resume says it that way, the prompt says to use no number outside the resume
+(posting numbers too), and a paragraph's first word is no longer read as a name ("Your" was refused). `try_tailor.py --letter` runs it for
+real. **Rework count:** 1 (reached Ted). **Root cause:** slice 3 was only judged on whether the letter was accurate (the check), never on whether
+it read well, and no real-model letter had been read before Ted did. **Not done:** each prompt run here used the built-in fake resume, whose
+bullets are thin, so how and result come out sparse; Ted's real resume will show more. Eight real letters at about $0.007 each.

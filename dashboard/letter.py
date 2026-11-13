@@ -42,6 +42,10 @@ MESSAGES = {
 GREETING_WORDS = {"i", "hello", "hi", "dear", "hiring", "manager", "team", "thank", "thanks", "you", "best", "regards",
                   "sincerely", "warmly"}
 
+# Numbers in words that the number check can't read, so a letter may not use them unless the resume does ("a fifth" for 20%).
+FRACTION_WORDS = re.compile(r"\b(half|halved|third|thirds|quarter|fifth|fifths|tenth|double|doubled|triple|tripled|twice|"
+                            r"thrice|dozen|dozens)\b", re.IGNORECASE)
+
 # PROVIDER(structure, posting_text, company, title, missing_labels, note) -> ReadResult whose fields are {"letter": str};
 # tests replace it so no call is made. May raise tailor.TailorError.
 PROVIDER = None
@@ -54,13 +58,32 @@ SCHEMA = {
 }
 
 PROMPT = (
-    "You write a short cover letter draft for a job applicant, from their resume and one job posting, for a job-alert "
+    "You write a cover letter draft for a job applicant, from their resume and one job posting, for a job-alert "
     "service. Return it as {letter}.\n"
-    "Format: plain text, first person, three short paragraphs, 120 to 220 words, no markdown. Start with \"Hello \" and "
+    "Format: plain text, first person, three short paragraphs, 150 to 230 words, no markdown. Start with \"Hello \" and "
     "the company's name and \"team,\" and end with \"Thank you,\" and then \"[Your name]\" on its own line.\n"
+    "How to write it:\n"
+    "- Find the through line first: the one thing this role most needs, and the one thread in the resume that speaks to "
+    "it. The whole letter tells that one story. It is not a list of strengths. Each paragraph picks up where the last one "
+    "stopped, linked by what the role needs, never by a new topic. Do not invent reasons for what the person did or what "
+    "it taught them: say why only when the resume does.\n"
+    "- Paragraph 1 states the through line: what the role needs and why this person's work points at it. Do not open "
+    "with who they are or that they are excited to apply.\n"
+    "- Paragraph 2 gives one or two examples from the resume as how and result: what they did, how they went about it, "
+    "and what changed because of it, in the resume's own numbers and outcomes.\n"
+    "- Paragraph 3 looks ahead: what they would do in this role, tied back to the through line, then a placeholder for "
+    "why this company.\n"
+    "- Never state a bare claim (\"I mentor designers\", \"I am strong at systems\"). A claim stays only with its how "
+    "and its result from the resume. If the resume gives no how or result for something, leave it out: a shorter letter "
+    "beats an empty claim. A skill that only appears in a skills list has no how or result, so do not mention it.\n"
+    "- Choose, do not pile up: use two or three things from the resume, the ones closest to what the role needs most, "
+    "and leave the rest out.\n"
     "Hard rules:\n"
     "- Use only what the resume says about the person. Never add a skill, tool, method, job title, employer, number, date, "
-    "result or claim that is not in the resume. Keep every number exactly as the resume has it.\n"
+    "result or claim that is not in the resume. Use no number the resume does not state, and that includes numbers from the "
+    "posting (say \"several product teams\", not \"four product teams\"). Write every number exactly as the resume writes it "
+    "(\"20%\", never \"a fifth\", \"half\" or \"doubled\"). How and result must come from the resume's own words, never be inferred, and never add a lesson "
+    "or a feeling the resume does not state (\"which is where I learned\", \"I have always\").\n"
     "- Speak to what the posting asks for, in the posting's own words where they mean the same as the resume's.\n"
     "- For anything a good letter would include that you do not know, write a short placeholder in square brackets, such "
     "as [one sentence on why you want to work at the company], [link to your portfolio] or [name of the hiring manager]. "
@@ -131,10 +154,14 @@ def check_letter(letter, resume, company, title, missing_patterns):
     if words < MIN_WORDS or words > MAX_WORDS:
         return False, f"It must be between {MIN_WORDS} and {MAX_WORDS} words."
     core = re.sub(r"\[[^\]]*\]", " ", letter)
+    core = re.sub(r"\s*\n+\s*", ". ", core)   # a line or paragraph starts a sentence, so its first word is not read as a name
     allowed_numbers = {value for value, _ in tailor.numbers(resume)}
     extra = [value for value, _ in tailor.numbers(core) if value not in allowed_numbers]
     if extra:
         return False, "It stated a number that is not in the resume."
+    in_resume = set(m.lower() for m in FRACTION_WORDS.findall(resume))
+    if any(m.lower() not in in_resume for m in FRACTION_WORDS.findall(core)):
+        return False, "It restated a number in words (such as a fifth or doubled). Write numbers as the resume does."
     known = set(tailor.NAME_RE.findall(resume.lower())) | set(tailor._words(resume))
     known |= set(tailor._words(company)) | set(tailor._words(title)) | GREETING_WORDS
     unknown = [name for name in tailor.names(core) if name not in known]
