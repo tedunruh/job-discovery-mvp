@@ -1574,3 +1574,13 @@ contains "you"). **Rework count:** 0 so far (shown to Ted on a real role, Koalaf
 test and QC letters used "Your ..." and "Thank you", so they had to change with the rule. **Not done:** the demonstrative check is a heuristic
 (a refused letter is written once more, so a false alarm costs one extra call, not a failure); the gallery specimens still show the old
 "Thank you, [Your name]" wording (they are specimens, not checked).
+
+### 2026-11-13 — SC-72: wider panel, no scroll inside the panel's scroll
+**What shipped.** Ted: the right panel had a double scroll (the letter box scrolled inside the panel body) and the job list had a lot of
+empty space. The panel is now `clamp(480px, 42%, 680px)` wide (was 480px), and the cover letter box grows with its text (`fitLetter` in
+`panel.js` adds `is-fitted`: no scroll of its own, no resize handle), so the panel body is the only thing that scrolls. QC checks that the box shows
+all its text when the letter arrives and keeps doing so while the person types. **Rework count:** 0 so far (not yet seen by Ted).
+**Root cause of the double scroll:** the text area was built as a fixed-height field (14 rows), which is right for a form but wrong inside a
+panel that already scrolls. **What went wrong while building it:** my first edit put the fit call in the neighbouring function (`swapChange`, same
+`replaceWith` line as `swapSection`), so the QC check caught it on its first run; a string-replace on a line that appears twice should name
+the function around it. **Not done:** a real look at the wider panel at several window widths (QC covers 1280 and 390, which have no overflow).

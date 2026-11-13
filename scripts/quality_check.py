@@ -1433,7 +1433,12 @@ def check_tailor(browser, base, token, user_id):
             check(page.evaluate("document.querySelector('#apply-panel [data-letter] textarea').labels.length === 0 && "
                                 "document.getElementById(document.querySelector('#apply-panel [data-letter] textarea').getAttribute('aria-labelledby')).textContent.trim()") == "Cover letter",
                   f"the letter box is named by its heading  [{tag}]")
-            box.fill(box.input_value() + "\n\nP.S. Edited by me.")
+            sizes = page.evaluate("(() => { const b = document.querySelector('#apply-panel [data-letter] textarea'); return [b.scrollHeight, b.clientHeight, b.style.height, b.className, b.rows]; })()")
+            check(sizes[0] <= sizes[1] + 1, f"the letter box shows all its text: no scroll inside the panel's scroll  [{tag}]", repr(sizes))
+            box.fill(box.input_value() + "\n\nP.S. Edited by me. " + "More words so the box has to grow. " * 40)
+            check(page.evaluate("(() => { const b = document.querySelector('#apply-panel [data-letter] textarea'); return b.scrollHeight <= b.clientHeight + 1; })()"),
+                  f"the letter box grows as the person types  [{tag}]")
+            box.fill(box.input_value().split("\n\nP.S.")[0] + "\n\nP.S. Edited by me.")
             box.press("Tab")
             page.wait_for_function("document.querySelector('#apply-panel [data-letter-saved]').textContent.includes('saved')", timeout=5000)
             conn = get_conn()
