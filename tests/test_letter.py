@@ -244,6 +244,21 @@ class Files(unittest.TestCase):
         self.assertEqual(rf.file_stem({"header": ["ada@example.com"]}, "A/B <c>"), "resume-a-b-c")
         self.assertEqual(rf.file_stem({}, ""), "resume")
 
+    def test_the_pdf_is_laid_out_like_the_word_file(self):
+        """Same page count in both: the PDF's lines are spaced as Word spaces them (Arial's 1.15 x 1.1 here), not looser.
+        It was once 1.35, so a resume that fit two pages in Word came out as three in the PDF."""
+        import pypdf
+        bullet = "Led the redesign of the onboarding flow for a product with two million monthly users " * 2
+        long = {"summary": "", "skills": [], "education": [], "other": [], "header": [],
+                "experience": [{"title": "Designer", "company": "Acme", "location": "", "dates": "", "bullets": [bullet] * 6}]}
+        ys = []
+        page = pypdf.PdfReader(io.BytesIO(rf.to_pdf(long))).pages[0]
+        page.extract_text(visitor_text=lambda text, cm, tm, fd, fs: ys.append(round(tm[5] * cm[3] + cm[5], 1)) if text.strip() else None)
+        ys = sorted(set(ys), reverse=True)
+        pitches = [round(a - b, 1) for a, b in zip(ys, ys[1:])]
+        self.assertIn(round(10 * rf.LINE, 1), pitches)   # a wrapped line sits 12.65 pt below the one above
+        self.assertTrue(all(p < 14.5 for p in pitches[2:]), pitches)   # after the heading and role lines
+
     def test_the_files_are_made_from_the_kept_changes_only(self):
         changes = [{"id": "c1", "kind": "reword", "target": "summary", "value": "Brand new summary.", "kept": True},
                    {"id": "c2", "kind": "skills", "target": "skills", "value": ["User research", "Figma", "Prototyping"], "kept": False}]
