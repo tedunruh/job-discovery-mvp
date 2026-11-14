@@ -3,6 +3,7 @@
     python scripts/try_tailor.py                                  # a built-in fake resume and a fake posting
     python scripts/try_tailor.py path/to/cv.pdf posting.txt       # your resume and a posting's text (both are sent to Anthropic)
     python scripts/try_tailor.py --effort medium                  # how hard Sonnet thinks: low (default), medium, high
+    python scripts/try_tailor.py --letter                         # also write the cover letter (a third call) and check it
 
 It runs the two calls a tailoring makes, the same code the dashboard runs: the small model reads the PDF into
 structure and the line-by-line check against the PDF's text runs; then the main model proposes edits and the accuracy
@@ -18,7 +19,7 @@ from dotenv import load_dotenv
 
 load_dotenv(".env.local")
 
-from dashboard import fit, tailor  # noqa: E402
+from dashboard import fit, letter, tailor  # noqa: E402
 from scripts.try_resume_read import fake_resume_pdf  # noqa: E402
 
 FAKE_POSTING = """Staff Product Designer, Design Systems at Juniper Labs (remote, United States)
@@ -60,6 +61,8 @@ def show(label, result, kind):
 
 def main():
     args = [a for a in sys.argv[1:]]
+    want_letter = "--letter" in args
+    args = [a for a in args if a != "--letter"]
     if "--effort" in args:
         at = args.index("--effort")
         tailor.EFFORT = args[at + 1]
@@ -116,7 +119,24 @@ def main():
         print(f"    after   {change['after']}")
         print(f"    why     {change['why']}")
 
-    spent = tailor.cost_usd(read.input_tokens, read.output_tokens, "structure") + tailor.cost_usd(result.input_tokens, result.output_tokens, "tailor")
+    letter_cost = 0.0
+    if want_letter:
+        kept = tailor.apply_changes(structure, [dict(c, kept=True) for c in changes])
+        labels, _ = tailor.missing_requirements(FAKE_REQUIREMENTS, evidence_text)
+        try:
+            written = letter.write(kept, posting, "Juniper Labs", "Staff Product Designer, Design Systems", labels)
+        except tailor.TailorError as e:
+            sys.exit(f"The letter call failed ({e.kind}).\nWhat the API said: {e.__context__ if e.__context__ else 'nothing: the call was not made'}")
+        show("3. Cover letter", written, "letter")
+        letter_cost = tailor.cost_usd(written.input_tokens, written.output_tokens, "letter")
+        text = letter.clean_letter((written.fields or {}).get("letter"))
+        ok, why = letter.check_letter(text, letter.resume_text(kept) + "\n" + resume_text, "Juniper Labs",
+                                      "Staff Product Designer, Design Systems", patterns)
+        print(f"  words        {len(text.split())}")
+        print(f"  accuracy     {'passed the check' if ok else 'REJECTED: ' + why + ' (a real run would write it once more)'}")
+        print("\n" + text + "\n")
+
+    spent = tailor.cost_usd(read.input_tokens, read.output_tokens, "structure") + tailor.cost_usd(result.input_tokens, result.output_tokens, "tailor") + letter_cost
     again = tailor.cost_usd(result.input_tokens, result.output_tokens, "tailor")
     print(f"\nThis run cost ${spent:.4f}. A person's first tailoring costs about that; later ones reuse the structure (about ${again:.4f}).")
     print(f"Ten tailorings by one person: about ${spent + 9 * again:.2f}. At the default Scout-wide cap of ${tailor.DEFAULT_MONTHLY_CAP_USD:.0f} a month that is "

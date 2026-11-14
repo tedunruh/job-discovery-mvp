@@ -1240,9 +1240,9 @@ TAILOR_LETTER = (
     "Hello Quality Check Studio team,\n\n"
     "I have spent 10 years designing products people use every day. At Northwind Health I owned the design system in "
     "Figma and hired two designers, and I ran the research behind a redesign that cut support calls by 20%.\n\n"
-    "Your Staff Product Designer role leads design systems, which is the work I enjoy most, and I like working "
-    "closely with developers to keep designs and code in sync. [One sentence on why you want to work at Quality Check Studio.]\n\n"
-    "I would love to talk about the role. [Link to your portfolio]\n\nThank you,\n[Your name]")
+    "The Staff Product Designer role at Quality Check Studio leads design systems, which is the work I enjoy most, and I like working "
+    "closely with developers to keep designs and code in sync. [One sentence on why Quality Check Studio appeals.]\n\n"
+    "I would love to talk about the role. [Link to portfolio]\n\nSincerely,\n[Name]")
 
 
 def got_404(ctx, url):
@@ -1428,12 +1428,17 @@ def check_tailor(browser, base, token, user_id):
             check(told, f"a screen reader is told the letter is ready  [{tag}]")
             check(page.evaluate("window.__changes.isConnected"), f"the finished letter swapped in without redrawing the changes  [{tag}]")
             box = page.locator("#apply-panel [data-letter] textarea")
-            check(box.input_value().startswith("Hello Quality Check Studio team,") and "[Your name]" in box.input_value(),
+            check(box.input_value().startswith("Hello Quality Check Studio team,") and "[Name]" in box.input_value(),
                   f"the letter is a draft with bracketed parts to fill in  [{tag}]")
             check(page.evaluate("document.querySelector('#apply-panel [data-letter] textarea').labels.length === 0 && "
                                 "document.getElementById(document.querySelector('#apply-panel [data-letter] textarea').getAttribute('aria-labelledby')).textContent.trim()") == "Cover letter",
                   f"the letter box is named by its heading  [{tag}]")
-            box.fill(box.input_value() + "\n\nP.S. Edited by me.")
+            sizes = page.evaluate("(() => { const b = document.querySelector('#apply-panel [data-letter] textarea'); return [b.scrollHeight, b.clientHeight, b.style.height, b.className, b.rows]; })()")
+            check(sizes[0] <= sizes[1] + 1, f"the letter box shows all its text: no scroll inside the panel's scroll  [{tag}]", repr(sizes))
+            box.fill(box.input_value() + "\n\nP.S. Edited by me. " + "More words so the box has to grow. " * 40)
+            check(page.evaluate("(() => { const b = document.querySelector('#apply-panel [data-letter] textarea'); return b.scrollHeight <= b.clientHeight + 1; })()"),
+                  f"the letter box grows as the person types  [{tag}]")
+            box.fill(box.input_value().split("\n\nP.S.")[0] + "\n\nP.S. Edited by me.")
             box.press("Tab")
             page.wait_for_function("document.querySelector('#apply-panel [data-letter-saved]').textContent.includes('saved')", timeout=5000)
             conn = get_conn()

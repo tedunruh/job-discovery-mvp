@@ -1548,3 +1548,39 @@ open and to hold the right text, never against each other, so nothing compared t
 line pitch to the Word file's. Compared with the same resume exported by Pages (not Word): within a few percent (Pages spaces lines a
 little tighter than Word does, so I can't confirm Word's exact page break). Not done: a look at a real Word export; resumes that fill a page to
 the last line can still break a line or two differently in Word and the PDF.
+
+
+### 2026-11-13 — SC-72: the cover letter read like a list of strengths
+**What shipped.** Ted, after applying with the letters: strong attributes, but they read as a series of bullet points with no through line, and
+claims like "I mentor designers" did nothing; they wanted the how and the result. The prompt (`letter.PROMPT`) now has the model find one
+through line (what the role needs, and the thread in the resume that answers it) and tell that, with each paragraph linked by the role's
+need; it gives one or two examples as what they did, how, and what changed in the resume's own numbers; it bans bare claims (a claim stays
+only with its how and result, and a skill that appears only in a skills list isn't mentioned) and bans invented reasons or lessons.
+Two checks the real runs exposed: the model rewrote "20%" as "a fifth", and quoted the posting's numbers ("four product teams"), so
+`check_letter` now refuses a number said in words unless the resume says it that way, the prompt says to use no number outside the resume
+(posting numbers too), and a paragraph's first word is no longer read as a name ("Your" was refused). `try_tailor.py --letter` runs it for
+real. **Rework count:** 1 (reached Ted). **Root cause:** slice 3 was only judged on whether the letter was accurate (the check), never on whether
+it read well, and no real-model letter had been read before Ted did. **Not done:** each prompt run here used the built-in fake resume, whose
+bullets are thin, so how and result come out sparse; Ted's real resume will show more. Eight real letters at about $0.007 each.
+
+
+### 2026-11-13 — SC-72: voice rules for the cover letter
+**What shipped.** Ted gave a style rule for the letter: no "you", "your" or "yours" (name the company, team, product or role instead), no
+this/that/these/those standing alone (each is followed by its noun), and every sentence specific to the posting or the resume. These are in
+the prompt and enforced by `check_letter`: a draft with a second-person word outside the brackets is refused, and so is a bare
+demonstrative (`vague_demonstrative`: "This shows", "I did that", "That is why"; "that" as a conjunction or relative pronoun
+("a system that is shared") passes). The closing is now "Sincerely, [Name]" and the placeholders have no "your" in them ("Thank you" itself
+contains "you"). **Rework count:** 0 so far (shown to Ted on a real role, Koalafi, before it ships). **Root cause of the fixtures breaking:** the
+test and QC letters used "Your ..." and "Thank you", so they had to change with the rule. **Not done:** the demonstrative check is a heuristic
+(a refused letter is written once more, so a false alarm costs one extra call, not a failure); the gallery specimens still show the old
+"Thank you, [Your name]" wording (they are specimens, not checked).
+
+### 2026-11-13 — SC-72: wider panel, no scroll inside the panel's scroll
+**What shipped.** Ted: the right panel had a double scroll (the letter box scrolled inside the panel body) and the job list had a lot of
+empty space. The panel is now `clamp(480px, 42%, 680px)` wide (was 480px), and the cover letter box grows with its text (`fitLetter` in
+`panel.js` adds `is-fitted`: no scroll of its own, no resize handle), so the panel body is the only thing that scrolls. QC checks that the box shows
+all its text when the letter arrives and keeps doing so while the person types. **Rework count:** 0 so far (not yet seen by Ted).
+**Root cause of the double scroll:** the text area was built as a fixed-height field (14 rows), which is right for a form but wrong inside a
+panel that already scrolls. **What went wrong while building it:** my first edit put the fit call in the neighbouring function (`swapChange`, same
+`replaceWith` line as `swapSection`), so the QC check caught it on its first run; a string-replace on a line that appears twice should name
+the function around it. **Not done:** a real look at the wider panel at several window widths (QC covers 1280 and 390, which have no overflow).

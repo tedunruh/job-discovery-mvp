@@ -1513,6 +1513,8 @@ button.fg-link {
   text-align: left;
   resize: vertical;
 }
+/* A text area the page has fitted to its text (panel.js adds is-fitted): no scroll of its own, no handle. */
+.fg-textarea.is-fitted { overflow-y: hidden; resize: none; }
 .fg-files { display: flex; flex-direction: column; gap: var(--fg-space-3); }
 .fg-files .fg-file-row {
   padding: var(--fg-space-3);

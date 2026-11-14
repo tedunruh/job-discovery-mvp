@@ -30,10 +30,10 @@ GOOD = (
     "I design products people use every day, and I have spent 10 years doing it across B2B and consumer products. At "
     "Northwind Health I owned the design system in Figma and hired two designers, and I ran the research behind a "
     "redesign that cut support calls by 20%.\n\n"
-    "Your Senior Product Designer role asks for someone who can set a direction and then build it with developers. "
-    "That is the work I enjoy most. Before Northwind Health, at Fieldstone, I designed onboarding and billing flows "
-    "for a B2B platform. [One sentence on why you want to work at Juniper.]\n\n"
-    "I would love to talk about the role. [Link to your portfolio]\n\nThank you,\n[Your name]"
+    "The Senior Product Designer role at Juniper asks for someone who can set a direction and then build it with developers. "
+    "That work is what I enjoy most. Before Northwind Health, at Fieldstone, I designed onboarding and billing flows "
+    "for a B2B platform. [One sentence on why Juniper appeals.]\n\n"
+    "I would love to talk about the role. [Link to portfolio]\n\nSincerely,\n[Name]"
 )
 
 
@@ -67,14 +67,51 @@ class CheckLetter(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("posting asks for", why)
 
+    def test_a_number_said_in_words_is_refused_unless_the_resume_says_it_that_way(self):
+        ok, why = self.check(GOOD.replace("cut support calls by 20%", "cut support calls by a fifth"))
+        self.assertFalse(ok)
+        self.assertIn("in words", why)
+        ok, _ = lt.check_letter(GOOD.replace("by 20%", "by a fifth"), plain() + "\ncut calls by a fifth", "Juniper Labs",
+                                "Senior Product Designer", patterns())
+        self.assertTrue(ok)   # the resume itself says it that way
+
+    def test_the_first_word_of_a_paragraph_is_not_read_as_a_name(self):
+        self.assertEqual(lt.check_letter(GOOD.replace("Hello Juniper team,\n\n", "Hello Juniper team,\n\nMeanwhile the posting caught my eye. ", 1),
+                                         plain(), "Juniper Labs", "Senior Product Designer", patterns()), (True, ""))
+
+    def test_the_prompt_asks_for_a_through_line_and_for_how_and_result(self):
+        for phrase in ("through line", "how and result", "bare claim", "skills list"):
+            self.assertIn(phrase, lt.PROMPT.replace("how and its result", "how and result"))
+
+    def test_second_person_words_are_refused_outside_brackets_only(self):
+        for bad in ("Your team", "your team", "Thank you,", "you are", "yourself"):
+            ok, why = self.check(GOOD.replace("The Senior Product Designer role at Juniper", bad + " Senior Product Designer role at Juniper", 1))
+            self.assertFalse(ok, bad)
+            self.assertIn("you", why)
+        self.assertTrue(self.check(GOOD.replace("[Link to portfolio]", "[Link to your portfolio, and why you chose it]"))[0])
+
+    def test_a_pointing_word_with_no_noun_is_refused(self):
+        for sentence in ("That is the work I enjoy most.", "This shows how I work.", "I did that at Fieldstone.",
+                         "Those are the habits I bring.", "I built it, and that is why I applied."):
+            self.assertTrue(lt.vague_demonstrative(sentence), sentence)
+            ok, why = self.check(GOOD.replace("That work is what I enjoy most.", sentence))
+            self.assertFalse(ok, sentence)
+            self.assertIn("this, that, these or those", why)
+
+    def test_a_pointing_word_with_its_noun_and_a_plain_that_are_fine(self):
+        for sentence in ("That migration cut support calls by 20%.", "This design system serves 20 teams.",
+                         "I built a system that is shared by several teams.", "I tested so that teams could ship faster.",
+                         "Those components shipped in Figma.", "The role requires someone that has led a system."):
+            self.assertFalse(lt.vague_demonstrative(sentence), sentence)
+
     def test_the_company_and_role_are_not_made_up_facts(self):
         self.assertTrue(self.check(GOOD.replace("Hello Juniper team", "Hello Juniper Labs team"))[0])
 
     def test_what_is_in_brackets_is_for_the_person_and_is_not_checked(self):
-        self.assertTrue(self.check(GOOD.replace("[Link to your portfolio]", "[Link to Ada's 2031 Behance page]"))[0])
+        self.assertTrue(self.check(GOOD.replace("[Link to portfolio]", "[Link to Ada's 2031 Behance page]"))[0])
 
     def test_too_short_or_too_long_is_refused(self):
-        self.assertFalse(self.check("Hello Juniper team,\n\nHi.\n\nThank you,\n[Your name]")[0])
+        self.assertFalse(self.check("Hello Juniper team,\n\nHi.\n\nSincerely,\n[Name]")[0])
         self.assertFalse(self.check(GOOD + " " + "word " * 400)[0])
 
     def test_clean_letter_is_plain_bounded_text(self):

@@ -833,7 +833,7 @@
   <section class="spec" data-component="textarea">
     <div>
       <h3>Text area</h3>
-      <p class="spec-use">Use for a few paragraphs the person writes or edits, like a cover letter. It is a text field that grows: the same box, 16px text, three controls tall to start, resized only up and down. Name it with the heading above it (<code>aria-labelledby</code>) or a label; free text stays left-aligned.</p>
+      <p class="spec-use">Use for a few paragraphs the person writes or edits, like a cover letter. It is a text field that grows: the same box, 16px text, three controls tall to start, resized only up and down. In the panel, the cover letter box grows with its text (the page adds <code>is-fitted</code>: no scroll of its own, no handle), so the panel is the only thing that scrolls. Name it with the heading above it (<code>aria-labelledby</code>) or a label; free text stays left-aligned.</p>
       <code class="spec-code">{% raw %}{{ fg.textarea(id, name, value, labelledby, rows, maxlength) }}{% endraw %} · textarea.fg-input.fg-textarea</code>
     </div>
     <div class="states">

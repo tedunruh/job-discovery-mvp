@@ -131,6 +131,19 @@
     again();
   }
 
+  /* The letter box grows with its text, so the panel body is the only thing that scrolls (no scroll inside a scroll). */
+  function fitLetter() {
+    Array.prototype.forEach.call(panel.querySelectorAll("[data-letter-form] textarea"), function (box) {
+      if (!box.offsetParent) return;
+      var look = window.getComputedStyle(box);
+      box.classList.add("is-fitted");
+      box.style.height = "auto";
+      box.style.height = (box.scrollHeight + parseFloat(look.borderTopWidth) + parseFloat(look.borderBottomWidth)) + "px";
+    });
+  }
+  panel.addEventListener("input", function (event) { if (event.target.tagName === "TEXTAREA") fitLetter(); });
+  window.addEventListener("resize", fitLetter);
+
   /* Put the server's markup in the panel and start whatever its stage needs. */
   function render(html, id, focusFirst) {
     stopWork();
@@ -139,6 +152,7 @@
     current = id;
     workspace.classList.add("fg-has-panel");
     select(id);
+    fitLetter();
     sync();
     if (window.fgJob && window.fgJob.showTailored) window.fgJob.showTailored(id, !!panel.querySelector("[data-tailored]"));
     if (focusFirst) {
@@ -249,6 +263,7 @@
     if (!fresh || !old) return false;
     var had = old.contains(document.activeElement);
     old.replaceWith(document.importNode(fresh, true));
+    fitLetter();
     var first = panel.querySelector(selector + " [data-letter-focus]");
     if (first && (focus || had)) first.focus();
     var voice = panel.querySelector(selector + " [data-announce]");

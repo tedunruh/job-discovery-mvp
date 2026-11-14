@@ -68,7 +68,7 @@
     }
     .voice-wrap + .workspace { margin-top: var(--fg-space-6); }
     .is-collapsed .workspace, .is-collapsed .voice-wrap + .workspace { margin-top: var(--fg-space-2); }
-    .workspace > .fg-panel { flex: 0 0 480px; max-width: none; animation: fg-slide 220ms ease; }
+    .workspace > .fg-panel { flex: 0 0 clamp(480px, 42%, 680px); max-width: none; animation: fg-slide 220ms ease; }
     @media (prefers-reduced-motion: reduce) { .workspace > .fg-panel { animation: none; } }
     /* Phone: the panel is a full screen sheet (below the toast, which stays visible). */
     @media (max-width: 680px) {
