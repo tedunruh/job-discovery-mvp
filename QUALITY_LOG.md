@@ -1584,3 +1584,6 @@ all its text when the letter arrives and keeps doing so while the person types. 
 panel that already scrolls. **What went wrong while building it:** my first edit put the fit call in the neighbouring function (`swapChange`, same
 `replaceWith` line as `swapSection`), so the QC check caught it on its first run; a string-replace on a line that appears twice should name
 the function around it. **Not done:** a real look at the wider panel at several window widths (QC covers 1280 and 390, which have no overflow).
+
+**Follow-up, same day:** Ted asked for 50/50. With the panel open the list and the panel now share the width equally (`flex: 1 1 0` on both; the panel's
+minimum is 480px), replacing the `clamp(480px, 42%, 680px)` above. QC checks the two widths match (or the panel is at its 480px floor and so wider).
