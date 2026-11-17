@@ -1584,3 +1584,15 @@ all its text when the letter arrives and keeps doing so while the person types. 
 panel that already scrolls. **What went wrong while building it:** my first edit put the fit call in the neighbouring function (`swapChange`, same
 `replaceWith` line as `swapSection`), so the QC check caught it on its first run; a string-replace on a line that appears twice should name
 the function around it. **Not done:** a real look at the wider panel at several window widths (QC covers 1280 and 390, which have no overflow).
+
+### 2026-11-16 — Workday: lighter schedule and a cool-off
+**What shipped.** Workday refused the collector's GitHub servers from about Nov 15 22:30 UTC for over a day (the same requests from Ted's Mac
+were fine; some boards still got through, so it looked like a throttle, not a ban). The per-run breaker already stopped after 5 refusals, but every
+run started over, the 4 core tenants (heavy, several searches each) were outside the breaker, and a 429 on a core tenant counted as that board
+"failing". Now: (1) Workday is asked less (hot tenants hourly instead of every 30 min, huge ones every 2h, core ones hourly, 3 requests at a
+time instead of 6); (2) core fetches are inside the breaker and a 429 is no longer a board failure; (3) a cool-off per ATS (`ats_cooloff`, applied
+to Neon before the code): after a trip the ATS is left alone for 1h, then 2h, 4h, 6h each time in a row, and one success clears it; the hourly
+alert says it is paused. **Rework count:** 0 so far. **Root cause:** the breaker had no memory between runs, and its counters were reset in
+the middle of the run (`_scan_tail`), so what the core stage saw was thrown away. **Cost:** new Workday roles can reach alerts up to an hour or
+two later. **Not done:** nothing proves the block was caused by our request volume (it may be GitHub's shared servers); if it never lifts, the
+next step is another network for Workday, which costs money.

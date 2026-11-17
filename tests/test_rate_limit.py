@@ -88,6 +88,87 @@ class ScanWithBlockedAts(unittest.TestCase):
         self.assertIn("48 board", alerts[0])
 
 
+class CoreCompaniesAreGuardedToo(unittest.TestCase):
+    def setUp(self):
+        rc._rate_limited.clear()
+        rc._succeeded.clear()
+        self.old = rc.COLLECTORS["workday"]
+        self.calls = []
+
+        def always_429(ident):
+            self.calls.append(ident)
+            raise http_error(429)
+        rc.COLLECTORS["workday"] = always_429
+
+    def tearDown(self):
+        rc.COLLECTORS["workday"] = self.old
+        rc._rate_limited.clear()
+        rc._succeeded.clear()
+
+    def test_core_fetches_stop_after_the_trip_count_and_count_toward_the_pause(self):
+        results = [rc._fetch_company(board(i, "workday", "core")) for i in range(1, 11)]
+        self.assertEqual(len(self.calls), rc.RATE_LIMIT_TRIP)
+        self.assertEqual(sum(isinstance(r[1], rc.AtsBlocked) for r in results), 10 - rc.RATE_LIMIT_TRIP)
+        self.assertEqual(rc._rate_limited["workday"], rc.RATE_LIMIT_TRIP)
+
+    def test_a_429_is_a_rate_limit_but_a_403_or_404_is_not(self):
+        self.assertTrue(rc._is_rate_limit(http_error(429)))
+        self.assertFalse(rc._is_rate_limit(http_error(403)))
+        self.assertFalse(rc._is_rate_limit(http_error(404)))
+        self.assertFalse(rc._is_rate_limit(ValueError("x")))
+
+
+class CoolOff(unittest.TestCase):
+    """settle_cooloffs: pause an ATS that tripped (longer each time in a row), clear one that answered."""
+    def setUp(self):
+        rc._rate_limited.clear()
+        rc._succeeded.clear()
+        self.saved, self.cleared = [], []
+        self.patches = [
+            mock.patch.object(rc, "save_ats_cooloff", lambda conn, ats, level, minutes: self.saved.append((ats, level, minutes))),
+            mock.patch.object(rc, "clear_ats_cooloff", lambda conn, ats: self.cleared.append(ats)),
+        ]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        rc._rate_limited.clear()
+        rc._succeeded.clear()
+
+    def test_the_first_trip_pauses_it_an_hour(self):
+        rc._rate_limited["workday"] = rc.RATE_LIMIT_TRIP
+        self.assertEqual(rc.settle_cooloffs(None, {}), {"workday": 60})
+        self.assertEqual(self.saved, [("workday", 1, 60)])
+
+    def test_each_trip_in_a_row_pauses_it_longer_up_to_six_hours(self):
+        rc._rate_limited["workday"] = rc.RATE_LIMIT_TRIP
+        got = []
+        for level in (1, 2, 3, 4, 4):
+            rc.settle_cooloffs(None, {"workday": {"active": False, "level": level, "minutes_left": 0}})
+            got.append(self.saved[-1][2])
+        self.assertEqual(got, [120, 240, 360, 360, 360])
+
+    def test_a_few_refusals_below_the_trip_do_not_pause_it(self):
+        rc._rate_limited["workday"] = rc.RATE_LIMIT_TRIP - 1
+        self.assertEqual(rc.settle_cooloffs(None, {}), {})
+        self.assertEqual(self.saved, [])
+
+    def test_a_success_after_a_pause_clears_it_but_no_attempt_leaves_it(self):
+        before = {"workday": {"active": False, "level": 2, "minutes_left": 0}}
+        rc.settle_cooloffs(None, before)
+        self.assertEqual(self.cleared, [])                 # nothing was asked of it this run
+        rc._succeeded["workday"] = 3
+        rc.settle_cooloffs(None, before)
+        self.assertEqual(self.cleared, ["workday"])
+
+    def test_a_pause_still_running_is_never_cleared(self):
+        rc._succeeded["workday"] = 3
+        rc.settle_cooloffs(None, {"workday": {"active": True, "level": 1, "minutes_left": 30}})
+        self.assertEqual(self.cleared, [])
+
+
 class WorkableCadence(unittest.TestCase):
     def test_hot_workable_boards_are_checked_every_other_run_and_never_skipped_twice(self):
         boards = [board(i) for i in range(1, 41)]

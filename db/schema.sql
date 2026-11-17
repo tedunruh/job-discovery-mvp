@@ -451,3 +451,17 @@ ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ;
 ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS applied_at TIMESTAMPTZ;
 ALTER TABLE tailor_calls DROP CONSTRAINT IF EXISTS tailor_calls_kind_check;
 ALTER TABLE tailor_calls ADD CONSTRAINT tailor_calls_kind_check CHECK (kind IN ('structure', 'tailor', 'letter'));
+
+-- ---------------------------------------------------------------------------
+-- Workday block (Nov 2026): a cool-off per ATS. When an ATS rate-limits a run (RATE_LIMIT_TRIP refusals) the collector
+-- stops asking it for a while, then tries again: 1h, 2h, 4h, then 6h each time it is refused again; one success
+-- clears the row. Additive; apply to Neon before pushing the code.
+--   until_at  no requests to this ATS before this time
+--   level     how many refusals in a row (picks the pause length)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ats_cooloff (
+    ats TEXT PRIMARY KEY,
+    until_at TIMESTAMPTZ NOT NULL,
+    level INTEGER NOT NULL DEFAULT 1,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

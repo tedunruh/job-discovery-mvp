@@ -1283,6 +1283,28 @@ def get_db_now(conn):
         return cur.fetchone()[0]
 
 
+def get_ats_cooloffs(conn):
+    """{ats: {"active": bool, "level": int, "minutes_left": int}} for every ATS with a cool-off row. A row whose time has
+    passed is "not active" (ask it again) but stays, so a second refusal pauses it for longer."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT ats, until_at > now(), level, GREATEST(EXTRACT(EPOCH FROM until_at - now()) / 60, 0) FROM ats_cooloff")
+        return {ats: {"active": bool(active), "level": level, "minutes_left": int(left)}
+                for ats, active, level, left in cur.fetchall()}
+
+
+def save_ats_cooloff(conn, ats, level, minutes):
+    with conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO ats_cooloff (ats, until_at, level) VALUES (%s, now() + make_interval(mins => %s), %s)
+               ON CONFLICT (ats) DO UPDATE SET until_at = EXCLUDED.until_at, level = EXCLUDED.level, updated_at = now()""",
+            (ats, minutes, level))
+
+
+def clear_ats_cooloff(conn, ats):
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM ats_cooloff WHERE ats = %s", (ats,))
+
+
 def mark_wide_scanned(conn, company_ids, settings_loaded_at=None):
     """Record that these boards have had their first wide scan: from now on a new wanted role alerts.
     Skipped for a board asked for a catch-up after `settings_loaded_at`: this run's picture of what people
