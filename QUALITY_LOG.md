@@ -1656,9 +1656,10 @@ looking for." and heads the list (the visible "What they're asking for" heading 
 with" is a Goldenrod card with Ink text and a real list. New Field Guide pieces: `fg.fit_tip` and `fg.lead` (macros), `.fg-tip*` and `.fg-lead*`
 (CSS), a gallery specimen with the note showing. The tooltip says what the card says ("My estimate from the posting and your resume, not the
 employer's screen."); the Figma frame shows a shorter "Estimate from posting and your resume." and the two should be reconciled.
-**Verification gap.** 708 unit tests pass. The full quality check did NOT complete here: four runs on fresh Neon branches stalled or timed out
-(page loads on a cold branch; the profile alerts switch took more than its 5s wait, which also fails on untouched `main`; the last run lost the
-network at cleanup, "No route to host"), so the new tooltip, stepper and lead-card checks have not reported a result. The alerts-switch wait is raised
-to 20s. **Rework count:** not known yet. **Root cause of the churn:** the quality check has fixed waits that assume a fast database link; add a check
-or a retry only after seeing it fail on a fast link too. **Standing check to add:** run the check on a warmed branch from a stable network and read the
-printed totals, not the exit code of a wrapper.
+**Verification.** 708 unit tests and 564/564 quality checks pass (a warmed Neon branch, the check run in the background). The first full run
+was 563/564: the new lead card's heading came out at weight 600 on the Field Guide page because the gallery's `.spec h3` rule (one class and one
+element) outranked `.fg-lead-title` (one class); the card is now `.fg-lead .fg-lead-title`. Earlier runs on cold branches timed out on page loads and on the
+profile alerts switch's 5s wait (raised to 20s; untouched `main` failed the same way), and one lost the network at cleanup, so none of them counted.
+**Rework count:** 1 (the weight). **Root cause:** I wrote a component's heading rule with one class and tested it only where no page rule competes; a
+gallery or page that styles bare `h3` beats it. **Standing check:** the typeface check already caught it; keep heading rules in components at two
+classes (`.fg-x .fg-x-title`) when the element is a bare h1-h3. **Not verified:** the new layout has not been looked at in a browser.

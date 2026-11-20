@@ -1640,7 +1640,7 @@ button.fg-link {
   border: 1px solid var(--fg-color-signal-discovery);
   border-radius: var(--fg-radius-sm);
 }
-.fg-lead-title {
+.fg-lead .fg-lead-title {   /* two classes: a page's own h3 rule (the gallery's .spec h3) must not outrank it */
   margin: 0;
   font-family: var(--fg-font-family-display);
   font-variation-settings: var(--fg-font-display-variation);
