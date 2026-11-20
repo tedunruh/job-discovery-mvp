@@ -1152,6 +1152,8 @@ def check_panel(browser, base, token):
         else:
             tops = page.evaluate("[document.querySelector('.board').getBoundingClientRect().top, document.getElementById('apply-panel').getBoundingClientRect().top]")
             check(abs(tops[0] - tops[1]) <= 1, f"the list and the panel have their tops aligned  [{tag}]", f"{tops}")
+            widths = page.evaluate("[document.querySelector('.board').getBoundingClientRect().width, document.getElementById('apply-panel').getBoundingClientRect().width]")
+            check(abs(widths[0] - widths[1]) <= 1 or widths[1] >= widths[0], f"the list and the panel share the width 50/50 (the panel never below 480px)  [{tag}]", f"{widths}")
             edge = page.evaluate("[getComputedStyle(document.getElementById('%s')).borderTopColor, getComputedStyle(document.querySelector('#apply-panel .fg-button--primary')).backgroundColor]" % row_id)
             check(edge[0] == edge[1], f"the open card has the Forest edge  [{tag}]", f"{edge}")
             # the scroll fold: first scroll folds Scout's line and slims the header; the top brings it all back

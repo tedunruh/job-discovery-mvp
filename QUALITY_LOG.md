@@ -1585,6 +1585,9 @@ panel that already scrolls. **What went wrong while building it:** my first edit
 `replaceWith` line as `swapSection`), so the QC check caught it on its first run; a string-replace on a line that appears twice should name
 the function around it. **Not done:** a real look at the wider panel at several window widths (QC covers 1280 and 390, which have no overflow).
 
+**Follow-up, same day:** Ted asked for 50/50. With the panel open the list and the panel now share the width equally (`flex: 1 1 0` on both; the panel's
+minimum is 480px), replacing the `clamp(480px, 42%, 680px)` above. QC checks the two widths match (or the panel is at its 480px floor and so wider).
+
 ### 2026-11-16 — Workday: lighter schedule and a cool-off
 **What shipped.** Workday refused the collector's GitHub servers from about Nov 15 22:30 UTC for over a day (the same requests from Ted's Mac
 were fine; some boards still got through, so it looked like a throttle, not a ban). The per-run breaker already stopped after 5 refusals, but every

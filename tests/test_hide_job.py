@@ -87,7 +87,7 @@ class Card(Base):
 
     def test_the_board_has_a_default_border_and_no_shadow(self):
         html = self.client.get("/").get_data(as_text=True)
-        board = re.search(r"\.board \{(.*?)\}", html, re.S).group(1)
+        board = re.search(r"^\s*\.board \{(.*?)\}", html, re.S | re.M).group(1)   # the board's own rule, not one that only ends in ".board"
         self.assertIn("border: 1px solid var(--fg-color-border-default)", board)
         self.assertNotIn("box-shadow", board)
 
