@@ -1627,3 +1627,11 @@ checked the letters against the rules, not by reading them as a hiring manager w
 before and after any prompt or rule change. **Not done:** one letter inferred a situation ("the risk was that an AI insight would show up as a bare suggestion")
 from the resume's facts; the prompt forbids invented reasons but it is a judgement call. The pypdf text that feeds "Not in your resume" drops "ti", "tt"
 and "fi" letter pairs ("foundatons"); not touched here.
+
+### 2026-11-20 — SC-72: tighter panel spacing and 18px voice intro
+**What shipped.** Ted's direction on the open panel: an 8px gap between the board and the panel (was 16px), the voice intro at 18px with its margin removed
+(`--fg-font-size-title`; the phone rule no longer overrides it), and a smaller radius on the two sections (board and `.fg-panel`, 12px to 8px, `--fg-radius-lg`).
+Tokens only; 706 tests and 543/543 checks pass. **Rework count:** 0 so far. **Not done:** the Figma file (`w7hKbZWJIgb74guqh5uGUF`) still shows 16px and 12px.
+**Quality-check note:** four runs timed out loading pages right after the machine had slept (`ERR_NETWORK_IO_SUSPENDED`, then page-load and tab-return
+timeouts); untouched `main` passed 543/543 and so did this branch once the machine was awake. Treat a timeout on the first page load as the machine
+or network until `main` fails the same way, and rerun before changing code.

@@ -1430,7 +1430,7 @@ button.fg-link {
   overflow: hidden;
   background: var(--fg-color-surface-page);
   border: 1px solid var(--fg-color-border-default);
-  border-radius: var(--fg-radius-xl);
+  border-radius: var(--fg-radius-lg);
 }
 /* The page animates the panel it opens (a specimen on a page that is already there should not slide). */
 @keyframes fg-slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
