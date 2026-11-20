@@ -53,7 +53,7 @@
           {%- endif %}>
       <div class="fg-split">
         <div class="fg-split-main">
-          {%- call(part) fg.card("resume", "Your resume", "I read it once to fill in what I can. It stays private to you, and you can delete it any time.") %}
+          {%- call(part) fg.card("resume", "Your resume", "I read it once to fill in what I can. It stays private to you, and you can delete it any time. When you tailor it for a job, I send it and that posting to Claude.") %}
           {%- if resume %}
           {%- call fg.file_row(resume.filename, "Added " ~ (resume.uploaded_at | humanize)) %}
           <a class="fg-button fg-button--secondary" href="/resume/file" target="_blank" rel="noopener">View</a>
