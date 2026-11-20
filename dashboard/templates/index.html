@@ -62,7 +62,7 @@
       min-height: 0;
       display: flex;
       align-items: stretch;
-      gap: var(--fg-space-4);
+      gap: var(--fg-space-2);
       margin-top: calc(var(--fg-space-8) + var(--fg-space-1));
       transition: margin-top 220ms ease;
     }
@@ -108,7 +108,7 @@
       overflow: hidden;   /* the board itself never scrolls: its tabs stay put and only the list below them does, like the panel's body */
       background: var(--fg-color-surface-page);
       border: 1px solid var(--fg-color-border-default);
-      border-radius: var(--fg-radius-xl);
+      border-radius: var(--fg-radius-lg);
     }
 
     .toolbar {
@@ -168,10 +168,10 @@
     .hidden-title:focus { outline: none; }
     /* Scout speaks: one Fraunces line on the band, above the board (SC-69). */
     .voice-intro {
-      margin: var(--fg-space-2) 0 0;
+      margin: 0;
       padding-inline: var(--fg-space-6);
       max-width: 720px;
-      font-size: var(--fg-font-size-2xl);
+      font-size: var(--fg-font-size-title);
       line-height: var(--fg-font-line-height-snug);
     }
     /* The tabs stay at the top of the board; the list under them scrolls on its own, so its scrollbar starts below the
@@ -208,7 +208,7 @@
       .board > .fg-tabs { margin-inline: var(--fg-space-3); }
       .board > [role="tabpanel"] { padding: 0 var(--fg-space-3) var(--fg-space-3); }
       .workspace, .voice-wrap + .workspace { margin-top: var(--fg-space-4); }
-      .voice-intro { padding-inline: 0; font-size: var(--fg-font-size-xl); }
+      .voice-intro { padding-inline: 0; }
       .caught-up .contour { width: 360px; right: -120px; }
       .more { margin-left: var(--fg-space-3); }
     }
