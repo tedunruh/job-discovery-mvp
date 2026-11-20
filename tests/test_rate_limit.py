@@ -60,7 +60,7 @@ class Breaker(unittest.TestCase):
 
 
 class ScanWithBlockedAts(unittest.TestCase):
-    def test_blocked_boards_are_neither_failed_nor_checked_and_the_alert_names_the_ats(self):
+    def test_blocked_boards_are_neither_failed_nor_checked_and_the_scan_itself_sends_no_alert(self):
         saved = []
         alerts = []
 
@@ -83,9 +83,7 @@ class ScanWithBlockedAts(unittest.TestCase):
             rc._scan_tail(Conn(), [board(i) for i in range(1, 51)], alerts, lambda *a: None)
 
         self.assertEqual([cid for batch in saved for cid in batch], [1, 2])   # only the two that were refused
-        self.assertEqual(len(alerts), 1)
-        self.assertIn("Workable is rate-limiting", alerts[0])
-        self.assertIn("48 board", alerts[0])
+        self.assertEqual(alerts, [])   # the scan stays quiet: settle_cooloffs decides when a block is worth a buzz
 
 
 class CoreCompaniesAreGuardedToo(unittest.TestCase):
@@ -119,13 +117,15 @@ class CoreCompaniesAreGuardedToo(unittest.TestCase):
 
 
 class CoolOff(unittest.TestCase):
-    """settle_cooloffs: pause an ATS that tripped (longer each time in a row), clear one that answered."""
+    """settle_cooloffs: pause an ATS that tripped (longer each time in a row), clear one that answered, and say so on the
+    phone only when it is worth it: the second refusal in a row, then once a day, and once when it answers again."""
     def setUp(self):
         rc._rate_limited.clear()
         rc._succeeded.clear()
-        self.saved, self.cleared = [], []
+        self.saved, self.cleared, self.alerts = [], [], []
         self.patches = [
-            mock.patch.object(rc, "save_ats_cooloff", lambda conn, ats, level, minutes: self.saved.append((ats, level, minutes))),
+            mock.patch.object(rc, "save_ats_cooloff",
+                              lambda conn, ats, level, minutes, alerted=False: self.saved.append((ats, level, minutes, alerted))),
             mock.patch.object(rc, "clear_ats_cooloff", lambda conn, ats: self.cleared.append(ats)),
         ]
         for p in self.patches:
@@ -137,35 +137,65 @@ class CoolOff(unittest.TestCase):
         rc._rate_limited.clear()
         rc._succeeded.clear()
 
-    def test_the_first_trip_pauses_it_an_hour(self):
+    def settle(self, before):
+        return rc.settle_cooloffs(None, before, self.alerts)
+
+    @staticmethod
+    def state(level, active=False, alerted_hours=None):
+        return {"active": active, "level": level, "minutes_left": 0, "alerted_hours": alerted_hours}
+
+    def test_the_first_trip_pauses_it_an_hour_and_stays_quiet(self):
         rc._rate_limited["workday"] = rc.RATE_LIMIT_TRIP
-        self.assertEqual(rc.settle_cooloffs(None, {}), {"workday": 60})
-        self.assertEqual(self.saved, [("workday", 1, 60)])
+        self.assertEqual(self.settle({}), {"workday": 60})
+        self.assertEqual(self.saved, [("workday", 1, 60, False)])
+        self.assertEqual(self.alerts, [])
 
     def test_each_trip_in_a_row_pauses_it_longer_up_to_six_hours(self):
         rc._rate_limited["workday"] = rc.RATE_LIMIT_TRIP
         got = []
         for level in (1, 2, 3, 4, 4):
-            rc.settle_cooloffs(None, {"workday": {"active": False, "level": level, "minutes_left": 0}})
+            self.settle({"workday": self.state(level)})
             got.append(self.saved[-1][2])
         self.assertEqual(got, [120, 240, 360, 360, 360])
 
+    def test_the_second_refusal_in_a_row_is_announced_once_then_only_a_day_later(self):
+        rc._rate_limited["workday"] = rc.RATE_LIMIT_TRIP
+        self.settle({"workday": self.state(1)})
+        self.assertEqual(len(self.alerts), 1)
+        self.assertIn("Workday", self.alerts[0])
+        self.assertTrue(self.saved[-1][3])                                   # recorded as announced
+        for hours, level in ((1, 2), (6, 3), (23.5, 4)):                     # later refusals, same day: quiet
+            self.settle({"workday": self.state(level, alerted_hours=hours)})
+        self.assertEqual(len(self.alerts), 1)
+        self.assertFalse(self.saved[-1][3])
+        self.settle({"workday": self.state(4, alerted_hours=24.5)})          # a day on: one more
+        self.assertEqual(len(self.alerts), 2)
+
     def test_a_few_refusals_below_the_trip_do_not_pause_it(self):
         rc._rate_limited["workday"] = rc.RATE_LIMIT_TRIP - 1
-        self.assertEqual(rc.settle_cooloffs(None, {}), {})
+        self.assertEqual(self.settle({}), {})
         self.assertEqual(self.saved, [])
+        self.assertEqual(self.alerts, [])
 
     def test_a_success_after_a_pause_clears_it_but_no_attempt_leaves_it(self):
-        before = {"workday": {"active": False, "level": 2, "minutes_left": 0}}
-        rc.settle_cooloffs(None, before)
+        before = {"workday": self.state(2)}
+        self.settle(before)
         self.assertEqual(self.cleared, [])                 # nothing was asked of it this run
         rc._succeeded["workday"] = 3
-        rc.settle_cooloffs(None, before)
+        self.settle(before)
         self.assertEqual(self.cleared, ["workday"])
+
+    def test_answering_again_is_announced_only_if_the_block_was(self):
+        rc._succeeded["workday"] = 3
+        self.settle({"workday": self.state(1)})                              # a blip nobody was told about
+        self.assertEqual(self.alerts, [])
+        self.settle({"workday": self.state(3, alerted_hours=5)})             # a block we announced
+        self.assertEqual(len(self.alerts), 1)
+        self.assertIn("answering again", self.alerts[0])
 
     def test_a_pause_still_running_is_never_cleared(self):
         rc._succeeded["workday"] = 3
-        rc.settle_cooloffs(None, {"workday": {"active": True, "level": 1, "minutes_left": 30}})
+        self.settle({"workday": self.state(1, active=True)})
         self.assertEqual(self.cleared, [])
 
 

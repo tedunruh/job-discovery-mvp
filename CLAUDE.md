@@ -93,7 +93,7 @@ fingerprint (`'rescan'` = silent re-scan).
 - Health: last runs in `scheduler_runs` (should be ~6-10 min, finished); `source_health` statuses;
   `python scripts/engagement.py 7` for per-person use; `python scripts/actions_usage.py`.
 - Rate limits: when an ATS refuses `RATE_LIMIT_TRIP` requests in a run the collector pauses it (table `ats_cooloff`: 1h, then 2h, 4h, 6h each
-  time in a row; one success clears it) and sends a health alert hourly while it lasts. To lift a pause by hand:
+  time in a row; one success clears it). It alerts once the second refusal in a row, then at most once a day, and once when the ATS answers again. To lift a pause by hand:
   `DELETE FROM ats_cooloff WHERE ats = 'workday'`. Workday is also asked less often than the others (hot tenants hourly, huge ones every 2h).
 - Switch a board/batch off: `UPDATE companies SET tier='off' WHERE ...` (reversible).
 - Pay ranges (SC-71): the collector fills them as it writes postings; `python scripts/backfill_pay.py` (dry run; `--sample 25`; `--write`) fills the ones already stored.

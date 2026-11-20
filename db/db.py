@@ -1284,20 +1284,27 @@ def get_db_now(conn):
 
 
 def get_ats_cooloffs(conn):
-    """{ats: {"active": bool, "level": int, "minutes_left": int}} for every ATS with a cool-off row. A row whose time has
-    passed is "not active" (ask it again) but stays, so a second refusal pauses it for longer."""
+    """{ats: {"active": bool, "level": int, "minutes_left": int, "alerted_hours": float or None}} for every ATS with a cool-off
+    row. A row whose time has passed is "not active" (ask it again) but stays, so a second refusal pauses it for longer.
+    alerted_hours is how long ago this block was last announced (None: never)."""
     with conn.cursor() as cur:
-        cur.execute("SELECT ats, until_at > now(), level, GREATEST(EXTRACT(EPOCH FROM until_at - now()) / 60, 0) FROM ats_cooloff")
-        return {ats: {"active": bool(active), "level": level, "minutes_left": int(left)}
-                for ats, active, level, left in cur.fetchall()}
+        cur.execute("""SELECT ats, until_at > now(), level, GREATEST(EXTRACT(EPOCH FROM until_at - now()) / 60, 0),
+                              EXTRACT(EPOCH FROM now() - alerted_at) / 3600 FROM ats_cooloff""")
+        return {ats: {"active": bool(active), "level": level, "minutes_left": int(left),
+                      "alerted_hours": float(ago) if ago is not None else None}
+                for ats, active, level, left, ago in cur.fetchall()}
 
 
-def save_ats_cooloff(conn, ats, level, minutes):
+def save_ats_cooloff(conn, ats, level, minutes, alerted=False):
+    """Pause `ats` for `minutes` from now. `alerted` records that this block was announced just now (otherwise the time
+    it was last announced is kept)."""
     with conn.cursor() as cur:
         cur.execute(
-            """INSERT INTO ats_cooloff (ats, until_at, level) VALUES (%s, now() + make_interval(mins => %s), %s)
-               ON CONFLICT (ats) DO UPDATE SET until_at = EXCLUDED.until_at, level = EXCLUDED.level, updated_at = now()""",
-            (ats, minutes, level))
+            """INSERT INTO ats_cooloff (ats, until_at, level, alerted_at)
+               VALUES (%s, now() + make_interval(mins => %s), %s, CASE WHEN %s THEN now() END)
+               ON CONFLICT (ats) DO UPDATE SET until_at = EXCLUDED.until_at, level = EXCLUDED.level, updated_at = now(),
+                   alerted_at = CASE WHEN %s THEN now() ELSE ats_cooloff.alerted_at END""",
+            (ats, minutes, level, alerted, alerted))
 
 
 def clear_ats_cooloff(conn, ats):

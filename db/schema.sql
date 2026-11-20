@@ -465,3 +465,7 @@ CREATE TABLE IF NOT EXISTS ats_cooloff (
     level INTEGER NOT NULL DEFAULT 1,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Cool-off alerts: say so once a day, not every hour. alerted_at is when this block was last announced (NULL: never),
+-- so a short blip stays quiet and a long one is mentioned about once every ALERT_EVERY_HOURS. Additive; apply before the code.
+ALTER TABLE ats_cooloff ADD COLUMN IF NOT EXISTS alerted_at TIMESTAMPTZ;

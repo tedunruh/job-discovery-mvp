@@ -1596,3 +1596,14 @@ alert says it is paused. **Rework count:** 0 so far. **Root cause:** the breaker
 the middle of the run (`_scan_tail`), so what the core stage saw was thrown away. **Cost:** new Workday roles can reach alerts up to an hour or
 two later. **Not done:** nothing proves the block was caused by our request volume (it may be GitHub's shared servers); if it never lifts, the
 next step is another network for Workday, which costs money.
+
+### 2026-11-19 — Workday: one alert a day, not one an hour
+**What shipped.** Ted was flooded with pipeline health alerts: 17 in 12 hours, nearly all the hourly "Workday is rate-limiting us" reminder plus
+Workiva (a core Workday company) re-announcing "failed 3 consecutive cycles" each time Workday let one request through and then refused again.
+Now the cool-off decides when to buzz: not on the first refusal (a blip clears itself), once on the second in a row, then at most once every
+24 hours (`ALERT_EVERY_HOURS`), and once when it answers again. The scan and the start of a run no longer send reminders. Added `alerted_at` to
+`ats_cooloff` (applied to Neon). **Rework count:** 0 so far. **Root cause:** I added the cool-off in the same change as the old
+"remind hourly" alert and did not treat "how many phone buzzes will this cause over a multi-day block" as a design question; an alert that repeats
+for as long as a problem lasts is a log, not an alert. **Standing check to add:** when adding an alert, say how often it can fire in the worst
+case (a block that lasts a week) and make that number small. **Not done:** other flapping core alerts (a core Lever board timing out) still
+announce after 3 failures in a row; they are rare and real.

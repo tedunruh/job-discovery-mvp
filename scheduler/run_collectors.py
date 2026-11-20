@@ -88,6 +88,9 @@ RATE_LIMIT_TRIP = 5
 # retrying every run only gave it more to refuse). The first refusal pauses it 1 hour, a second in a row 2, then 4, then 6
 # hours. After the pause the next run asks again (the breaker stops that at RATE_LIMIT_TRIP refusals); one success clears it.
 COOLOFF_MINUTES = (60, 120, 240, 360)
+# Say so about a block once a day, not every hour (a block can last days and the phone is not a log). A refusal that clears
+# after one pause stays quiet; the first alert is on the second refusal in a row, and the next one a day later.
+ALERT_EVERY_HOURS = 24
 WORKABLE_EVERY = 2  # hot Workable boards are checked every Nth run (they rarely post)
 # Past this, don't start more tail work this run (the next run picks it up); keeps a run
 # well inside the 15 min cadence even if an ATS is slow.
@@ -261,18 +264,29 @@ def select_core(companies, now=None):
             if c["ats_type"] != "workday" or c["id"] % WORKDAY_CORE_EVERY == slot % WORKDAY_CORE_EVERY]
 
 
-def settle_cooloffs(conn, before):
+def settle_cooloffs(conn, before, health_alerts):
     """After the run: pause every ATS that tripped the breaker (longer each time in a row) and clear the cool-off of one that
-    answered. `before` is what get_ats_cooloffs returned at the start. Returns {ats: minutes} for the ones just paused."""
+    answered. `before` is what get_ats_cooloffs returned at the start. Adds to `health_alerts` only when it is worth a
+    phone buzz: the second refusal in a row (then at most once a day), and once when it answers again after that.
+    Returns {ats: minutes} for the ones just paused."""
     paused = {}
     for ats, refusals in _rate_limited.items():
         if refusals >= RATE_LIMIT_TRIP:
-            level = min(before.get(ats, {}).get("level", 0) + 1, len(COOLOFF_MINUTES))
-            save_ats_cooloff(conn, ats, level, COOLOFF_MINUTES[level - 1])
+            was = before.get(ats)
+            level = min((was["level"] if was else 0) + 1, len(COOLOFF_MINUTES))
+            ago = was["alerted_hours"] if was else None
+            tell = level >= 2 and (ago is None or ago >= ALERT_EVERY_HOURS)
+            save_ats_cooloff(conn, ats, level, COOLOFF_MINUTES[level - 1], alerted=tell)
             paused[ats] = COOLOFF_MINUTES[level - 1]
+            if tell:
+                health_alerts.append(f"{ats.capitalize()} keeps refusing our requests, so it is paused and retried automatically "
+                                     f"(next try in about {COOLOFF_MINUTES[level - 1] // 60} h). No action needed; "
+                                     f"you'll hear about it again only if it lasts another day.")
     for ats, state in before.items():
         if not state["active"] and ats not in paused and _succeeded.get(ats, 0) > 0:
             clear_ats_cooloff(conn, ats)
+            if state["alerted_hours"] is not None:
+                health_alerts.append(f"{ats.capitalize()} is answering again.")
     return paused
 
 
@@ -371,9 +385,6 @@ def _run(health_alerts):
         paused = {ats for ats, state in cooloffs.items() if state["active"]}
         for ats in sorted(paused):
             print(f"{ats} is paused after rate-limiting us: not asked for another {cooloffs[ats]['minutes_left']} min")
-            if _tail_slot() % 4 == 0:  # remind hourly while a pause lasts
-                health_alerts.append(f"{ats.capitalize()} is rate-limiting us and paused. Trying again in about "
-                                     f"{cooloffs[ats]['minutes_left']} min; no action needed unless this lasts a day.")
         core = select_core([c for c in everything if c["tier"] == "core" and c["ats_type"] not in paused])
         tail = order_for_fairness(select_tail([c for c in everything if c["tier"] != "core" and c["ats_type"] not in paused]))
 
@@ -503,7 +514,7 @@ def _run(health_alerts):
                 conn = ensure_conn(conn)
 
         try:
-            for ats, minutes in settle_cooloffs(conn, cooloffs).items():
+            for ats, minutes in settle_cooloffs(conn, cooloffs, health_alerts).items():
                 print(f"{ats} refused {RATE_LIMIT_TRIP}+ requests this run: paused for {minutes} min")
             conn.commit()
         except Exception as e:  # noqa: BLE001
@@ -669,9 +680,7 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
     )
     for ats, n in blocked.items():
         print(f"{ats} is rate-limiting us: {n} board(s) not requested this run")
-        if _tail_slot() % 4 == 0:  # remind hourly, not every run, while a block lasts
-            health_alerts.append(f"{ats.capitalize()} is rate-limiting us - {n} board(s) skipped this run. "
-                                 f"Pausing it for a while, then trying again; no action needed unless this lasts a day.")
+        # No alert here: settle_cooloffs tells (once a day at most) when it is worth a buzz.
     if stats["failed"] >= TAIL_FAILURE_ALERT_MIN and stats["failed"] > TAIL_FAILURE_ALERT_RATIO * max(stats["scanned"], 1):
         health_alerts.append(
             f"{stats['failed']} of {stats['scanned']} discovered job boards failed this run "
