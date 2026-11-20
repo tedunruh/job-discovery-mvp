@@ -385,5 +385,22 @@ class Run(unittest.TestCase):
         self.assertEqual(t.message("something new"), t.message("failed"))
 
 
+class LongLinesAreNotCutMidWord(unittest.TestCase):
+    """A resume bullet used to be cut at 400 characters, ending in the middle of a word in the person's file."""
+    def test_a_long_real_bullet_is_kept_whole(self):
+        bullet = ("Built the design system as a JSON token architecture generated from foundations and design principles, "
+                  "then ran every generated output against the spec and tightened the spec wherever it fell short. ") * 3
+        bullet = bullet.strip()
+        self.assertGreater(len(bullet), 400)
+        got = t.clean_structure({"experience": [{"company": "A", "title": "B", "location": "", "dates": "", "bullets": [bullet]}]})
+        self.assertEqual(got["experience"][0]["bullets"], [bullet])
+
+    def test_a_runaway_line_is_cut_at_a_word_never_inside_one(self):
+        got = t._fit("word " * 1000, 1200)
+        self.assertLessEqual(len(got), 1200)
+        self.assertTrue(got.endswith("word"))
+        self.assertEqual(t._fit("x" * 5000, 100), "x" * 100)   # no space to cut at: the limit applies
+
+
 if __name__ == "__main__":
     unittest.main()

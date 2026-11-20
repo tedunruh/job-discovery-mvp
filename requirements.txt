@@ -6,3 +6,4 @@ gunicorn
 anthropic==0.125.0
 pypdf==6.21.4
 fpdf2==2.8.3
+pyspellchecker==0.8.4

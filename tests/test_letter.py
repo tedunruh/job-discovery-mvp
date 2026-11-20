@@ -62,6 +62,17 @@ class CheckLetter(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("sketch", why)
 
+    def test_a_name_the_posting_uses_may_be_repeated_but_a_tool_it_asks_for_may_not(self):
+        posting = "Our Security Investigation and Internet Map products. You will work with the Agents PM. Working knowledge of React."
+        text = GOOD.replace("in Figma", "alongside the Agents PM on Security Investigation")
+        self.assertFalse(self.check(text)[0])                                     # not in the resume: refused without the posting
+        ok, why = lt.check_letter(text, plain(), "Juniper Labs", "Senior Product Designer", patterns(), posting)
+        self.assertTrue(ok, why)
+        ok, why = lt.check_letter(GOOD.replace("with developers", "with developers in react"), plain(), "Juniper Labs",
+                                  "Senior Product Designer", patterns(), posting)
+        self.assertFalse(ok)                                                      # the posting asks for React and the resume lacks it
+        self.assertIn("posting asks for", why)
+
     def test_a_requirement_the_resume_lacks_may_not_be_claimed(self):
         ok, why = self.check(GOOD.replace("with developers", "with developers in react"))
         self.assertFalse(ok)
@@ -80,8 +91,8 @@ class CheckLetter(unittest.TestCase):
                                          plain(), "Juniper Labs", "Senior Product Designer", patterns()), (True, ""))
 
     def test_the_prompt_asks_for_a_through_line_and_for_how_and_result(self):
-        for phrase in ("through line", "how and result", "bare claim", "skills list"):
-            self.assertIn(phrase, lt.PROMPT.replace("how and its result", "how and result"))
+        for phrase in ("through line", "what changed", "bare claim", "skills list", "first person", "never copy a resume bullet"):
+            self.assertIn(phrase, lt.PROMPT)
 
     def test_second_person_words_are_refused_outside_brackets_only(self):
         for bad in ("Your team", "your team", "Thank you,", "you are", "yourself"):
@@ -90,19 +101,49 @@ class CheckLetter(unittest.TestCase):
             self.assertIn("you", why)
         self.assertTrue(self.check(GOOD.replace("[Link to portfolio]", "[Link to your portfolio, and why you chose it]"))[0])
 
-    def test_a_pointing_word_with_no_noun_is_refused(self):
-        for sentence in ("That is the work I enjoy most.", "This shows how I work.", "I did that at Fieldstone.",
-                         "Those are the habits I bring.", "I built it, and that is why I applied."):
-            self.assertTrue(lt.vague_demonstrative(sentence), sentence)
+    def test_a_pointing_word_alone_is_no_longer_a_reason_to_refuse(self):
+        # It was a hard rule until Nov 2026; enforcing it made the model write stiff, disconnected sentences. The prompt
+        # still asks for a noun after this/that/these/those, but a draft is not thrown away over it.
+        self.assertIn("follow it with the noun", lt.PROMPT)
+        for sentence in ("That is the work I enjoy most.", "This shows how I work.", "I did that at Fieldstone."):
             ok, why = self.check(GOOD.replace("That work is what I enjoy most.", sentence))
-            self.assertFalse(ok, sentence)
-            self.assertIn("this, that, these or those", why)
+            self.assertTrue(ok, (sentence, why))
 
-    def test_a_pointing_word_with_its_noun_and_a_plain_that_are_fine(self):
-        for sentence in ("That migration cut support calls by 20%.", "This design system serves 20 teams.",
-                         "I built a system that is shared by several teams.", "I tested so that teams could ship faster.",
-                         "Those components shipped in Figma.", "The role requires someone that has led a system."):
-            self.assertFalse(lt.vague_demonstrative(sentence), sentence)
+    def test_a_misspelled_word_is_refused_and_named(self):
+        ok, why = self.check(GOOD.replace("design", "desgin", 1))
+        self.assertFalse(ok)
+        self.assertIn("desgin", why)
+        self.assertIn("misspelled", why)
+
+    def test_words_the_resume_or_posting_use_are_not_called_misspelled(self):
+        self.assertEqual(lt.misspelled("I worked in zorblat.", "the posting wants zorblat experience"), [])
+        self.assertEqual(lt.misspelled("Heatlth teams and designs.", ""), ["heatlth"])   # a plural of a real word is fine
+
+    def test_the_spelling_check_is_skipped_when_the_word_list_is_missing(self):
+        import builtins
+        real = builtins.__import__
+
+        def no_speller(name, *a, **k):
+            if name == "spellchecker":
+                raise ImportError(name)
+            return real(name, *a, **k)
+        old, lt._SPELLER = lt._SPELLER, None
+        try:
+            with mock.patch("builtins.__import__", no_speller):
+                self.assertEqual(lt.misspelled("Heatlth", ""), [])
+        finally:
+            lt._SPELLER = old
+
+    def test_the_letter_call_uses_the_letter_effort(self):
+        seen = {}
+
+        def fake_call(model, system, content, schema, effort, max_tokens, timeout):
+            seen.update(effort=effort, max_tokens=max_tokens)
+            return mock.Mock()
+        with mock.patch.object(lt.tailor, "_call", fake_call):
+            lt.write(STRUCT, "posting", "Juniper Labs", "Designer", [])
+        self.assertEqual(seen["effort"], lt.LETTER_EFFORT)
+        self.assertEqual(lt.LETTER_EFFORT, "medium")
 
     def test_the_company_and_role_are_not_made_up_facts(self):
         self.assertTrue(self.check(GOOD.replace("Hello Juniper team", "Hello Juniper Labs team"))[0])
