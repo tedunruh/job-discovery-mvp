@@ -1609,6 +1609,13 @@ def applied_tailorings(conn, user_id):
         return {r[0]: {"id": r[1], "has_letter": bool(r[2])} for r in cur.fetchall()}
 
 
+def has_tailored(conn, user_id):
+    """True once this person has ever had a tailoring written (the call rows stay when a tailoring is deleted)."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT EXISTS (SELECT 1 FROM tailor_calls WHERE user_id = %s AND kind = 'tailor')", (user_id,))
+        return bool(cur.fetchone()[0])
+
+
 def tailor_usage(conn, user_id):
     """(this person's finished tailorings this month, everyone's tailoring spend this month in dollars), UTC months."""
     with conn.cursor() as cur:

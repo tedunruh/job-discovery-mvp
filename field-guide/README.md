@@ -176,7 +176,7 @@ is for supporting text only (metadata, hints, counts, section notes).
 | `.fg-panel` · `.fg-panel-head` `.fg-panel-body` `.fg-panel-foot` · `_prep_panel.html` · `js/panel.js` | One job's detail beside the list (SC-72). Opens only from a card's title, closes only with Close, Apply keeps it open. The page decides its place (a full screen sheet on a phone) |
 | `fg.steps(current)` · `.fg-steps` | Prep, Tailor, Apply under the panel's head. The current step is Forest with `aria-current`; done steps say "(done)" in words |
 | `fg.change(c, action, id)` · `.fg-changes` `.fg-change` | One edit Scout made to a resume: kind and where, Before (struck through) and After, why, Undo or Redo. An undone change says "Undone" in words |
-| `fg.check(name, label, checked, form)` · `.fg-check` `.fg-checkbox` | One optional yes ("Write a cover letter too"); `form` ties it to a form elsewhere so it can stand above that form's buttons |
+| `fg.check(name, label, checked, form)` · `.fg-check` `.fg-checkbox` | One optional yes ("Remind me tomorrow"); `form` ties it to a form elsewhere so it can stand above that form's buttons |
 | `fg.textarea(id, name, value, labelledby)` · `.fg-textarea` | A text field that grows, for a few paragraphs the person writes or edits (the cover letter). Named by the heading above it; resized only up and down |
 | `div.fg-files` > `fg.file_row` · `.fg-files` | The files to send in the panel's Ready step, one card row each, a Download button whose hidden words name the file and company |
 | `fg.job_tailored()` · `fg.job(…, tailored=True)` | The quiet "Tailored" marker after the time (with Viewed): a tailored resume is ready for this job. `js/job.js` `showTailored` adds and removes it when the panel's Ready step shows or leaves |
