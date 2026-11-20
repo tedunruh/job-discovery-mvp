@@ -286,6 +286,23 @@
 {%- endmacro %}
 {#- Day heading: the label, how many jobs are in the group, and a hairline across. The caller wraps the group in
     <section class="fg-day" aria-label="Today">. -#}
+{#- The fit under the panel's title (SC-72): pips and the word, focusable, with a tooltip that says what it is. Shown on
+    hover, keyboard focus and tap (js/panel.js toggles .is-shown on tap), and the tooltip is the fit's accessible
+    description. `id` names the tooltip; `text` is what it says. -#}
+{% macro fit_tip(id, score, text, shown=False) -%}
+<span class="fg-tip-anchor"><span class="fg-fit-tip" tabindex="0" aria-describedby="{{ id }}" data-tip-toggle>{{ fit(score) }}</span><span class="fg-tip{{ ' is-shown' if shown else '' }}" role="tooltip" id="{{ id }}">{{ text }}</span></span>
+{%- endmacro %}
+{#- A short list of what to lead with, in a Goldenrod card (SC-72). `id` names the heading; `lines` are the points. -#}
+{% macro lead(id, title, lines) -%}
+<section class="fg-lead" aria-labelledby="{{ id }}">
+  <h3 class="fg-lead-title" id="{{ id }}">{{ title }}</h3>
+  <ul class="fg-lead-list">
+    {%- for line in lines %}
+    <li>{{ line }}</li>
+    {%- endfor %}
+  </ul>
+</section>
+{%- endmacro %}
 {% macro day(label, count) -%}
 <div class="fg-day-head"><h2 class="fg-day-label">{{ label }} <span class="fg-day-count">· {{ count }}</span></h2><span class="fg-day-rule" aria-hidden="true"></span></div>
 {%- endmacro %}
@@ -338,7 +355,7 @@
 </li>
 {%- endmacro %}
 
-{#- The three steps of applying (SC-72), under the panel's head: Prep, Tailor, Apply. `current` is 0, 1 or 2; the ones
+{#- The three steps of applying (SC-72), first in the panel's body (they scroll with it): Prep, Tailor, Apply. `current` is 0, 1 or 2; the ones
     before it are done. The current step is marked with aria-current and Forest, and the done ones say so in words. -#}
 {% macro steps(current=0) -%}
 <ol class="fg-steps" aria-label="Steps">

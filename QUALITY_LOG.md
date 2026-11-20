@@ -1647,3 +1647,19 @@ checkbox, the first-time line, the `aria-describedby` tie, and that a cancelled 
 **Rework count:** 0 so far. **Root cause of the gap:** I built slice 3 from my own reading of the card's old wording and never re-read the card
 before calling it done; the card moved on (11/20) while the code kept the checkbox and the count. **Standing check to add:** before closing a
 sprint card, read the live card and compare each acceptance line with what the panel does, not with the slice's own notes.
+
+### 2026-11-20 — SC-72: panel header and Prep redesign (Figma 412:983)
+**What shipped.** Ted redesigned the panel on the card (version of record: Figma Field Guide node 412:983). The fit now sits under the title as a
+focusable thing with a tooltip (hover, keyboard focus, tap; Escape puts it away; the tooltip is its `aria-describedby`); the horizontal stepper with
+connector lines is the first thing in the scrolling body (no separate steps bar); Scout's line reads "You meet 6 of the 7 attributes <company> is
+looking for." and heads the list (the visible "What they're asking for" heading is now hidden but kept for screen readers); "What I would lead
+with" is a Goldenrod card with Ink text and a real list. New Field Guide pieces: `fg.fit_tip` and `fg.lead` (macros), `.fg-tip*` and `.fg-lead*`
+(CSS), a gallery specimen with the note showing. The tooltip says what the card says ("My estimate from the posting and your resume, not the
+employer's screen."); the Figma frame shows a shorter "Estimate from posting and your resume." and the two should be reconciled.
+**Verification.** 708 unit tests and 564/564 quality checks pass (a warmed Neon branch, the check run in the background). The first full run
+was 563/564: the new lead card's heading came out at weight 600 on the Field Guide page because the gallery's `.spec h3` rule (one class and one
+element) outranked `.fg-lead-title` (one class); the card is now `.fg-lead .fg-lead-title`. Earlier runs on cold branches timed out on page loads and on the
+profile alerts switch's 5s wait (raised to 20s; untouched `main` failed the same way), and one lost the network at cleanup, so none of them counted.
+**Rework count:** 1 (the weight). **Root cause:** I wrote a component's heading rule with one class and tested it only where no page rule competes; a
+gallery or page that styles bare `h3` beats it. **Standing check:** the typeface check already caught it; keep heading rules in components at two
+classes (`.fg-x .fg-x-title`) when the element is a bare h1-h3. **Not verified:** the new layout has not been looked at in a browser.
