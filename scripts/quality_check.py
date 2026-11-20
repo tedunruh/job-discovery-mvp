@@ -1331,7 +1331,7 @@ def check_tailor(browser, base, token, user_id):
                   f"the fit sits in the header with its tooltip as its description  [{tag}]")
             check(note.is_hidden(), f"the fit's note is quiet until asked for  [{tag}]")
             tip.focus()
-            check(note.is_visible() and note.inner_text().startswith("My estimate from the posting and your resume"),
+            check(note.is_visible() and note.inner_text().strip() == "Estimate from posting and your resume.",
                   f"keyboard focus on the fit shows its note  [{tag}]", note.inner_text())
             page.keyboard.press("Escape")
             check(page.locator("#apply-panel:not([hidden])").count() == 1 and note.is_hidden(), f"Escape puts the note away and leaves the panel open  [{tag}]")

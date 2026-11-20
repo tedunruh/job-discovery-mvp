@@ -1430,23 +1430,25 @@ button.fg-link {
   overflow: hidden;
   background: var(--fg-color-surface-page);
   border: 1px solid var(--fg-color-border-default);
-  border-radius: var(--fg-radius-lg);
+  border-radius: var(--fg-radius-md);
 }
 /* The page animates the panel it opens (a specimen on a page that is already there should not slide). */
 @keyframes fg-slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 .fg-panel-head {
   display: grid;
   grid-template-columns: var(--fg-size-mono) minmax(0, 1fr) auto;
-  column-gap: var(--fg-space-3);
+  column-gap: var(--fg-space-6);
+  row-gap: calc(var(--fg-space-1) / 2);
   align-items: center;
   padding: var(--fg-space-4) var(--fg-space-4) var(--fg-space-3) var(--fg-space-6);
   border-bottom: 1px solid var(--fg-color-border-subtle);
 }
 .fg-panel-company {
   margin: 0;
-  font-size: var(--fg-font-size-sm);
+  font-size: var(--fg-font-size-xs);
+  font-weight: var(--fg-font-weight-medium);
   color: var(--fg-color-text-secondary);
-  font-variant-caps: all-small-caps;
+  text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 .fg-panel-title {
@@ -1459,7 +1461,7 @@ button.fg-link {
 .fg-panel-title:focus { outline: none; }
 .fg-panel-head .fg-icon-button { grid-column: 3; grid-row: 1 / 4; align-self: start; }
 .fg-panel-head .fg-mono { grid-row: 1 / 4; align-self: start; }
-.fg-panel-head .fg-tip-anchor { grid-column: 2; grid-row: 3; justify-self: start; margin-top: var(--fg-space-1); }
+.fg-panel-head .fg-tip-anchor { grid-column: 2; grid-row: 3; justify-self: start; }
 .fg-panel-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -1467,8 +1469,10 @@ button.fg-link {
   display: flex;
   flex-direction: column;
   gap: var(--fg-space-6);
-  padding: var(--fg-space-4) var(--fg-space-6) var(--fg-space-6);
+  padding: var(--fg-space-4) var(--fg-space-6);
 }
+/* Scout's line at the top of a stage: Figma sets it at the font's own line height. */
+.fg-panel-body > .fg-voice { line-height: normal; }
 .fg-panel-help { margin: 0; font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
 .fg-panel-sec { display: flex; flex-direction: column; gap: var(--fg-space-3); }
 .fg-panel-sec-title {
@@ -1481,9 +1485,9 @@ button.fg-link {
   display: flex;
   flex-direction: column;
   gap: var(--fg-space-3);
-  padding: var(--fg-space-4) var(--fg-space-6) var(--fg-space-5);
+  padding: var(--fg-space-3) var(--fg-space-6) var(--fg-space-4);
   border-top: 1px solid var(--fg-color-border-subtle);
-  background: var(--fg-color-surface-card);
+  background: var(--fg-color-surface-page);
 }
 .fg-panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--fg-space-2); }
 .fg-panel-actions > form { display: contents; }
@@ -1535,6 +1539,7 @@ button.fg-link {
   gap: var(--fg-space-3);
   align-items: center;
   padding: var(--fg-space-3) var(--fg-space-4);
+  font-size: var(--fg-font-size-md);
   font-weight: var(--fg-font-weight-medium);
   color: var(--fg-color-text-primary);
 }
@@ -1584,8 +1589,8 @@ button.fg-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: var(--fg-radius-full);
   border: 1px solid var(--fg-color-border-default);
   font-size: var(--fg-font-size-xs);
@@ -1616,14 +1621,14 @@ button.fg-link {
   width: max-content;
   max-width: min(320px, 80vw);
   padding: var(--fg-space-1) var(--fg-space-2);
-  background: var(--fg-color-surface-card);
-  border: 1px solid var(--fg-color-border-default);
+  background: var(--fg-color-surface-raised);
+  border: 1px solid var(--fg-color-border-subtle);
   border-radius: var(--fg-radius-md);
   box-shadow: var(--fg-shadow-raised);
   font-size: var(--fg-font-size-sm);
   font-weight: var(--fg-font-weight-medium);
   line-height: var(--fg-font-line-height-snug);
-  color: var(--fg-color-text-primary);
+  color: var(--fg-color-text-secondary);
   text-align: left;
 }
 .fg-tip-anchor:hover .fg-tip, .fg-tip-anchor:focus-within .fg-tip, .fg-tip.is-shown { display: block; }
@@ -1655,10 +1660,10 @@ button.fg-link {
   display: flex;
   flex-direction: column;
   gap: var(--fg-space-1);
-  font-size: var(--fg-font-size-sm);
+  font-size: var(--fg-font-size-md);
   font-weight: var(--fg-font-weight-medium);
   line-height: var(--fg-font-line-height-body);
-  color: var(--fg-color-text-primary);
+  color: var(--fg-color-text-secondary);
 }
 
 /* ---------- Change list (SC-72) ---------- */

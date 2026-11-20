@@ -51,7 +51,7 @@ def say(flags, company="they"):
     if got == total:
         return f"You meet all {total} attributes {company} is looking for." if total > 1 else f"You meet the attribute {company} is looking for."
     line = f"You meet {got} of the {total} attributes {company} is looking for."
-    return line if got >= total - 1 else line + " Worth a look before you apply."
+    return line
 
 
 MAX_LETTER_CHARS = letter.MAX_CHARS

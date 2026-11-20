@@ -22,7 +22,7 @@ class Line(unittest.TestCase):
         self.assertEqual(prep.say([True, True, True], "Juniper Labs"), "You meet all 3 attributes Juniper Labs is looking for.")
         self.assertEqual(prep.say([True] * 6 + [False], "Juniper Labs"), "You meet 6 of the 7 attributes Juniper Labs is looking for.")
         self.assertEqual(prep.say([True, False, False, False], "Juniper Labs"),
-                         "You meet 1 of the 4 attributes Juniper Labs is looking for. Worth a look before you apply.")
+                         "You meet 1 of the 4 attributes Juniper Labs is looking for.")
 
     def test_flags_use_the_same_test_as_the_score(self):
         text = "built a design system in figma"
@@ -66,7 +66,7 @@ class Build(unittest.TestCase):
         out = self.build()
         self.assertEqual(out["state"], "ok")
         self.assertEqual((out["company"], out["title"], out["mono"], out["source"]), ("Co", "Senior Product Designer", "CO", "Ashby"))
-        self.assertEqual(out["say"], "You meet 2 of the 4 attributes Co is looking for. Worth a look before you apply.")
+        self.assertEqual(out["say"], "You meet 2 of the 4 attributes Co is looking for.")
         self.assertEqual([(r["text"], r["mark"], r["state"]) for r in out["requirements"]], [
             ("Design systems experience", "yes", "In your resume"), ("Figma", "yes", "In your resume"),
             ("Mentoring", "no", "Not in your resume"), ("Healthcare products", "no", "Not in your resume")])
@@ -166,7 +166,7 @@ class Route(unittest.TestCase):
         head = html.split('<div class="fg-panel-body"')[0]
         self.assertIn('data-panel-title>Staff Designer</h2>', head)
         self.assertIn('<span class="fg-fit-tip" tabindex="0" aria-describedby="fit-tip-5" data-tip-toggle>', head)
-        self.assertIn('role="tooltip" id="fit-tip-5">My estimate from the posting and your resume, not the employer’s screen.</span>', head)
+        self.assertIn('role="tooltip" id="fit-tip-5">Estimate from posting and your resume.</span>', head)
         self.assertNotIn("fg-panel-fit", html)
 
     def test_the_stepper_is_the_first_thing_in_the_body_and_there_is_no_separate_steps_bar(self):
@@ -191,7 +191,7 @@ class Route(unittest.TestCase):
         self.assertIn('href="/open/5" target="_blank"', html)
         self.assertIn("Apply<span class=\"fg-visually-hidden\"> (opens the posting in a new tab)</span>", html)
         self.assertIn("You meet all 2 attributes Juniper &lt;Labs&gt; is looking for.", html)
-        self.assertIn("My estimate from the posting and your resume, not the employer’s screen.", html)
+        self.assertIn("Estimate from posting and your resume.", html)
         self.assertIn("Great fit", html)
         self.assertEqual(html.count('class="fg-req"'), 2)
         self.assertIn("In your resume", html)
