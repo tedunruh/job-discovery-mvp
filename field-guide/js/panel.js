@@ -228,6 +228,19 @@
 
   panel.addEventListener("click", function (event) {
     if (event.target.closest && event.target.closest("[data-panel-close]")) close();
+    var tip = event.target.closest && event.target.closest("[data-tip-toggle]");
+    var shown = panel.querySelectorAll(".fg-tip.is-shown");
+    for (var i = 0; i < shown.length; i++) shown[i].classList.remove("is-shown");
+    if (tip) {   // a tap shows the fit's note, and the next tap anywhere in the panel puts it away
+      var note = document.getElementById(tip.getAttribute("aria-describedby"));
+      if (note && !(shown.length && shown[0] === note)) note.classList.add("is-shown");
+    }
+  });
+  panel.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    var shown = panel.querySelectorAll(".fg-tip.is-shown");
+    for (var i = 0; i < shown.length; i++) shown[i].classList.remove("is-shown");
+    if (document.activeElement && document.activeElement.hasAttribute("data-tip-toggle")) document.activeElement.blur();
   });
 
   /* Forms in the panel post in the background. A plain one (Tailor, Cancel) answers with the panel's new stage. An

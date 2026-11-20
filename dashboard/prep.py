@@ -44,12 +44,13 @@ MESSAGES = {
 }
 
 
-def say(flags):
-    """Scout's line for a job whose requirements were checked against a resume."""
+def say(flags, company="they"):
+    """Scout's line for a job whose requirements were checked against a resume (it heads the list: "You meet 6 of the
+    7 attributes Juniper Labs is looking for.")."""
     got, total = sum(flags), len(flags)
     if got == total:
-        return "You cover everything they list."
-    line = f"You cover {got} of the {total} things they list."
+        return f"You meet all {total} attributes {company} is looking for." if total > 1 else f"You meet the attribute {company} is looking for."
+    line = f"You meet {got} of the {total} attributes {company} is looking for."
     return line if got >= total - 1 else line + " Worth a look before you apply."
 
 
@@ -166,7 +167,7 @@ def build(conn, user_id, posting_id, notice=None):
     # The resume's text is read once for the whole panel (each read is a round trip to the database).
     resume_text = stored_text if stored_text is not None else resume_text_for(conn, user_id)
     flags = covered_flags(requirements, evidence(resume_text, skills, titles))
-    out["say"] = say(flags)
+    out["say"] = say(flags, out["company"])
     out["requirements"] = [
         {"text": r["label"], "mark": "yes" if hit else "no", "state": "In your resume" if hit else "Not in your resume"}
         for r, hit in zip(requirements, flags)

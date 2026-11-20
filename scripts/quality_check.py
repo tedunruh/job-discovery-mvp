@@ -296,7 +296,7 @@ def check_leave_warning(ctx, base):
     sw.click()
     try:
         page.wait_for_function("(b) => document.getElementById('alerts')?.getAttribute('aria-checked') !== b",
-                               arg=before, timeout=5000)
+                               arg=before, timeout=20000)
     except Exception:
         pass  # reported below: the switch didn't flip in place
     page.wait_for_load_state("load")
@@ -312,7 +312,7 @@ def check_leave_warning(ctx, base):
           "...and the line under it says the new state in words", detail)
     sw.click()  # put it back
     page.wait_for_function("(b) => document.getElementById('alerts').getAttribute('aria-checked') === b",
-                           arg=before, timeout=5000)
+                           arg=before, timeout=20000)
     stay["on"] = True
     page.click("a.fg-wordmark")  # walking away
     page.wait_for_timeout(300)
@@ -1323,6 +1323,26 @@ def check_tailor(browser, base, token, user_id):
             steps = page.evaluate("[...document.querySelectorAll('#apply-panel .fg-step')].map(li => [li.textContent.trim(), li.getAttribute('aria-current')])")
             check(steps[0][1] == "step" and [x[0][1:] for x in steps][:3] == ["Prep", "Tailor", "Apply"],
                   f"the steps strip names Prep, Tailor, Apply with Prep current  [{tag}]", str(steps))
+            check(page.evaluate("!!document.querySelector('#apply-panel .fg-panel-body > .fg-steps:first-child') && !document.querySelector('#apply-panel .fg-panel-head + .fg-steps')"),
+                  f"the stepper is the first thing in the scrolling body, not a bar under the header  [{tag}]")
+            tip = page.locator("#apply-panel .fg-panel-head [data-tip-toggle]")
+            note = page.locator("#apply-panel .fg-panel-head .fg-tip")
+            check(tip.count() == 1 and note.count() == 1 and tip.get_attribute("aria-describedby") == note.get_attribute("id"),
+                  f"the fit sits in the header with its tooltip as its description  [{tag}]")
+            check(note.is_hidden(), f"the fit's note is quiet until asked for  [{tag}]")
+            tip.focus()
+            check(note.is_visible() and note.inner_text().startswith("My estimate from the posting and your resume"),
+                  f"keyboard focus on the fit shows its note  [{tag}]", note.inner_text())
+            page.keyboard.press("Escape")
+            check(page.locator("#apply-panel:not([hidden])").count() == 1 and note.is_hidden(), f"Escape puts the note away and leaves the panel open  [{tag}]")
+            tip.click()
+            check(note.is_visible(), f"a tap on the fit shows its note  [{tag}]")
+            page.locator("#apply-panel .fg-panel-body").click(position={"x": 4, "y": 4})
+            check(note.is_hidden(), f"the next tap puts it away  [{tag}]")
+            steps_box = page.evaluate("(() => { const li = [...document.querySelectorAll('#apply-panel .fg-steps .fg-step')]; const r = li.map(x => x.getBoundingClientRect()); const o = document.querySelector('#apply-panel .fg-steps').getBoundingClientRect(); return [r.every(x => x.top >= o.top - 1 && x.bottom <= o.bottom + 1), o.right <= document.querySelector('#apply-panel').getBoundingClientRect().right]; })()")
+            check(steps_box[0] and steps_box[1], f"the three steps and their connectors sit on one line inside the panel  [{tag}]", str(steps_box))
+            lead_ok = page.evaluate("(() => { const c = document.querySelector('#apply-panel .fg-lead'); if (!c) return null; const cs = getComputedStyle(c); return [cs.backgroundColor, cs.borderTopColor, c.querySelectorAll('ul > li').length > 0]; })()")
+            check(lead_ok is not None and lead_ok[2] and lead_ok[0] != "rgba(0, 0, 0, 0)", f"What I would lead with is a Goldenrod card with a real list  [{tag}]", str(lead_ok))
             check(page.locator("#apply-panel input[type=checkbox]").count() == 0, f"Prep has no checkbox beside Tailor  [{tag}]")
             note = page.evaluate("(() => { const n = document.querySelector('#apply-panel .fg-panel-foot .fg-panel-help'); return n ? n.textContent.trim() : ''; })()")
             check(note == "To tailor, I send your resume and this posting to Claude. I’ll only say this once.",

@@ -19,10 +19,10 @@ POSTING = {"id": 5, "title": "Senior Product Designer", "company_name": "Co", "a
 
 class Line(unittest.TestCase):
     def test_scouts_line_counts_what_the_resume_covers(self):
-        self.assertEqual(prep.say([True, True, True]), "You cover everything they list.")
-        self.assertEqual(prep.say([True, True, False]), "You cover 2 of the 3 things they list.")
-        self.assertEqual(prep.say([True, False, False, False]),
-                         "You cover 1 of the 4 things they list. Worth a look before you apply.")
+        self.assertEqual(prep.say([True, True, True], "Juniper Labs"), "You meet all 3 attributes Juniper Labs is looking for.")
+        self.assertEqual(prep.say([True] * 6 + [False], "Juniper Labs"), "You meet 6 of the 7 attributes Juniper Labs is looking for.")
+        self.assertEqual(prep.say([True, False, False, False], "Juniper Labs"),
+                         "You meet 1 of the 4 attributes Juniper Labs is looking for. Worth a look before you apply.")
 
     def test_flags_use_the_same_test_as_the_score(self):
         text = "built a design system in figma"
@@ -66,7 +66,7 @@ class Build(unittest.TestCase):
         out = self.build()
         self.assertEqual(out["state"], "ok")
         self.assertEqual((out["company"], out["title"], out["mono"], out["source"]), ("Co", "Senior Product Designer", "CO", "Ashby"))
-        self.assertEqual(out["say"], "You cover 2 of the 4 things they list. Worth a look before you apply.")
+        self.assertEqual(out["say"], "You meet 2 of the 4 attributes Co is looking for. Worth a look before you apply.")
         self.assertEqual([(r["text"], r["mark"], r["state"]) for r in out["requirements"]], [
             ("Design systems experience", "yes", "In your resume"), ("Figma", "yes", "In your resume"),
             ("Mentoring", "no", "Not in your resume"), ("Healthcare products", "no", "Not in your resume")])
@@ -86,7 +86,7 @@ class Build(unittest.TestCase):
         self.resume_text = "skill0 skill1 skill2 skill3 skill4"
         out = self.build()
         self.assertEqual(len(out["lead"]), 3)
-        self.assertEqual(out["say"], "You cover everything they list.")
+        self.assertEqual(out["say"], "You meet all 5 attributes Co is looking for.")
 
     def test_nothing_covered_leads_with_nothing(self):
         self.resume_text = "unrelated"
@@ -131,7 +131,7 @@ class Build(unittest.TestCase):
 
 def sample(**over):
     out = {"id": 5, "company": "Juniper <Labs>", "title": "Staff Designer", "mono": "JL", "tint": "sage", "source": "Ashby",
-           "state": "ok", "say": "You cover everything they list.", "message": "",
+           "state": "ok", "say": "You meet all 2 attributes Juniper <Labs> is looking for.", "message": "",
            "fit": {"pips": 4, "label": "Great fit"},
            "requirements": [{"text": "Design systems <b>x</b>", "mark": "yes", "state": "In your resume"},
                             {"text": "React", "mark": "no", "state": "Not in your resume"}],
@@ -161,13 +161,36 @@ class Route(unittest.TestCase):
         self.assertEqual(r.headers["Cache-Control"], "no-store")
         return r.get_data(as_text=True)
 
+    def test_the_fit_sits_under_the_title_with_a_focusable_tooltip_as_its_description(self):
+        html = self.get()
+        head = html.split('<div class="fg-panel-body"')[0]
+        self.assertIn('data-panel-title>Staff Designer</h2>', head)
+        self.assertIn('<span class="fg-fit-tip" tabindex="0" aria-describedby="fit-tip-5" data-tip-toggle>', head)
+        self.assertIn('role="tooltip" id="fit-tip-5">My estimate from the posting and your resume, not the employer’s screen.</span>', head)
+        self.assertNotIn("fg-panel-fit", html)
+
+    def test_the_stepper_is_the_first_thing_in_the_body_and_there_is_no_separate_steps_bar(self):
+        html = self.get()
+        head, body = html.split('<div class="fg-panel-body"', 1)
+        self.assertNotIn("fg-steps", head)
+        self.assertTrue(body.split(">", 1)[1].lstrip().startswith('<ol class="fg-steps"'))
+
+    def test_scouts_line_heads_the_list_and_what_i_would_lead_with_is_a_goldenrod_card(self):
+        self.body = sample(lead=["The design system you rebuilt."])
+        html = self.get()
+        self.assertLess(html.index("attributes Juniper"), html.index('class="fg-reqs"'))
+        self.assertNotIn(">What they’re asking for</h3>", html.replace('class="fg-visually-hidden" id="panel-reqs-title-5">What they’re asking for</h3>', ""))
+        self.assertIn('<section class="fg-lead" aria-labelledby="panel-lead-title-5">', html)
+        self.assertIn('<h3 class="fg-lead-title" id="panel-lead-title-5">What I would lead with</h3>', html)
+        self.assertIn('<ul class="fg-lead-list">', html)
+
     def test_it_draws_the_panel_with_a_heading_a_close_button_and_apply(self):
         html = self.get()
         self.assertIn('<h2 class="fg-panel-title" id="panel-title" tabindex="-1"', html)
         self.assertIn('aria-label="Close"', html)
         self.assertIn('href="/open/5" target="_blank"', html)
         self.assertIn("Apply<span class=\"fg-visually-hidden\"> (opens the posting in a new tab)</span>", html)
-        self.assertIn("You cover everything they list.", html)
+        self.assertIn("You meet all 2 attributes Juniper &lt;Labs&gt; is looking for.", html)
         self.assertIn("My estimate from the posting and your resume, not the employer’s screen.", html)
         self.assertIn("Great fit", html)
         self.assertEqual(html.count('class="fg-req"'), 2)

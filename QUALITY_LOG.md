@@ -1647,3 +1647,18 @@ checkbox, the first-time line, the `aria-describedby` tie, and that a cancelled 
 **Rework count:** 0 so far. **Root cause of the gap:** I built slice 3 from my own reading of the card's old wording and never re-read the card
 before calling it done; the card moved on (11/20) while the code kept the checkbox and the count. **Standing check to add:** before closing a
 sprint card, read the live card and compare each acceptance line with what the panel does, not with the slice's own notes.
+
+### 2026-11-20 — SC-72: panel header and Prep redesign (Figma 412:983)
+**What shipped.** Ted redesigned the panel on the card (version of record: Figma Field Guide node 412:983). The fit now sits under the title as a
+focusable thing with a tooltip (hover, keyboard focus, tap; Escape puts it away; the tooltip is its `aria-describedby`); the horizontal stepper with
+connector lines is the first thing in the scrolling body (no separate steps bar); Scout's line reads "You meet 6 of the 7 attributes <company> is
+looking for." and heads the list (the visible "What they're asking for" heading is now hidden but kept for screen readers); "What I would lead
+with" is a Goldenrod card with Ink text and a real list. New Field Guide pieces: `fg.fit_tip` and `fg.lead` (macros), `.fg-tip*` and `.fg-lead*`
+(CSS), a gallery specimen with the note showing. The tooltip says what the card says ("My estimate from the posting and your resume, not the
+employer's screen."); the Figma frame shows a shorter "Estimate from posting and your resume." and the two should be reconciled.
+**Verification gap.** 708 unit tests pass. The full quality check did NOT complete here: four runs on fresh Neon branches stalled or timed out
+(page loads on a cold branch; the profile alerts switch took more than its 5s wait, which also fails on untouched `main`; the last run lost the
+network at cleanup, "No route to host"), so the new tooltip, stepper and lead-card checks have not reported a result. The alerts-switch wait is raised
+to 20s. **Rework count:** not known yet. **Root cause of the churn:** the quality check has fixed waits that assume a fast database link; add a check
+or a retry only after seeing it fail on a fast link too. **Standing check to add:** run the check on a warmed branch from a stable network and read the
+printed totals, not the exit code of a wrapper.

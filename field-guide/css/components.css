@@ -1457,7 +1457,9 @@ button.fg-link {
   color: var(--fg-color-text-primary);
 }
 .fg-panel-title:focus { outline: none; }
-.fg-panel-head .fg-icon-button { grid-column: 3; grid-row: 1 / 3; align-self: start; }
+.fg-panel-head .fg-icon-button { grid-column: 3; grid-row: 1 / 4; align-self: start; }
+.fg-panel-head .fg-mono { grid-row: 1 / 4; align-self: start; }
+.fg-panel-head .fg-tip-anchor { grid-column: 2; grid-row: 3; justify-self: start; margin-top: var(--fg-space-1); }
 .fg-panel-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -1465,25 +1467,14 @@ button.fg-link {
   display: flex;
   flex-direction: column;
   gap: var(--fg-space-6);
-  padding: var(--fg-space-6);
+  padding: var(--fg-space-4) var(--fg-space-6) var(--fg-space-6);
 }
-.fg-panel-fit { display: flex; flex-wrap: wrap; align-items: center; gap: var(--fg-space-2) var(--fg-space-3); }
 .fg-panel-help { margin: 0; font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); }
 .fg-panel-sec { display: flex; flex-direction: column; gap: var(--fg-space-3); }
 .fg-panel-sec-title {
   margin: 0;
   font-size: var(--fg-font-size-lg);
   font-weight: var(--fg-font-weight-demibold);
-  color: var(--fg-color-text-primary);
-}
-.fg-panel-list {
-  margin: 0;
-  padding-left: var(--fg-space-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--fg-space-2);
-  font-weight: var(--fg-font-weight-medium);
-  line-height: var(--fg-font-line-height-body);
   color: var(--fg-color-text-primary);
 }
 .fg-panel-foot {
@@ -1568,17 +1559,25 @@ button.fg-link {
 
 /* ---------- Steps (SC-72) ---------- */
 /* Where the person is in applying: Prep, Tailor, Apply. The current step is Forest with aria-current; steps before it
-   show a Forest outline and say "(done)" for screen readers. A strip under the panel's head, never a navigation. */
+   show a Forest outline and say "(done)" for screen readers. The first thing in the panel's body, never a navigation. */
 .fg-steps {
   display: flex;
-  gap: var(--fg-space-6);
+  align-items: center;
   margin: 0;
-  padding: var(--fg-space-3) var(--fg-space-6);
+  padding: 0;
   list-style: none;
-  border-bottom: 1px solid var(--fg-color-border-subtle);
   font-size: var(--fg-font-size-sm);
   font-weight: var(--fg-font-weight-medium);
   color: var(--fg-color-text-secondary);
+}
+/* A connector line between one step and the next. */
+.fg-step + .fg-step::before {
+  content: "";
+  flex: none;
+  width: 64px;
+  height: 1px;
+  margin-left: var(--fg-space-2);
+  background: var(--fg-color-border-default);
 }
 .fg-step { display: inline-flex; align-items: center; gap: var(--fg-space-2); }
 .fg-step-num {
@@ -1599,7 +1598,68 @@ button.fg-link {
   color: var(--fg-color-text-on-action);
 }
 .fg-step.is-done .fg-step-num { border-color: var(--fg-color-action-primary); color: var(--fg-color-action-primary); }
-@media (max-width: 680px) { .fg-steps { padding-inline: var(--fg-space-4); gap: var(--fg-space-4); } }
+@media (max-width: 680px) { .fg-step + .fg-step::before { width: 28px; } }
+
+/* ---------- Tooltip (SC-72) ---------- */
+/* A short note on something small that is not a button, such as the fit under the panel's title. The anchor wraps the
+   focusable thing and the note; the note shows on hover, on keyboard focus, and on tap (panel.js adds .is-shown), and
+   Escape puts it away. The thing it explains points at it with aria-describedby. */
+.fg-tip-anchor { position: relative; display: inline-flex; }
+.fg-fit-tip { display: inline-flex; border-radius: var(--fg-radius-sm); cursor: default; }
+.fg-tip {
+  display: none;
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  top: calc(100% + var(--fg-space-1));
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(320px, 80vw);
+  padding: var(--fg-space-1) var(--fg-space-2);
+  background: var(--fg-color-surface-card);
+  border: 1px solid var(--fg-color-border-default);
+  border-radius: var(--fg-radius-md);
+  box-shadow: var(--fg-shadow-raised);
+  font-size: var(--fg-font-size-sm);
+  font-weight: var(--fg-font-weight-medium);
+  line-height: var(--fg-font-line-height-snug);
+  color: var(--fg-color-text-primary);
+  text-align: left;
+}
+.fg-tip-anchor:hover .fg-tip, .fg-tip-anchor:focus-within .fg-tip, .fg-tip.is-shown { display: block; }
+
+/* ---------- Lead card (SC-72) ---------- */
+/* What to lead with, in a Goldenrod card: the fill and edge are Goldenrod and the words are Ink, so the colour never
+   carries the meaning. A real list under a Fraunces heading. */
+.fg-lead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-2);
+  padding: var(--fg-space-3) var(--fg-space-4);
+  background: var(--fg-color-signal-discovery-subtle);
+  border: 1px solid var(--fg-color-signal-discovery);
+  border-radius: var(--fg-radius-sm);
+}
+.fg-lead-title {
+  margin: 0;
+  font-family: var(--fg-font-family-display);
+  font-variation-settings: var(--fg-font-display-variation);
+  font-weight: var(--fg-font-weight-regular);
+  font-size: var(--fg-font-size-lg);
+  line-height: var(--fg-font-line-height-snug);
+  color: var(--fg-color-text-primary);
+}
+.fg-lead-list {
+  margin: 0;
+  padding-left: var(--fg-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fg-space-1);
+  font-size: var(--fg-font-size-sm);
+  font-weight: var(--fg-font-weight-medium);
+  line-height: var(--fg-font-line-height-body);
+  color: var(--fg-color-text-primary);
+}
 
 /* ---------- Change list (SC-72) ---------- */
 /* What tailoring changed in the resume, one card per change: its kind and where, the text before (struck through) and
