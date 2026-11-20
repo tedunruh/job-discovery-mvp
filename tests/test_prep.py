@@ -296,14 +296,6 @@ class Stages(unittest.TestCase):
         out = self.stage()
         self.assertEqual((out["stage"], out["letter"]), ("review", None))
 
-    def test_the_tailor_offer_includes_the_letter_only_when_they_can_have_one(self):
-        with mock.patch.object(prep.letter, "is_configured", lambda: True):
-            self.assertTrue(self.stage()["tailor"]["letter"])
-        with mock.patch.object(prep.letter, "is_configured", lambda: False):
-            self.assertFalse(self.stage()["tailor"]["letter"])
-        self.letters, self.avail = True, ("limit", 10)
-        self.assertFalse(self.stage()["tailor"]["letter"])   # no tailoring left, so no letter offer beside it
-
     def test_the_limit_and_an_unavailable_service_replace_the_button_with_a_message(self):
         self.avail = ("limit", 10)
         out = self.stage()
@@ -353,8 +345,9 @@ class TailorRoutes(unittest.TestCase):
     def test_the_prep_stage_offers_tailoring_with_the_count_and_keeps_apply(self):
         html = self.client.get("/prep/5").get_data(as_text=True)
         self.assertIn('action="/tailor/start/5" data-panel-form><button class="fg-button fg-button--primary" type="submit">Tailor my resume</button>', html)
-        self.assertIn("3 of 10 tailored this month.", html)
-        self.assertIn("I send your resume and this posting to Claude", html)
+        self.assertNotIn("tailored this month", html)           # no running count
+        self.assertNotIn('class="fg-panel-help" id="tailor-note', html)   # and no line when it says nothing new
+        self.assertNotIn("aria-describedby", html.split('data-panel-form><button')[1].split(">")[0])
         self.assertIn("Apply<span class=\"fg-visually-hidden\"> without tailoring (opens the posting in a new tab)</span>", html)
         self.assertIn('<li class="fg-step" aria-current="step"><span class="fg-step-num" aria-hidden="true">1</span>Prep', html)
 
@@ -462,23 +455,41 @@ if __name__ == "__main__":
 
     # --- slice 3: the letter, Ready and the files ---
 
-    def test_the_prep_stage_offers_a_cover_letter_beside_tailoring_when_they_can_have_one(self):
-        self.body = sample(stage="prep", tailor={"state": "ok", "used": 3, "limit": 10, "message": "", "letter": True})
+    def test_prep_has_no_cover_letter_checkbox_and_tailoring_never_asks_for_one(self):
         html = self.client.get("/prep/5").get_data(as_text=True)
-        self.assertIn('<input class="fg-checkbox" type="checkbox" name="letter" value="1" form="tailor-start-5"> Write a cover letter too', html)
-        self.assertIn('<form id="tailor-start-5" method="post" action="/tailor/start/5"', html)
-        self.body = sample(stage="prep", tailor={"state": "ok", "used": 3, "limit": 10, "message": "", "letter": False})
-        self.assertNotIn("cover letter", self.client.get("/prep/5").get_data(as_text=True))
-
-    def test_the_letter_is_asked_for_only_when_ticked_and_allowed(self):
+        self.assertNotIn('name="letter"', html)
+        self.assertNotIn("Write a cover letter too", html)
         asked = []
-        self.body = sample(stage="prep", tailor={"state": "ok", "used": 3, "limit": 10, "message": "", "letter": True})
         with mock.patch.object(prep.tailor, "start", lambda c, u, p, want_letter=False: asked.append(want_letter) or 9):
             self.client.post("/tailor/start/5", data={"letter": "1"})
             self.client.post("/tailor/start/5")
-            self.body = sample(stage="prep", tailor={"state": "ok", "used": 3, "limit": 10, "message": "", "letter": False})
-            self.client.post("/tailor/start/5", data={"letter": "1"})
-        self.assertEqual(asked, [True, False, False])
+        self.assertEqual(asked, [False, False])
+
+    def test_the_one_line_under_the_buttons_is_linked_to_tailor_and_appears_only_when_it_says_something(self):
+        first = "To tailor, I send your resume and this posting to Claude. I’ll only say this once."
+        for note, shown in ((first, first), ("2 tailorings left this month.", "2 tailorings left this month."),
+                            ("1 tailoring left this month.", "1 tailoring left this month.")):
+            self.body = sample(stage="prep", tailor={"state": "ok", "used": 3, "limit": 10, "message": "", "note": note})
+            html = self.client.get("/prep/5").get_data(as_text=True)
+            self.assertIn(f'<p class="fg-panel-help" id="tailor-note-5">{shown}</p>', html)
+            self.assertIn('type="submit" aria-describedby="tailor-note-5">Tailor my resume</button>', html)
+
+    def test_the_note_rules(self):
+        """First time: the data line. Two or fewer left: the count. Otherwise nothing."""
+        def note(used, ever):
+            out = {"company": "X"}
+            with mock.patch.object(prep.tailor, "availability", lambda c, u: ("ok", used)), \
+                 mock.patch.object(prep.tailor, "has_tailored", lambda c, u: ever), \
+                 mock.patch.object(prep, "expire_stale_tailorings", lambda c, u: None), \
+                 mock.patch.object(prep, "latest_tailoring", lambda c, u, p: None), \
+                 mock.patch.object(prep, "get_resume", lambda c, u: None):
+                prep.stage_for(None, 1, 5, out, None)
+            return out["tailor"]["note"]
+        self.assertEqual(note(0, False), prep.FIRST_TAILORING_NOTE)
+        self.assertEqual(note(0, True), "")                       # tailored in an earlier month: not the first time
+        self.assertEqual(note(3, True), "")
+        self.assertEqual(note(8, True), "2 tailorings left this month.")
+        self.assertEqual(note(9, True), "1 tailoring left this month.")
 
     def review_body(self, letter, **over):
         return sample(stage="review", tid=9, say="Here’s what I changed.", letter=dict({

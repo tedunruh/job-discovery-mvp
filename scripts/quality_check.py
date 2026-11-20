@@ -1291,7 +1291,6 @@ def check_tailor(browser, base, token, user_id):
             tag = f"@{w}"
             gate.clear()
             letter_gate.clear()
-            ticked = not mobile   # at 1280 the letter is asked for with Tailor; at 390 from Review
             del structure_reads[:]
             conn = get_conn()
             with conn.cursor() as cur:   # each width starts from nothing tailored
@@ -1324,11 +1323,12 @@ def check_tailor(browser, base, token, user_id):
             steps = page.evaluate("[...document.querySelectorAll('#apply-panel .fg-step')].map(li => [li.textContent.trim(), li.getAttribute('aria-current')])")
             check(steps[0][1] == "step" and [x[0][1:] for x in steps][:3] == ["Prep", "Tailor", "Apply"],
                   f"the steps strip names Prep, Tailor, Apply with Prep current  [{tag}]", str(steps))
-            box = page.locator("#apply-panel input[name='letter']")
-            check(box.count() == 1 and page.evaluate("document.querySelector('#apply-panel input[name=letter]').labels[0].textContent.trim()") == "Write a cover letter too",
-                  f"Prep offers an unticked 'Write a cover letter too' beside Tailor  [{tag}]")
-            help_text = page.evaluate("document.querySelector('#apply-panel .fg-panel-foot .fg-panel-help').textContent")
-            check(help_text.startswith("0 of 10 tailored this month."), f"the month's count sits under the Tailor button  [{tag}]", help_text)
+            check(page.locator("#apply-panel input[type=checkbox]").count() == 0, f"Prep has no checkbox beside Tailor  [{tag}]")
+            note = page.evaluate("(() => { const n = document.querySelector('#apply-panel .fg-panel-foot .fg-panel-help'); return n ? n.textContent.trim() : ''; })()")
+            check(note == "To tailor, I send your resume and this posting to Claude. I’ll only say this once.",
+                  f"the first time, one line says what is sent to Claude  [{tag}]", note)
+            check(page.evaluate("(() => { const n = document.querySelector('#apply-panel .fg-panel-foot .fg-panel-help'); const b = document.querySelector('#apply-panel .fg-panel-foot form button'); return !!n && b.getAttribute('aria-describedby') === n.id; })()"),
+                  f"that line is tied to the Tailor button for screen readers  [{tag}]")
 
             # Tailor: the Working stage
             page.locator("#apply-panel button:has-text('Tailor my resume')").click()
@@ -1347,13 +1347,11 @@ def check_tailor(browser, base, token, user_id):
             page.locator("#apply-panel form[action$='/cancel'] button").click()
             page.wait_for_selector("#apply-panel button:has-text('Tailor my resume')")
             check(page.evaluate("document.activeElement.hasAttribute('data-panel-focus')"), f"Cancel puts focus on Prep's first line  [{tag}]")
-            check(page.evaluate("document.querySelector('#apply-panel .fg-panel-foot .fg-panel-help').textContent").startswith("0 of 10"),
-                  f"a cancelled tailoring does not use one of the ten  [{tag}]")
+            check(page.evaluate("(() => { const n = document.querySelector('#apply-panel .fg-panel-foot .fg-panel-help'); return n ? n.textContent : ''; })()").startswith("To tailor, I send"),
+                  f"a cancelled tailoring does not count: it is still the first time  [{tag}]")
 
             # Tailor again: no press needed to get from Working to Review
             gate.set()
-            if ticked:
-                page.locator("#apply-panel input[name='letter']").check()
             page.locator("#apply-panel button:has-text('Tailor my resume')").click()
             page.wait_for_selector("#apply-panel .fg-changes", timeout=30000)
             check(page.evaluate("document.activeElement.hasAttribute('data-panel-focus')"), f"when it finishes, focus lands on Review's first line  [{tag}]")
@@ -1409,15 +1407,12 @@ def check_tailor(browser, base, token, user_id):
             # The cover letter: only its own section changes while it is written
             page.evaluate("window.__changes = document.querySelector('#apply-panel .fg-changes')")
             section = page.locator("#apply-panel [data-letter]")
-            if ticked:
-                check("Writing your cover letter…" in section.inner_text(), f"a letter asked for with Tailor is being written when Review opens  [{tag}]", section.inner_text())
-            else:
-                text = section.inner_text()
-                check("Most applications don’t need one." in text and "doesn’t count toward your 10 this month" in text,
-                      f"Review offers a cover letter and says it does not use one of the ten  [{tag}]", text)
-                section.locator("button:has-text('Write a cover letter')").click()
-                page.wait_for_selector("#apply-panel [data-letter] .fg-progress")
-                check(page.evaluate("document.activeElement.hasAttribute('data-letter-focus')"), f"asking for the letter moves focus to its section's first line  [{tag}]")
+            text = section.inner_text()
+            check("Most applications don’t need one." in text and "doesn’t count toward your 10 this month" in text,
+                  f"Review offers a cover letter and says it does not use one of the ten  [{tag}]", text)
+            section.locator("button:has-text('Write a cover letter')").click()
+            page.wait_for_selector("#apply-panel [data-letter] .fg-progress")
+            check(page.evaluate("document.activeElement.hasAttribute('data-letter-focus')"), f"asking for the letter moves focus to its section's first line  [{tag}]")
             check(page.evaluate("window.__changes.isConnected"), f"while the letter is written the changes above it stay where they were  [{tag}]")
             check(page.locator("#apply-panel .fg-panel-foot button:has-text('Looks good')").count() == 1, f"Review has Looks good beside Apply  [{tag}]")
             letter_gate.set()

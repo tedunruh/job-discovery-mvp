@@ -54,6 +54,7 @@ def say(flags):
 
 
 MAX_LETTER_CHARS = letter.MAX_CHARS
+FIRST_TAILORING_NOTE = "To tailor, I send your resume and this posting to Claude. I’ll only say this once."
 WORKING_STEPS = [
     "Reading your resume…",
     "Reading the posting…",
@@ -119,12 +120,15 @@ def stage_for(conn, user_id, posting_id, out, notice):
                    else "Here’s what I changed." if review["total"] else "I didn’t find anything worth changing.")
     else:
         state, used = tailor.availability(conn, user_id)
+        left = tailor.MONTHLY_TAILORINGS_PER_PERSON - used
+        first = state == "ok" and used == 0 and not tailor.has_tailored(conn, user_id)
         out["tailor"] = {"state": state, "used": used, "limit": tailor.MONTHLY_TAILORINGS_PER_PERSON,
                          "message": {"limit": f"You’ve tailored {used} resumes this month, the most for now. It starts over "
                                               f"on {tailor.next_reset()}.",
                                      "unavailable": tailor.message("unavailable"), "ok": ""}[state],
-                         # a letter is available when tailoring is (same key, same month's spend): no second query
-                         "letter": state == "ok" and letter.is_configured()}
+                         # the one line under the buttons: only when it says something new (the card's footer rule)
+                         "note": FIRST_TAILORING_NOTE if first else
+                         (f"{left} tailoring{'' if left == 1 else 's'} left this month." if state == "ok" and left <= 2 else "")}
         out["notice"] = notice
 
 
@@ -209,7 +213,7 @@ def register(app, require_login):
             body = build(conn, g.user_id, posting_id)
             conn.commit()
             if body is not None and body["state"] == "ok" and body["stage"] == "prep" and body["tailor"]["state"] == "ok":
-                tailor.start(conn, g.user_id, posting_id, request.form.get("letter") == "1" and body["tailor"]["letter"])
+                tailor.start(conn, g.user_id, posting_id)
             return panel(conn, posting_id)
         finally:
             conn.close()

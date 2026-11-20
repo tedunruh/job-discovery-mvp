@@ -1627,3 +1627,15 @@ checked the letters against the rules, not by reading them as a hiring manager w
 before and after any prompt or rule change. **Not done:** one letter inferred a situation ("the risk was that an AI insight would show up as a bare suggestion")
 from the resume's facts; the prompt forbids invented reasons but it is a judgement call. The pypdf text that feeds "Not in your resume" drops "ti", "tt"
 and "fi" letter pairs ("foundatons"); not touched here.
+
+### 2026-11-20 — SC-72: the Prep footer matches the card
+**What shipped.** Ted edited SC-72 on the board after PR #36 merged: Prep's footer is just Tailor my resume and Apply, with no "Write a cover letter
+too" checkbox and no running count. One line sits under the buttons only when it says something new: the first time a person tailors ("To tailor, I
+send your resume and this posting to Claude. I'll only say this once.") and when 2 or fewer tailorings are left; the line is tied to the Tailor button
+with `aria-describedby`. The letter is written only on request from Review or Ready (unchanged, and free of the 10). The same fact now sits on the
+profile page's resume card. "First time" is read from `tailor_calls` (`has_tailored`; the rows stay when a tailoring is deleted), so no schema
+change. Field Guide: the panel spec shows the three footer states; the `fg.check` specimens now use a neutral label. `quality_check.py` asserts no
+checkbox, the first-time line, the `aria-describedby` tie, and that a cancelled tailoring is still the first time. 705 tests and 546/546 checks pass.
+**Rework count:** 0 so far. **Root cause of the gap:** I built slice 3 from my own reading of the card's old wording and never re-read the card
+before calling it done; the card moved on (11/20) while the code kept the checkbox and the count. **Standing check to add:** before closing a
+sprint card, read the live card and compare each acceptance line with what the panel does, not with the slice's own notes.

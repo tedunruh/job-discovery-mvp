@@ -42,6 +42,7 @@ from db.db import (
     get_user_profile,
     log_tailor_call,
     save_resume_structure,
+    has_tailored,
     tailor_usage,
 )
 from role_categories import skill_phrase
