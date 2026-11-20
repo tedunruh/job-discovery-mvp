@@ -48,29 +48,37 @@ class SelectTail(unittest.TestCase):
 
 
 class WorkdayCadence(unittest.TestCase):
-    def test_hot_workday_tenants_are_checked_every_other_run_but_each_one_regularly(self):
+    def test_hot_workday_tenants_are_checked_hourly_and_each_one_regularly(self):
         wd = [dict(board(i, "hot"), ats_type="workday") for i in range(1, 41)]
         other = [board(i, "hot") for i in range(100, 110)]
-        picked_by_slot = [{c["id"] for c in rc.select_tail(wd + other, now=s * rc.RUN_INTERVAL_SECONDS)} for s in range(4)]
+        picked_by_slot = [{c["id"] for c in rc.select_tail(wd + other, now=s * rc.RUN_INTERVAL_SECONDS)} for s in range(8)]
         for p in picked_by_slot:
             self.assertEqual({c["id"] for c in other}, p & {c["id"] for c in other})  # everything else: every run
         counts = [len(p & {c["id"] for c in wd}) for p in picked_by_slot]
-        self.assertTrue(all(18 <= n <= 22 for n in counts), counts)  # about half each run
-        for t in range(1, 41):  # no tenant goes more than one run unchecked
-            for s in range(3):
-                self.assertTrue(t in picked_by_slot[s] or t in picked_by_slot[s + 1])
+        self.assertTrue(all(8 <= n <= 12 for n in counts), counts)  # about a quarter each run
+        for t in range(1, 41):  # no tenant goes more than four runs (an hour) unchecked
+            for s in range(4):
+                self.assertTrue(any(t in picked_by_slot[s + k] for k in range(4)))
+
+    def test_core_workday_companies_come_up_hourly_and_everything_else_core_every_run(self):
+        core = [dict(board(i, "core"), ats_type="workday") for i in range(1, 9)] + [board(i, "core", ) for i in range(100, 104)]
+        picks = [{c["id"] for c in rc.select_core(core, now=s * rc.RUN_INTERVAL_SECONDS)} for s in range(4)]
+        for p in picks:
+            self.assertEqual({100, 101, 102, 103}, p & {100, 101, 102, 103})
+        self.assertEqual(set().union(*[p & set(range(1, 9)) for p in picks]), set(range(1, 9)))   # each one, once an hour
+        self.assertTrue(all(len(p & set(range(1, 9))) == 2 for p in picks))
 
 
 class BigWorkdayTenants(unittest.TestCase):
-    def test_huge_tenants_are_checked_hourly_and_small_ones_every_other_run(self):
+    def test_huge_tenants_are_checked_every_two_hours_and_small_ones_hourly(self):
         small = [dict(board(i, "hot"), ats_type="workday", scan_marker="design:30") for i in range(1, 41)]
         big = [dict(board(i, "hot"), ats_type="workday", scan_marker="design:1800") for i in range(101, 141)]
-        picks = [{c["id"] for c in rc.select_tail(small + big, now=s * rc.RUN_INTERVAL_SECONDS)} for s in range(8)]
-        for s_ in range(8):
-            self.assertTrue(18 <= len(picks[s_] & {c["id"] for c in small}) <= 22)   # ~half of the small ones each run
-            self.assertTrue(7 <= len(picks[s_] & {c["id"] for c in big}) <= 13)      # ~a quarter of the big ones
-        for t in range(101, 141):  # every big tenant is still checked at least once in 4 runs
-            self.assertTrue(any(t in picks[s_] for s_ in range(4)))
+        picks = [{c["id"] for c in rc.select_tail(small + big, now=s * rc.RUN_INTERVAL_SECONDS)} for s in range(16)]
+        for s_ in range(16):
+            self.assertTrue(8 <= len(picks[s_] & {c["id"] for c in small}) <= 12)   # ~a quarter of the small ones each run
+            self.assertTrue(3 <= len(picks[s_] & {c["id"] for c in big}) <= 7)      # ~an eighth of the big ones
+        for t in range(101, 141):  # every big tenant is still checked at least once in 8 runs
+            self.assertTrue(any(t in picks[s_] for s_ in range(8)))
 
     def test_a_tenant_with_no_marker_yet_counts_as_small(self):
         self.assertEqual(rc._marker_total({"scan_marker": None}), 0)
