@@ -61,6 +61,9 @@ READ_TIMEOUT_SECONDS, TAILOR_TIMEOUT_SECONDS = 90, 150   # background threads: n
 MAX_POSTING_CHARS = 12000
 MAX_REWRITES, MAX_CHANGES = 8, 12
 MAX_ROLES, MAX_BULLETS, MAX_SKILLS, MAX_LINES = 12, 14, 60, 30
+# Length limits for what the model returns when it splits a resume into parts. Generous on purpose: they only stop
+# runaway output, and a line over its limit is cut at a word, never in the middle of one.
+LINE_CHARS, SUMMARY_CHARS, NAME_CHARS, SHORT_CHARS, SKILL_CHARS = 1200, 2000, 200, 120, 120
 CONCURRENT = threading.BoundedSemaphore(3)   # at most three tailorings at once on this server
 
 MESSAGES = {
@@ -181,8 +184,19 @@ def _clean(text):
     return " ".join(str(text or "").split())
 
 
-def _list(value, limit, size=400):
-    return [_clean(x)[:size] for x in (value if isinstance(value, list) else []) if isinstance(x, str) and _clean(x)][:limit]
+def _fit(text, size):
+    """The text, kept whole when it fits; otherwise cut at the last word that fits, never in the middle of a word (a bullet
+    cut at 400 characters used to end "...tr" in the person's resume file). The limits are only a safety net for garbage;
+    a real resume line is far shorter."""
+    text = _clean(text)
+    if len(text) <= size:
+        return text
+    cut = text[:size]
+    return (cut.rsplit(" ", 1)[0] if " " in cut else cut).rstrip(" ,;:-")
+
+
+def _list(value, limit, size=LINE_CHARS):
+    return [_fit(x, size) for x in (value if isinstance(value, list) else []) if isinstance(x, str) and _clean(x)][:limit]
 
 
 def clean_structure(raw):
@@ -194,15 +208,15 @@ def clean_structure(raw):
         if not isinstance(role, dict):
             continue
         roles.append({
-            "company": _clean(role.get("company"))[:120], "title": _clean(role.get("title"))[:120],
-            "location": _clean(role.get("location"))[:80], "dates": _clean(role.get("dates"))[:60],
+            "company": _fit(role.get("company"), NAME_CHARS), "title": _fit(role.get("title"), NAME_CHARS),
+            "location": _fit(role.get("location"), SHORT_CHARS), "dates": _fit(role.get("dates"), SHORT_CHARS),
             "bullets": _list(role.get("bullets"), MAX_BULLETS),
         })
     other = []
     for section in (raw.get("other") if isinstance(raw.get("other"), list) else [])[:6]:
         if isinstance(section, dict) and _clean(section.get("heading")):
-            other.append({"heading": _clean(section["heading"])[:80], "lines": _list(section.get("lines"), MAX_LINES)})
-    return {"header": _list(raw.get("header"), 6, 120), "summary": _clean(raw.get("summary"))[:900], "experience": roles, "skills": _list(raw.get("skills"), MAX_SKILLS, 80),
+            other.append({"heading": _fit(section["heading"], SHORT_CHARS), "lines": _list(section.get("lines"), MAX_LINES)})
+    return {"header": _list(raw.get("header"), 6, NAME_CHARS), "summary": _fit(raw.get("summary"), SUMMARY_CHARS), "experience": roles, "skills": _list(raw.get("skills"), MAX_SKILLS, SKILL_CHARS),
             "education": _list(raw.get("education"), 8), "other": other}
 
 

@@ -1587,3 +1587,43 @@ the function around it. **Not done:** a real look at the wider panel at several 
 
 **Follow-up, same day:** Ted asked for 50/50. With the panel open the list and the panel now share the width equally (`flex: 1 1 0` on both; the panel's
 minimum is 480px), replacing the `clamp(480px, 42%, 680px)` above. QC checks the two widths match (or the panel is at its 480px floor and so wider).
+
+### 2026-11-16 — Workday: lighter schedule and a cool-off
+**What shipped.** Workday refused the collector's GitHub servers from about Nov 15 22:30 UTC for over a day (the same requests from Ted's Mac
+were fine; some boards still got through, so it looked like a throttle, not a ban). The per-run breaker already stopped after 5 refusals, but every
+run started over, the 4 core tenants (heavy, several searches each) were outside the breaker, and a 429 on a core tenant counted as that board
+"failing". Now: (1) Workday is asked less (hot tenants hourly instead of every 30 min, huge ones every 2h, core ones hourly, 3 requests at a
+time instead of 6); (2) core fetches are inside the breaker and a 429 is no longer a board failure; (3) a cool-off per ATS (`ats_cooloff`, applied
+to Neon before the code): after a trip the ATS is left alone for 1h, then 2h, 4h, 6h each time in a row, and one success clears it; the hourly
+alert says it is paused. **Rework count:** 0 so far. **Root cause:** the breaker had no memory between runs, and its counters were reset in
+the middle of the run (`_scan_tail`), so what the core stage saw was thrown away. **Cost:** new Workday roles can reach alerts up to an hour or
+two later. **Not done:** nothing proves the block was caused by our request volume (it may be GitHub's shared servers); if it never lifts, the
+next step is another network for Workday, which costs money.
+
+### 2026-11-19 — Workday: one alert a day, not one an hour
+**What shipped.** Ted was flooded with pipeline health alerts: 17 in 12 hours, nearly all the hourly "Workday is rate-limiting us" reminder plus
+Workiva (a core Workday company) re-announcing "failed 3 consecutive cycles" each time Workday let one request through and then refused again.
+Now the cool-off decides when to buzz: not on the first refusal (a blip clears itself), once on the second in a row, then at most once every
+24 hours (`ALERT_EVERY_HOURS`), and once when it answers again. The scan and the start of a run no longer send reminders. Added `alerted_at` to
+`ats_cooloff` (applied to Neon). **Rework count:** 0 so far. **Root cause:** I added the cool-off in the same change as the old
+"remind hourly" alert and did not treat "how many phone buzzes will this cause over a multi-day block" as a design question; an alert that repeats
+for as long as a problem lasts is a log, not an alert. **Standing check to add:** when adding an alert, say how often it can fire in the worst
+case (a block that lasts a week) and make that number small. **Not done:** other flapping core alerts (a core Lever board timing out) still
+announce after 3 failures in a row; they are rare and real.
+
+### 2026-11-19 — Cover letter: a person's voice, a spelling check, and resume lines no longer cut mid-word
+**What shipped.** Ted: the letters were "singular sentences of keyword stuffing in no person with no through line", and he saw spelling errors and
+truncation. Found in the stored data: (1) two resume bullets were cut at exactly 400 characters mid-word ("...harden with each round, tr") because
+`clean_structure` hard-capped every line; the limits are now generous and cut at a word (`_fit`). (2) The letters pasted the resume's bullets with a
+sentence between them. Causes, all mine: the prompt said "use only the resume's words" and "every sentence names a concrete thing", so copying was
+the safe move; the this/that rule was a hard rejection, so a natural draft ("That is the thread in my work") was thrown away and the retry avoided
+every connecting word; and the call ran at low effort. Now: a voice-first prompt (first person, one story told in order, transitions, facts in the
+model's own words, never a copied bullet), medium effort (`LETTER_EFFORT`), the this/that rule is guidance only (the no "you/your" ban is still
+hard), the accuracy check accepts names and terms the posting itself uses ("Security Investigation", "PM") while the "posting asks for it, resume lacks
+it" check stays strict, and a spelling check (`pyspellchecker`, words in the resume, posting, company or role are exempt) catches typos like "Heatlth".
+Tried on four real postings: 3 of 4 first drafts passed, the fourth after one retry before the posting-words change. **Rework count:** 0 so far.
+**Root cause:** I enforced a style rule as a code-level rejection without looking at what the rejection loop does to the model's next draft; and I
+checked the letters against the rules, not by reading them as a hiring manager would. **Standing check to add:** read three real outputs end to end
+before and after any prompt or rule change. **Not done:** one letter inferred a situation ("the risk was that an AI insight would show up as a bare suggestion")
+from the resume's facts; the prompt forbids invented reasons but it is a judgement call. The pypdf text that feeds "Not in your resume" drops "ti", "tt"
+and "fi" letter pairs ("foundatons"); not touched here.

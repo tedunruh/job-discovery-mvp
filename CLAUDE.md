@@ -67,7 +67,7 @@ Sprint history, incidents and open items: `docs/SPRINTS.md`. Process lessons: `Q
   (outage watchdog; the collector pings after each completed run and `/fail` on a crash).
 - **Config** is env vars / GitHub secrets, never in the repo: `DATABASE_URL`, `RESEND_API_KEY`,
   `RESEND_FROM`, `SECRET_KEY`, `NTFY_HEALTH_TOPIC`, `HEALTHCHECK_URL`, `ANTHROPIC_API_KEY` (dashboard only: it reads resumes;
-  never put it in the collector or GitHub secrets) and optionally `RESUME_MONTHLY_CAP_USD` (default 5) and `POSTING_MONTHLY_CAP_USD` (default 5; the cap on reading postings' requirements for the fit score, SC-70) and `TAILOR_MONTHLY_CAP_USD` (default 5; the cap on tailoring resumes, SC-72), plus `RENDER_API_KEY` locally.
+  never put it in the collector or GitHub secrets) and optionally `RESUME_MONTHLY_CAP_USD` (default 5) and `POSTING_MONTHLY_CAP_USD` (default 5; the cap on reading postings' requirements for the fit score, SC-70) and `TAILOR_MONTHLY_CAP_USD` (default 5; the cap on tailoring resumes, SC-72) and `LETTER_EFFORT` (default medium; how hard the model thinks writing the cover letter), plus `RENDER_API_KEY` locally.
   Locally they live in `.env.local` (git-ignored); `private/` (git-ignored) holds invite material.
   Never print, commit or paste values. The repo is **public**: no tester names, topics or keys.
 
@@ -92,6 +92,9 @@ fingerprint (`'rescan'` = silent re-scan).
 **Runbook**
 - Health: last runs in `scheduler_runs` (should be ~6-10 min, finished); `source_health` statuses;
   `python scripts/engagement.py 7` for per-person use; `python scripts/actions_usage.py`.
+- Rate limits: when an ATS refuses `RATE_LIMIT_TRIP` requests in a run the collector pauses it (table `ats_cooloff`: 1h, then 2h, 4h, 6h each
+  time in a row; one success clears it). It alerts once the second refusal in a row, then at most once a day, and once when the ATS answers again. To lift a pause by hand:
+  `DELETE FROM ats_cooloff WHERE ats = 'workday'`. Workday is also asked less often than the others (hot tenants hourly, huge ones every 2h).
 - Switch a board/batch off: `UPDATE companies SET tier='off' WHERE ...` (reversible).
 - Pay ranges (SC-71): the collector fills them as it writes postings; `python scripts/backfill_pay.py` (dry run; `--sample 25`; `--write`) fills the ones already stored.
 - Add boards: `scripts/discover_boards.py` (harvest/validate/enrich/report, read-only) then

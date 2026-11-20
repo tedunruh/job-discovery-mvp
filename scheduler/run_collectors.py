@@ -12,6 +12,7 @@ from collectors import ashby, greenhouse, lever, pay, rippling, workable, workda
 from collectors.filters import is_design_role
 from dashboard.filters import work_type
 from db.db import (
+    clear_ats_cooloff,
     clear_closed_descriptions,
     content_hash,
     ensure_conn,
@@ -20,6 +21,7 @@ from db.db import (
     get_all_user_profiles,
     get_all_user_role_categories,
     get_all_users,
+    get_ats_cooloffs,
     get_companies_to_scan,
     ensure_alert_token,
     get_conn,
@@ -35,6 +37,7 @@ from db.db import (
     record_fetch_success,
     record_tail_scan_results,
     record_zero_result,
+    save_ats_cooloff,
     set_scan_markers,
     start_scheduler_run,
     touch_source_health,
@@ -62,21 +65,32 @@ FETCH_WORKERS = 8
 RUN_INTERVAL_SECONDS = 15 * 60
 COLD_SLICES = 16
 TAIL_WORKERS = 12
-WORKDAY_EVERY = 2  # hot Workday tenants are probed every Nth run
+# Workday blocked the collector's servers for over a day in Nov 2026, so it is asked less: hot Workday tenants are probed
+# hourly (every 4th run), not every 30 minutes, the few core ones hourly too, and the huge ones every 2 hours. A new Workday
+# role can show up in alerts up to an hour or two later than before.
+WORKDAY_EVERY = 4
+WORKDAY_CORE_EVERY = 4
 # Huge enterprise tenants (their "design" search matches hundreds+ of postings, mostly noise)
-# churn nearly every run, so each probe turns into a 25-page scan. Check those hourly.
+# churn nearly every run, so each probe turns into a 25-page scan.
 WORKDAY_BIG_TOTAL = 400
-WORKDAY_BIG_EVERY = 4
+WORKDAY_BIG_EVERY = 8
 TAIL_CHUNK = 48  # boards fetched per batch: the time budget is only checked between batches, and a batch
 # of Workday first scans (several seconds each) must not be able to overrun it by minutes
 # Per-ATS cap on simultaneous requests, so a few thousand boards don't hammer one host.
-TAIL_PER_ATS = {"greenhouse": 8, "ashby": 5, "lever": 4, "workable": 4, "rippling": 4, "workday": 6}
+TAIL_PER_ATS = {"greenhouse": 8, "ashby": 5, "lever": 4, "workable": 4, "rippling": 4, "workday": 3}
 TAIL_COMMIT_EVERY = 100
 # An ATS that answers this many requests in one run with 429/403 is rate-limiting or blocking
 # us. Stop asking it for the rest of the run (the boards stay first in line for the next
 # run) instead of failing hundreds of boards and prolonging the block - Workable once held
 # one for ~23 hours.
 RATE_LIMIT_TRIP = 5
+# When an ATS trips the breaker, stop asking it for a while (it was refusing the collector's servers for over a day, and
+# retrying every run only gave it more to refuse). The first refusal pauses it 1 hour, a second in a row 2, then 4, then 6
+# hours. After the pause the next run asks again (the breaker stops that at RATE_LIMIT_TRIP refusals); one success clears it.
+COOLOFF_MINUTES = (60, 120, 240, 360)
+# Say so about a block once a day, not every hour (a block can last days and the phone is not a log). A refusal that clears
+# after one pause stays quiet; the first alert is on the second refusal in a row, and the next one a day later.
+ALERT_EVERY_HOURS = 24
 WORKABLE_EVERY = 2  # hot Workable boards are checked every Nth run (they rarely post)
 # Past this, don't start more tail work this run (the next run picks it up); keeps a run
 # well inside the 15 min cadence even if an ATS is slow.
@@ -98,6 +112,7 @@ COLLECTORS = {
 TAIL_COLLECTORS = dict(COLLECTORS, greenhouse=lambda ident: greenhouse.fetch(ident, light=True))
 _ats_slots = {ats: threading.Semaphore(n) for ats, n in TAIL_PER_ATS.items()}
 _rate_limited = {}  # ats -> rate-limit answers so far this run
+_succeeded = {}  # ats -> boards fetched without an error so far this run (a success ends a cool-off)
 _rate_lock = threading.Lock()
 # SC-51: the description step for this run (None when not running, so tests and scripts that call the
 # fetch functions directly are unaffected). The fetch workers read it to tag wanted roles.
@@ -106,6 +121,15 @@ _describer = None
 
 class AtsBlocked(Exception):
     """This ATS is rate-limiting us this run: the board was not requested."""
+
+
+def _note_success(ats):
+    with _rate_lock:
+        _succeeded[ats] = _succeeded.get(ats, 0) + 1
+
+
+def _is_rate_limit(error):
+    return getattr(getattr(error, "response", None), "status_code", None) == 429
 
 
 def _note_rate_limit(ats, error):
@@ -149,10 +173,15 @@ def _fetch_company(company):
     ones straight away - every tracked company's whole board is held in memory
     at once, and only design roles keep their raw payload (see upsert_postings).
     """
+    ats = company["ats_type"]
+    if _rate_limited.get(ats, 0) >= RATE_LIMIT_TRIP:
+        return None, AtsBlocked(ats)
     try:
-        postings = COLLECTORS[company["ats_type"]](company["ats_identifier"])
+        postings = COLLECTORS[ats](company["ats_identifier"])
     except Exception as e:
+        _note_rate_limit(ats, e)
         return None, e
+    _note_success(ats)
     pay.attach(company["ats_type"], postings)  # SC-71: the pay the board gave as data, before the payload is dropped
     for p in postings:
         p["is_design"] = is_design_role(p.get("title") or "")
@@ -193,6 +222,7 @@ def _fetch_tail(company):
         except Exception as e:
             _note_rate_limit(ats, e)
             return None, e
+    _note_success(ats)
     pay.attach(ats, postings)  # SC-71
     storable = [p for p in postings if _is_storable(p)]
     design, other = [], []
@@ -224,6 +254,40 @@ def _marker_total(company):
     """The match count in a Workday tenant's stored change marker ("design:451" or "design:451|product manager:70" -> 451), or 0."""
     m = re.match(r"design:(\d+)(?:\||$)", company.get("scan_marker") or "")
     return int(m.group(1)) if m else 0
+
+
+def select_core(companies, now=None):
+    """Which core companies this run fetches: all of them, except that Workday ones (heavy: several searches each) come up
+    every WORKDAY_CORE_EVERY runs."""
+    slot = _tail_slot(now)
+    return [c for c in companies
+            if c["ats_type"] != "workday" or c["id"] % WORKDAY_CORE_EVERY == slot % WORKDAY_CORE_EVERY]
+
+
+def settle_cooloffs(conn, before, health_alerts):
+    """After the run: pause every ATS that tripped the breaker (longer each time in a row) and clear the cool-off of one that
+    answered. `before` is what get_ats_cooloffs returned at the start. Adds to `health_alerts` only when it is worth a
+    phone buzz: the second refusal in a row (then at most once a day), and once when it answers again after that.
+    Returns {ats: minutes} for the ones just paused."""
+    paused = {}
+    for ats, refusals in _rate_limited.items():
+        if refusals >= RATE_LIMIT_TRIP:
+            was = before.get(ats)
+            level = min((was["level"] if was else 0) + 1, len(COOLOFF_MINUTES))
+            ago = was["alerted_hours"] if was else None
+            tell = level >= 2 and (ago is None or ago >= ALERT_EVERY_HOURS)
+            save_ats_cooloff(conn, ats, level, COOLOFF_MINUTES[level - 1], alerted=tell)
+            paused[ats] = COOLOFF_MINUTES[level - 1]
+            if tell:
+                health_alerts.append(f"{ats.capitalize()} keeps refusing our requests, so it is paused and retried automatically "
+                                     f"(next try in about {COOLOFF_MINUTES[level - 1] // 60} h). No action needed; "
+                                     f"you'll hear about it again only if it lasts another day.")
+    for ats, state in before.items():
+        if not state["active"] and ats not in paused and _succeeded.get(ats, 0) > 0:
+            clear_ats_cooloff(conn, ats)
+            if state["alerted_hours"] is not None:
+                health_alerts.append(f"{ats.capitalize()} is answering again.")
+    return paused
 
 
 def select_tail(companies, now=None):
@@ -315,8 +379,14 @@ def _run(health_alerts):
             finish_scheduler_run(conn, run_id)
             conn.commit()
             return
-        core = [c for c in everything if c["tier"] == "core"]
-        tail = order_for_fairness(select_tail([c for c in everything if c["tier"] != "core"]))
+        _rate_limited.clear()
+        _succeeded.clear()
+        cooloffs = get_ats_cooloffs(conn)
+        paused = {ats for ats, state in cooloffs.items() if state["active"]}
+        for ats in sorted(paused):
+            print(f"{ats} is paused after rate-limiting us: not asked for another {cooloffs[ats]['minutes_left']} min")
+        core = select_core([c for c in everything if c["tier"] == "core" and c["ats_type"] not in paused])
+        tail = order_for_fairness(select_tail([c for c in everything if c["tier"] != "core" and c["ats_type"] not in paused]))
 
         def fan_out(conn, company, posting, posting_id):
             """Alert every user whose profile AND Work type fit this new role."""
@@ -351,6 +421,12 @@ def _run(health_alerts):
             label = f"{company['name']} ({company['ats_type']})"
             print(f"{label}...")
 
+            if isinstance(error, AtsBlocked):
+                print("  skipped: rate-limiting us this run")   # not requested: neither a success nor a failure
+                continue
+            if error is not None and _is_rate_limit(error):
+                print(f"  rate-limited (429), not the board's fault: {error}")   # no failure streak, no "degraded" alert
+                continue
             if error is not None:
                 print(f"  FAILED: {error}")
                 is_new_degradation, streak = record_fetch_failure(conn, company_id)
@@ -437,6 +513,18 @@ def _run(health_alerts):
                     pass
                 conn = ensure_conn(conn)
 
+        try:
+            for ats, minutes in settle_cooloffs(conn, cooloffs, health_alerts).items():
+                print(f"{ats} refused {RATE_LIMIT_TRIP}+ requests this run: paused for {minutes} min")
+            conn.commit()
+        except Exception as e:  # noqa: BLE001
+            print(f"saving the cool-off failed: {type(e).__name__}: {e}")
+            try:
+                conn.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            conn = ensure_conn(conn)
+
         _report_descriptions(_describer, health_alerts)
         finish_scheduler_run(conn, run_id)
         conn.commit()
@@ -491,7 +579,6 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
     if the server dropped it, write, then save progress - so a long run never holds a long idle
     connection or loses what it already did. Returns the connection to use afterwards."""
     t0 = time.time()
-    _rate_limited.clear()
     blocked = {}  # ats -> boards left unrequested because it was rate-limiting us
     stored = get_open_posting_hashes(conn, [c["id"] for c in tail])
     step = _describer
@@ -593,9 +680,7 @@ def _scan_tail(conn, tail, health_alerts, fan_out):
     )
     for ats, n in blocked.items():
         print(f"{ats} is rate-limiting us: {n} board(s) not requested this run")
-        if _tail_slot() % 4 == 0:  # remind hourly, not every run, while a block lasts
-            health_alerts.append(f"{ats.capitalize()} is rate-limiting us - {n} board(s) skipped this run. "
-                                 f"Retrying every run; no action needed unless this lasts a day.")
+        # No alert here: settle_cooloffs tells (once a day at most) when it is worth a buzz.
     if stats["failed"] >= TAIL_FAILURE_ALERT_MIN and stats["failed"] > TAIL_FAILURE_ALERT_RATIO * max(stats["scanned"], 1):
         health_alerts.append(
             f"{stats['failed']} of {stats['scanned']} discovered job boards failed this run "
