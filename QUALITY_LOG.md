@@ -1607,3 +1607,20 @@ Now the cool-off decides when to buzz: not on the first refusal (a blip clears i
 for as long as a problem lasts is a log, not an alert. **Standing check to add:** when adding an alert, say how often it can fire in the worst
 case (a block that lasts a week) and make that number small. **Not done:** other flapping core alerts (a core Lever board timing out) still
 announce after 3 failures in a row; they are rare and real.
+
+### 2026-11-19 — Cover letter: a person's voice, a spelling check, and resume lines no longer cut mid-word
+**What shipped.** Ted: the letters were "singular sentences of keyword stuffing in no person with no through line", and he saw spelling errors and
+truncation. Found in the stored data: (1) two resume bullets were cut at exactly 400 characters mid-word ("...harden with each round, tr") because
+`clean_structure` hard-capped every line; the limits are now generous and cut at a word (`_fit`). (2) The letters pasted the resume's bullets with a
+sentence between them. Causes, all mine: the prompt said "use only the resume's words" and "every sentence names a concrete thing", so copying was
+the safe move; the this/that rule was a hard rejection, so a natural draft ("That is the thread in my work") was thrown away and the retry avoided
+every connecting word; and the call ran at low effort. Now: a voice-first prompt (first person, one story told in order, transitions, facts in the
+model's own words, never a copied bullet), medium effort (`LETTER_EFFORT`), the this/that rule is guidance only (the no "you/your" ban is still
+hard), the accuracy check accepts names and terms the posting itself uses ("Security Investigation", "PM") while the "posting asks for it, resume lacks
+it" check stays strict, and a spelling check (`pyspellchecker`, words in the resume, posting, company or role are exempt) catches typos like "Heatlth".
+Tried on four real postings: 3 of 4 first drafts passed, the fourth after one retry before the posting-words change. **Rework count:** 0 so far.
+**Root cause:** I enforced a style rule as a code-level rejection without looking at what the rejection loop does to the model's next draft; and I
+checked the letters against the rules, not by reading them as a hiring manager would. **Standing check to add:** read three real outputs end to end
+before and after any prompt or rule change. **Not done:** one letter inferred a situation ("the risk was that an AI insight would show up as a bare suggestion")
+from the resume's facts; the prompt forbids invented reasons but it is a judgement call. The pypdf text that feeds "Not in your resume" drops "ti", "tt"
+and "fi" letter pairs ("foundatons"); not touched here.
