@@ -140,8 +140,7 @@ class Page(unittest.TestCase):
         self.assertRegex(html, r'<p class="fg-voice voice-intro" data-voice>2 new since yesterday\.</p>')
         self.assertLess(html.index("data-voice"), html.index('<section class="board"'))
 
-    def test_the_line_is_only_on_open_roles(self):
-        self.assertNotIn("data-voice", self.get("/?tab=applications"))
+    def test_the_line_is_not_on_the_hidden_list(self):   # Applications has its own line (SC-73)
         self.assertNotIn("data-voice", self.get("/?view=hidden"))
 
     def test_jobs_are_grouped_by_day_with_a_true_count_and_a_hairline(self):

@@ -120,20 +120,18 @@ class Applications(Base):
             self.assertNotIn(gone, li)
         self.assertIn('href="/open/9"', li)
 
-    def test_an_application_with_tailored_files_links_them_and_one_without_has_nothing_extra(self):
+    def test_the_files_are_in_the_panel_not_the_row_and_a_tailored_one_says_so(self):
         self.applications = [application(9, "Design Lead", 1), application(8, "Staff Designer", 2)]
         self.saved_files = {9: {"id": 41, "has_letter": True}}
         html = self.get("/?tab=applications")
         first = re.search(r'<li class="fg-job" id="posting-9">.*?</li>', html, re.S).group(0)
-        self.assertIn('href="/tailor/41/resume.pdf" download>Resume PDF</a>', first)
-        self.assertIn('href="/tailor/41/resume.docx" download>Word</a>', first)
-        self.assertIn('href="/tailor/41/letter.txt" download>Cover letter</a>', first)
-        self.assertIn('aria-label="Tailored files for Co"', first)
+        self.assertIn("</svg>Tailored</span>", first)
+        self.assertNotIn("/tailor/", first)                      # SC-73: the panel shows what was sent
+        self.assertNotIn("data-action", first)
         second = re.search(r'<li class="fg-job" id="posting-8">.*?</li>', html, re.S).group(0)
-        self.assertNotIn("/tailor/", second)
-        self.assertNotIn("data-action", second)
-        self.saved_files = {9: {"id": 41, "has_letter": False}}
-        self.assertNotIn("letter.txt", self.get("/?tab=applications"))
+        self.assertNotIn("Tailored", second)
+        self.assertIn('data-panel-url="/application/"', html)    # a card opens the application panel
+        self.assertIn('aria-controls="apply-panel"', first)
 
     def test_a_job_with_a_tailored_resume_says_tailored_after_the_time(self):
         self.tailored = {2}

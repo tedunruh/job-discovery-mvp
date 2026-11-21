@@ -1680,14 +1680,46 @@ def check_tailor(browser, base, token, user_id):
             apps = ctx.new_page()
             apps.goto(base + "/?tab=applications", wait_until="load")
             app_row = apps.locator(f"li.fg-job:has-text('{TAILOR_COMPANY}')")
-            links = apps.evaluate(f"[...document.querySelectorAll('li.fg-job')].filter(li => li.textContent.includes('{TAILOR_COMPANY}'))"
-                                  ".flatMap(li => [...li.querySelectorAll('a[download]')].map(a => [a.textContent.trim(), a.getAttribute('href')]))")
-            check([l[0] for l in links] == ["Resume PDF", "Word", "Cover letter"],
-                  f"the application lists the tailored resume and the letter  [{tag}]", str(links))
+            group_of = f"[...document.querySelectorAll('li.fg-job')].find(li => li.textContent.includes('{TAILOR_COMPANY}')).closest('section.fg-day').getAttribute('aria-label')"
+            check(app_row.locator("a[download]").count() == 0 and app_row.locator("[data-tailored-mark]").count() == 1,
+                  f"the application's row says Tailored and carries no file links  [{tag}]")
+            # SC-73: the card opens the application panel, which shows what was sent
+            app_row.locator(".fg-job-link").click()
+            apps.wait_for_selector("#apply-panel [data-application]")
+            links = apps.evaluate("[...document.querySelectorAll('#apply-panel a[download]')].map(a => [a.textContent.replace(/\\s+/g, ' ').trim(), a.getAttribute('href')])")
+            check([l[0] for l in links] == ["PDF of your resume tailored for Quality Check Studio", "Word file of your resume tailored for Quality Check Studio"],
+                  f"the application panel offers the tailored resume as PDF and Word  [{tag}]", str(links))
+            copy = apps.locator("#apply-panel [data-copy-text]")
+            check(copy.count() == 1 and (copy.get_attribute("data-copy-text") or "").rstrip().endswith("P.S. Edited by me."),
+                  f"the application panel has the letter to copy, with the person's edit  [{tag}]")
             if links:
                 kept = [ctx.request.get(base + l[1]) for l in links]
-                check([k.status for k in kept] == [200, 200, 200] and kept[0].body()[:4] == b"%PDF" and kept[2].text().rstrip().endswith("P.S. Edited by me."),
+                check([k.status for k in kept] == [200, 200] and kept[0].body()[:4] == b"%PDF",
                       f"those files still download after the job left Open roles  [{tag}]")
+            check(apps.locator("#apply-panel [data-history] .fg-history-text").all_inner_texts() == ["Applied with a tailored resume and cover letter"],
+                  f"History starts with the application and what went with it  [{tag}]")
+            check(apps.locator("#apply-panel [data-stage-select]").input_value() == "waiting" and apps.evaluate(group_of) == "Waiting to hear",
+                  f"a new application is waiting to hear  [{tag}]")
+            # Where it stands: the row moves, a toast says so with Undo, History grows, focus stays on the select
+            apps.select_option("#apply-panel [data-stage-select]", "interviewing")
+            apps.wait_for_selector("#toast-region .fg-toast")
+            apps.wait_for_function(f"{group_of} === 'Interviewing'")
+            check(apps.locator("#toast-region .fg-toast-text").inner_text() == "Moved to Interviewing.",
+                  f"changing Where it stands says what happened  [{tag}]", apps.locator("#toast-region").inner_text())
+            check(apps.locator("#apply-panel [data-history] .fg-history-text").first.inner_text() == "Interviewing"
+                  and apps.locator("#apply-panel [data-history] .fg-history-item").count() == 2,
+                  f"History gets the new line first  [{tag}]")
+            check(apps.evaluate("document.activeElement.matches('[data-stage-select]')"), f"focus stays on Where it stands  [{tag}]")
+            check("interview going" in apps.locator("[data-voice]").inner_text() and app_row.locator("[data-state-top]").inner_text() == "Interviewing",
+                  f"Scout's line and the row follow the change  [{tag}]", apps.locator("[data-voice]").inner_text())
+            check(app_row.get_attribute("aria-current") == "true", f"the row stays selected while its panel is open  [{tag}]")
+            apps.locator("#toast-region [data-toast-undo]").click()
+            apps.wait_for_function(f"{group_of} === 'Waiting to hear'")
+            check(apps.locator("#apply-panel [data-stage-select]").input_value() == "waiting"
+                  and apps.locator("#apply-panel [data-history] .fg-history-item").count() == 1,
+                  f"Undo puts the row, the select and History back  [{tag}]")
+            if os.environ.get("QC_SHOTS"):
+                apps.screenshot(path=os.path.join(os.environ["QC_SHOTS"], f"application-panel@{w}.png"))
             over = apps.evaluate("document.documentElement.scrollWidth - window.innerWidth")
             check(over <= 0, f"no horizontal overflow on Applications with files  [{tag}]", f"{over}px")
             if os.environ.get("QC_SHOTS"):

@@ -488,3 +488,19 @@ UPDATE user_postings up
        stage_changed_at = (SELECT max(e.created_at) FROM user_events e
                             WHERE e.user_id = up.user_id AND e.posting_id = up.posting_id AND e.event_type = 'applied')
  WHERE up.applied AND up.stage IS NULL;
+
+-- ---------------------------------------------------------------------------
+-- SC-73 slice 2: the history under "Where it stands". One row per change of stage the person makes (the first stage,
+-- waiting, is the application itself and has no row). prev_stage / prev_changed_at are what Undo puts back; a row is
+-- deleted when it is undone, and a person's rows go when they undo applying. Additive; apply to Neon before the code.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS application_stage_log (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    posting_id INTEGER NOT NULL REFERENCES postings(id) ON DELETE CASCADE,
+    stage TEXT NOT NULL CHECK (stage IN ('waiting', 'interviewing', 'offer', 'not', 'mine')),
+    prev_stage TEXT,
+    prev_changed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS application_stage_log_job_idx ON application_stage_log (user_id, posting_id, id DESC);

@@ -238,6 +238,8 @@ def set_applied(conn, posting_id, applied, user_id):
             """,
             (user_id, posting_id, applied, applied, applied),
         )
+        if not applied:   # undoing "applied" starts the story over if they apply again (SC-73 history)
+            cur.execute("DELETE FROM application_stage_log WHERE user_id = %s AND posting_id = %s", (user_id, posting_id))
 
 
 def is_onboarded(conn, user_id):
@@ -1106,11 +1108,12 @@ def get_hidden_among(conn, user_id, posting_ids):
         return {r[0] for r in cur.fetchall()}
 
 
-def get_applications(conn, user_id):
+def get_applications(conn, user_id, posting_id=None):
     """The roles this person has marked applied, open or closed (a role that has since closed is still something they
     applied to). applied_at is the time of their latest "applied" event for it, or None for a role marked applied
     before events were kept. stage is where it stands (SC-73: waiting, interviewing, offer, not, mine), stage_changed_at
-    when that last changed and posting_status whether the employer still has the role open. Newest activity first."""
+    when that last changed and posting_status whether the employer still has the role open. Newest activity first.
+    With `posting_id`, only that role (the application panel's)."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
@@ -1122,14 +1125,68 @@ def get_applications(conn, user_id):
             FROM user_postings up
             JOIN postings p ON p.id = up.posting_id
             JOIN companies c ON c.id = p.company_id
-            WHERE up.user_id = %s AND up.applied
+            WHERE up.user_id = %s AND up.applied""" + (" AND p.id = %s" if posting_id is not None else "") + """
             ORDER BY COALESCE(up.stage_changed_at, (SELECT max(e.created_at) FROM user_events e
                        WHERE e.user_id = up.user_id AND e.posting_id = p.id AND e.event_type = 'applied')) DESC NULLS LAST,
                      p.id DESC
             """,
-            (user_id,),
+            (user_id,) if posting_id is None else (user_id, posting_id),
         )
         return cur.fetchall()
+
+
+STAGES = ("waiting", "interviewing", "offer", "not", "mine")
+
+
+def set_stage(conn, user_id, posting_id, stage):
+    """Move one of this person's applications to a stage (SC-73). Returns the new history row's id, or None when
+    nothing changed (not applied to, an unknown stage, or already there). Caller commits."""
+    if stage not in STAGES:
+        return None
+    with conn.cursor() as cur:
+        cur.execute("SELECT COALESCE(stage, 'waiting'), stage_changed_at FROM user_postings "
+                    "WHERE user_id = %s AND posting_id = %s AND applied FOR UPDATE", (user_id, posting_id))
+        row = cur.fetchone()
+        if row is None or row[0] == stage:
+            return None
+        cur.execute("UPDATE user_postings SET stage = %s, stage_changed_at = now() WHERE user_id = %s AND posting_id = %s",
+                    (stage, user_id, posting_id))
+        cur.execute("INSERT INTO application_stage_log (user_id, posting_id, stage, prev_stage, prev_changed_at) "
+                    "VALUES (%s, %s, %s, %s, %s) RETURNING id", (user_id, posting_id, stage, row[0], row[1]))
+        return cur.fetchone()[0]
+
+
+def undo_stage(conn, user_id, posting_id, log_id):
+    """Put back what the change `log_id` replaced, but only while it is still the latest change for this application
+    (an Undo that is late, or from another tab, must not undo something newer). True when it was undone."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, prev_stage, prev_changed_at FROM application_stage_log "
+                    "WHERE user_id = %s AND posting_id = %s ORDER BY id DESC LIMIT 1 FOR UPDATE", (user_id, posting_id))
+        row = cur.fetchone()
+        if row is None or row[0] != log_id:
+            return False
+        cur.execute("UPDATE user_postings SET stage = %s, stage_changed_at = %s WHERE user_id = %s AND posting_id = %s AND applied",
+                    (row[1], row[2], user_id, posting_id))
+        cur.execute("DELETE FROM application_stage_log WHERE id = %s", (log_id,))
+        return True
+
+
+def get_stage_history(conn, user_id, posting_id):
+    """[(stage, when)] for the changes this person made to one application, newest first."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT stage, created_at FROM application_stage_log WHERE user_id = %s AND posting_id = %s "
+                    "ORDER BY id DESC", (user_id, posting_id))
+        return cur.fetchall()
+
+
+def applied_tailoring(conn, user_id, posting_id):
+    """The tailored files saved with one application: {"id", "letter" (text or ""), "saved_at"}, or None."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, CASE WHEN letter_state = 'ready' THEN COALESCE(letter, '') ELSE '' END, applied_at "
+                    "FROM tailorings WHERE user_id = %s AND posting_id = %s AND applied_at IS NOT NULL AND status = 'ready' "
+                    "ORDER BY applied_at DESC LIMIT 1", (user_id, posting_id))
+        row = cur.fetchone()
+        return {"id": row[0], "letter": row[1], "saved_at": row[2]} if row else None
 
 
 def get_applied_among(conn, user_id, posting_ids):

@@ -1,0 +1,15 @@
+{#- The Applications tab's groups (SC-73): the part the page swaps after a stage changes. `application_groups` is
+    [(label, count, rows)] from dashboard/elevate.py; `voice` is Scout's line, carried in data-voice-text so the page can update it. -#}
+{% import "_fg.html" as fg %}
+<div data-applications-list data-voice-text="{{ voice }}">
+  {%- for label, count, rows in application_groups %}
+  <section class="fg-day" aria-label="{{ label }}">
+    {{ fg.day(label, count) }}
+    <ul class="fg-job-list">
+      {%- for p in rows %}
+      {{ fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, p.status_top, p.status_bottom, tailored=(p.files is not none), mono=p.mono, tint=p.tint, pay=p.pay, closed=p.closed, panel=True) }}
+      {%- endfor %}
+    </ul>
+  </section>
+  {%- endfor %}
+</div>

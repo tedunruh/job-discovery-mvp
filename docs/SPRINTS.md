@@ -114,6 +114,9 @@ and letter (reading stays on Haiku 5.5); 10 tailorings per person per month as t
   code), the Applications tab grouped Waiting to hear, Interviewing, Offer, Closed with one status line per row and Scout's line counting what is going; over rows are
   dimmed (`fg.job(closed=True)`). Everything is still "waiting": slice 2 adds the application panel (Where it stands, history, what was sent) and slice 3 the
   check-ins (row questions, ntfy pushes, at most 3 per job).
+- **Track applications, slice 2 of 3 (SC-73, 11/21):** the application panel (Where it stands, History, What you sent) opens from any Applications card; a
+  stage change moves the row, updates Scout's line and shows a toast with an Undo that takes back exactly that change. New table `application_stage_log`
+  (schema applied to Neon before the code). The tailored file links left the rows for the panel. Slice 3 is the check-ins.
 - **Collector (same sprint):** Workday is asked less often (hot tenants every 4 runs, big ones every 8, core every 4, concurrency 3) and any ATS that
   keeps refusing is paused in `ats_cooloff` (60, 120, 240, 360 minutes; one success clears it); alerts fire on the second refusal in a row, then at
   most once a day, and once when it answers again (the hourly flood is gone). About 3,100 more Greenhouse, Ashby and Rippling boards were imported

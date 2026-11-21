@@ -54,6 +54,7 @@ from dashboard.profile import ask_for_catch_up
 from dashboard.requirements import queue as queue_reads
 from dashboard.return_ask import choose_asks
 from dashboard.skill_filter import apply_skill_cutoff
+from dashboard.applications import register as register_applications
 from dashboard.prep import register as register_prep
 from dashboard.profile import register as register_profile_screens
 from dashboard.resume import register as register_resume
@@ -177,6 +178,7 @@ def require_login(view):
 register_profile_screens(app, require_login)
 register_resume(app, require_login)
 register_prep(app, require_login)
+register_applications(app, require_login)
 
 
 def humanize_posted_at(dt):
@@ -196,6 +198,20 @@ def humanize_posted_at(dt):
 
 
 app.jinja_env.filters["humanize"] = humanize_posted_at
+
+
+def prepare_applications(applications, saved_files):
+    """Give each application what its row shows (place, pay, monogram, the tailored files, its status) and group them
+    (SC-73): [(group label, count, rows)]. Used by the Applications tab and by /applications/list, which the page asks for
+    after a stage changes so the row can move to its new group."""
+    for a in applications:
+        a["files"] = saved_files.get(a["id"])
+        a["applied_ago"] = humanize_posted_at(a["applied_at"])
+        a["place"] = location_line(a["location"], a["remote_type"])
+        a["activity_at"] = a.get("stage_changed_at") or a["applied_at"]
+        a["mono"], a["tint"] = monogram(a["company_name"]), tint(a["company_name"])
+        a["pay"] = pay_line(a)
+    return group_applications(applications)
 
 
 @app.after_request
@@ -419,16 +435,12 @@ def index():
         conn.close()
     for p in shown:
         p["tailored"] = p["id"] in tailored_ids
-    for a in applications:
-        a["files"] = saved_files.get(a["id"])
-        a["applied_ago"] = humanize_posted_at(a["applied_at"])
-        a["place"] = location_line(a["location"], a["remote_type"])
-        a["activity_at"] = a.get("stage_changed_at") or a["applied_at"]
+    application_groups = prepare_applications(applications, saved_files)   # SC-73: Waiting to hear, Interviewing, Offer, Closed
     for h in hidden:
         h["hidden_ago"] = humanize_posted_at(h["hidden_at"])
         h["place"] = location_line(h["location"], h["remote_type"])
         h["reason_label"] = HIDE_REASON_LABELS.get(h["hidden_reason"], "")
-    for rows in (shown, applications, hidden):    # SC-69: the company monogram, the same tint every time for a company
+    for rows in (shown, hidden):    # SC-69: the company monogram, the same tint every time for a company
         for r in rows:
             r["mono"], r["tint"] = monogram(r["company_name"]), tint(r["company_name"])
             r["pay"] = pay_line(r)                # SC-71: the pay range, or "" (a blank line) when none was found
@@ -438,7 +450,6 @@ def index():
     day_groups = rows_by_day(shown, day_counts, now)
     caught_up = total == 0 and posted_range == "all" and work_type_label(work_types) == "Any"
     voice = scout_line(day_counts.get("Today", 0), total, caught_up, close_phrase(close))
-    application_groups = group_applications(applications)   # SC-73: Waiting to hear, Interviewing, Offer, Closed
     if request.args.get("tab") == "applications":
         voice = applications_line(application_groups)
 
@@ -555,6 +566,23 @@ def dismiss_ask(posting_id):
     if request.headers.get("X-Requested-With") == "fetch":
         return "", 204
     return redirect(url_for("index", _anchor=f"posting-{posting_id}"))
+
+
+@app.route("/applications/list")
+@require_login
+def applications_list():
+    """The grouped Applications list on its own (SC-73): the page swaps it in after a stage changes. The line above the
+    board comes with it (data-voice-text)."""
+    conn = get_conn()
+    try:
+        applications = get_applications(conn, g.user_id)
+        saved_files = applied_tailorings(conn, g.user_id)
+    finally:
+        conn.close()
+    groups = prepare_applications(applications, saved_files)
+    response = app.make_response(render_template("_applications_list.html", application_groups=groups, voice=applications_line(groups)))
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.route("/set_applied/<int:posting_id>", methods=["POST"])
