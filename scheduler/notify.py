@@ -32,6 +32,14 @@ def alert_link(token):
     return f"{DASHBOARD_URL}/a/{token}"
 
 
+def checkin_link(token, grouped):
+    """Where a tap on a check-in push goes (SC-73): through Scout, like a new-role alert, so the tap is counted, and on to
+    the Applications tab (to the one row for a single job). No token (or the site asleep): the tab itself."""
+    if not token:
+        return f"{DASHBOARD_URL}/?tab=applications"
+    return f"{DASHBOARD_URL}/a/{token}/checkin" + ("?all=1" if grouped else "")
+
+
 def _post(payload, label):
     """POST to ntfy. Returns True on success; False (and prints) on any network
     error or non-2xx response - callers use this to raise a health alert rather
@@ -82,6 +90,27 @@ def notify_new_postings(new_postings, ntfy_topic, discovered_at=None):
         payload["click"] = click
 
     return _post(payload, "Notification")
+
+
+def notify_checkins(items, ntfy_topic, click):
+    """Returns True if sent (or nothing to send), False if the send failed.
+
+    One check-in push for one person (SC-73, copy from SC-64). items: [{"company", "title", "level" (1 to 3), "days"
+    (since they applied)}]. One job: "Did you hear back?" (level 3: "Should I close it?") with the company, title and
+    how long ago they applied; several share one push ("Any word on 3 applications?"), which has no buttons. `click` is
+    where a tap goes (see checkin_link)."""
+    if not ntfy_topic or not items:
+        return True
+    if len(items) == 1:
+        item = items[0]
+        close = item["level"] >= 3
+        title = "Should I close it?" if close else "Did you hear back?"
+        message = f"{item['company']}: {item['title']}\nYou applied {item['days']} days ago" + (", and there has been no word." if close else ".")
+    else:
+        title = f"Any word on {len(items)} applications?"
+        message = "\n".join(f"{i['company']}: {i['title']}" for i in items[:10])
+    payload = {"topic": ntfy_topic, "title": title, "message": message, "priority": 3, "click": click}
+    return _post(payload, "Check-in")
 
 
 def notify_health_alerts(alerts):

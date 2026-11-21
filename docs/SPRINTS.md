@@ -117,6 +117,9 @@ and letter (reading stays on Haiku 5.5); 10 tailorings per person per month as t
 - **Track applications, slice 2 of 3 (SC-73, 11/21):** the application panel (Where it stands, History, What you sent) opens from any Applications card; a
   stage change moves the row, updates Scout's line and shows a toast with an Undo that takes back exactly that change. New table `application_stage_log`
   (schema applied to Neon before the code). The tailored file links left the rows for the panel. Slice 3 is the check-ins.
+- **Track applications, slice 3 of 3 (SC-73, 11/21):** the check-ins from SC-64. A waiting application's row asks Did you hear back? from day 5, What did they say?, Should I
+  close it? on day 21; the collector sends one grouped push a day per person (after 9 AM Central, not while alerts are paused; days 5, 12, 21, at most 3 per job) and a tap
+  lands on the row. Rules in `checkins.py`, pushes in `scheduler/checkin_push.py`. No push has gone to anyone yet: the first goes when an application first turns 5 days old.
 - **Collector (same sprint):** Workday is asked less often (hot tenants every 4 runs, big ones every 8, core every 4, concurrency 3) and any ATS that
   keeps refusing is paused in `ats_cooloff` (60, 120, 240, 360 minutes; one success clears it); alerts fire on the second refusal in a row, then at
   most once a day, and once when it answers again (the hourly flood is gone). About 3,100 more Greenhouse, Ashby and Rippling boards were imported

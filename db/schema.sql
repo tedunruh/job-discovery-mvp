@@ -504,3 +504,19 @@ CREATE TABLE IF NOT EXISTS application_stage_log (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS application_stage_log_job_idx ON application_stage_log (user_id, posting_id, id DESC);
+
+-- ---------------------------------------------------------------------------
+-- SC-73 slice 3: check-ins on applications that are still waiting (SC-64's design). Additive; apply to Neon before the code.
+--   heard_at          they said Yes to "Did you hear back?": the row asks "What did they say?" and the check-ins end
+--   heard_not_yet_at  the latest Not yet to "Did you hear back?" (it is asked again on day 12)
+--   close_not_yet_at  Not yet to "Should I close it?": no more check-ins for the job
+--   checkin_pushes    how many check-in pushes this job has had (at most 3: days 5, 12 and 21)
+--   users.checkin_pushed_on   the Central date of this person's last check-in push: one a day at most, jobs grouped
+--   application_stage_log.source   'panel' (the select) or 'checkin' (an answer on the row), for the history's wording
+-- ---------------------------------------------------------------------------
+ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS heard_at TIMESTAMPTZ;
+ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS heard_not_yet_at TIMESTAMPTZ;
+ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS close_not_yet_at TIMESTAMPTZ;
+ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS checkin_pushes SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_pushed_on DATE;
+ALTER TABLE application_stage_log ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'panel';

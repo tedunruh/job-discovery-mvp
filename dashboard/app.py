@@ -54,6 +54,7 @@ from dashboard.profile import ask_for_catch_up
 from dashboard.requirements import queue as queue_reads
 from dashboard.return_ask import choose_asks
 from dashboard.skill_filter import apply_skill_cutoff
+from checkins import question as checkin_question
 from dashboard.applications import register as register_applications
 from dashboard.prep import register as register_prep
 from dashboard.profile import register as register_profile_screens
@@ -204,6 +205,7 @@ def prepare_applications(applications, saved_files):
     """Give each application what its row shows (place, pay, monogram, the tailored files, its status) and group them
     (SC-73): [(group label, count, rows)]. Used by the Applications tab and by /applications/list, which the page asks for
     after a stage changes so the row can move to its new group."""
+    now = datetime.now(timezone.utc)
     for a in applications:
         a["files"] = saved_files.get(a["id"])
         a["applied_ago"] = humanize_posted_at(a["applied_at"])
@@ -211,6 +213,7 @@ def prepare_applications(applications, saved_files):
         a["activity_at"] = a.get("stage_changed_at") or a["applied_at"]
         a["mono"], a["tint"] = monogram(a["company_name"]), tint(a["company_name"])
         a["pay"] = pay_line(a)
+        a["ask"] = checkin_question(a, now)   # SC-73: what the row asks (heard, say, close) or None
     return group_applications(applications)
 
 
@@ -651,6 +654,24 @@ def open_posting(posting_id):
     finally:
         conn.close()
     return redirect(url) if url else redirect(url_for("index"))
+
+
+@app.route("/a/<token>/checkin")
+def open_from_checkin(token):
+    """A tap on a check-in push (SC-73): the same private link as a new-role alert, but it goes to Scout's Applications
+    tab (the person answers on the row) and is counted as its own kind of tap, not as a posting opened. `all=1` (the
+    grouped push) lands on the tab, not on one row. Unknown token: the dashboard."""
+    conn = get_conn()
+    try:
+        target = get_alert_target(conn, token)
+        if target and request.method != "HEAD":
+            log_event(conn, target[0], "opened_checkin", target[1])
+            conn.commit()
+    finally:
+        conn.close()
+    if not target:
+        return redirect(url_for("index"))
+    return redirect(url_for("index", tab="applications", _anchor=None if request.args.get("all") else f"posting-{target[1]}"))
 
 
 @app.route("/a/<token>")

@@ -44,6 +44,7 @@ from db.db import (
     upsert_postings,
 )
 from role_categories import alerts_active, matches_city, matches_profile, matches_profile_titles, matches_work_type
+from scheduler.checkin_push import send as send_checkins
 from scheduler.crash_alerts import crash_message, previous_streak, recovered_message, should_alert_crash
 from scheduler.describe import DescriptionStep, build_gate, extra_workday_queries
 from scheduler.heartbeat import ping_failure, ping_success
@@ -492,6 +493,7 @@ def _run(health_alerts):
         print(f"core: {len(core)} companies in {time.time() - t_core:.0f}s")
         conn.commit()
         _deliver(new_postings_by_user, health_alerts)  # before the slow part, not after it
+        send_checkins(conn, all_user_profiles, health_alerts)  # SC-73: at most one a day per person, after 9 AM Central
         for company, roles in describe_later:  # requests, so after the alerts: never delays them
             conn = _describer.store(conn, company, roles)
             conn.commit()

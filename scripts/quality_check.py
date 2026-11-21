@@ -1715,11 +1715,59 @@ def check_tailor(browser, base, token, user_id):
             check(app_row.get_attribute("aria-current") == "true", f"the row stays selected while its panel is open  [{tag}]")
             apps.locator("#toast-region [data-toast-undo]").click()
             apps.wait_for_function(f"{group_of} === 'Waiting to hear'")
+            apps.wait_for_function("document.querySelector('#apply-panel [data-stage-select]') && document.querySelector('#apply-panel [data-stage-select]').value === 'waiting'")   # the panel redraws after the list
             check(apps.locator("#apply-panel [data-stage-select]").input_value() == "waiting"
                   and apps.locator("#apply-panel [data-history] .fg-history-item").count() == 1,
                   f"Undo puts the row, the select and History back  [{tag}]")
             if os.environ.get("QC_SHOTS"):
                 apps.screenshot(path=os.path.join(os.environ["QC_SHOTS"], f"application-panel@{w}.png"))
+
+            # SC-73 slice 3: a week on, the row asks "Did you hear back?"; the answers move it along
+            conn = get_conn()
+            with conn.cursor() as cur:
+                cur.execute("UPDATE user_events SET created_at = now() - interval '6 days' "
+                            "WHERE user_id = %s AND posting_id = %s AND event_type = 'applied'", (user_id, posting_id))
+            conn.commit()
+            conn.close()
+            apps.reload(wait_until="load")
+            ask = lambda: app_row.locator(".fg-job-question").all_inner_texts()
+            check(ask() == ["Did you hear back?"] and app_row.locator("[data-checkin]").count() == 2,
+                  f"an application six days old asks Did you hear back?  [{tag}]", str(ask()))
+            app_row.locator("[data-checkin='heard_no']").click()
+            apps.wait_for_selector(f"li.fg-job:has-text('{TAILOR_COMPANY}') [data-checkin-note]")
+            check(app_row.locator("[data-checkin-note]").inner_text() == "I’ll check back in a week."
+                  and apps.evaluate("document.activeElement.hasAttribute('data-checkin-note')"),
+                  f"Not yet says it will check back in a week, and says it aloud  [{tag}]")
+            apps.reload(wait_until="load")
+            check(ask() == [], f"after Not yet the row stays quiet  [{tag}]", str(ask()))
+            conn = get_conn()
+            with conn.cursor() as cur:
+                cur.execute("UPDATE user_postings SET heard_not_yet_at = NULL WHERE user_id = %s AND posting_id = %s", (user_id, posting_id))
+            conn.commit()
+            conn.close()
+            apps.reload(wait_until="load")
+            app_row.locator("[data-checkin='heard_yes']").click()
+            apps.wait_for_selector(f"li.fg-job:has-text('{TAILOR_COMPANY}') select[data-checkin-say]")
+            check(ask() == ["What did they say?"] and apps.evaluate("document.activeElement.hasAttribute('data-checkin-say')"),
+                  f"Yes asks What did they say? with focus on the menu  [{tag}]", str(ask()))
+            over = apps.evaluate("document.documentElement.scrollWidth - window.innerWidth")
+            check(over <= 0, f"no horizontal overflow with the check-in menu showing  [{tag}]", f"{over}px")
+            apps.reload(wait_until="load")
+            check(ask() == ["What did they say?"], f"What did they say? is still asked after a reload  [{tag}]", str(ask()))
+            app_row.locator("select[data-checkin-say]").select_option("interviewing")
+            apps.wait_for_function(f"{group_of} === 'Interviewing'")
+            check(apps.locator("#toast-region .fg-toast-text").inner_text() == "Moved to Interviewing."
+                  and app_row.locator(".fg-job-question").count() == 0,
+                  f"an answer moves the row with a toast, and the question is gone  [{tag}]")
+            check(apps.evaluate("document.activeElement.classList.contains('fg-job-link')"), f"focus lands on the row's title  [{tag}]")
+            app_row.locator(".fg-job-link").click()
+            apps.wait_for_selector("#apply-panel [data-history] .fg-history-text")
+            check(apps.locator("#apply-panel [data-history] .fg-history-text").first.inner_text() == "Heard back: interview",
+                  f"History says Heard back: interview  [{tag}]")
+            apps.locator("#toast-region [data-toast-undo]").click()
+            apps.wait_for_function(f"{group_of} === 'Waiting to hear'")
+            apps.wait_for_function("document.querySelector('#apply-panel [data-stage-select]') && document.querySelector('#apply-panel [data-stage-select]').value === 'waiting'")
+            check(apps.locator("#apply-panel [data-history] .fg-history-item").count() == 1, f"Undo of an answer puts History back too  [{tag}]")
             over = apps.evaluate("document.documentElement.scrollWidth - window.innerWidth")
             check(over <= 0, f"no horizontal overflow on Applications with files  [{tag}]", f"{over}px")
             if os.environ.get("QC_SHOTS"):
