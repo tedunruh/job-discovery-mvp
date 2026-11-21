@@ -224,8 +224,8 @@ def get_postings_by_ids(conn, user_id, posting_ids):
 
 
 def set_applied(conn, posting_id, applied, user_id):
-    """Mark a role applied (it starts at stage 'waiting', SC-73) or not (Undo: the stage is cleared). Applying again to
-    one that already has a stage keeps that stage."""
+    """Mark a role applied (it starts at stage 'waiting', SC-73) or not (Undo: the stage and the check-in answers and
+    push count are cleared, so applying again starts over). Applying again to one that already has a stage keeps it."""
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -234,7 +234,11 @@ def set_applied(conn, posting_id, applied, user_id):
             ON CONFLICT (user_id, posting_id) DO UPDATE SET
                 applied = EXCLUDED.applied,
                 stage = CASE WHEN EXCLUDED.applied THEN COALESCE(user_postings.stage, 'waiting') END,
-                stage_changed_at = CASE WHEN EXCLUDED.applied THEN COALESCE(user_postings.stage_changed_at, now()) END
+                stage_changed_at = CASE WHEN EXCLUDED.applied THEN COALESCE(user_postings.stage_changed_at, now()) END,
+                heard_at = CASE WHEN EXCLUDED.applied THEN user_postings.heard_at END,
+                heard_not_yet_at = CASE WHEN EXCLUDED.applied THEN user_postings.heard_not_yet_at END,
+                close_not_yet_at = CASE WHEN EXCLUDED.applied THEN user_postings.close_not_yet_at END,
+                checkin_pushes = CASE WHEN EXCLUDED.applied THEN user_postings.checkin_pushes ELSE 0 END
             """,
             (user_id, posting_id, applied, applied, applied),
         )
@@ -1120,6 +1124,7 @@ def get_applications(conn, user_id, posting_id=None):
             SELECT p.id, c.name AS company_name, c.ats_type, p.title, p.location, p.remote_type,
                    p.pay_min, p.pay_max, p.pay_currency, p.pay_period, p.status AS posting_status,
                    COALESCE(up.stage, 'waiting') AS stage, up.stage_changed_at,
+                   up.heard_at, up.heard_not_yet_at, up.close_not_yet_at, up.checkin_pushes,
                    (SELECT max(e.created_at) FROM user_events e
                     WHERE e.user_id = up.user_id AND e.posting_id = p.id AND e.event_type = 'applied') AS applied_at
             FROM user_postings up
@@ -1138,21 +1143,25 @@ def get_applications(conn, user_id, posting_id=None):
 STAGES = ("waiting", "interviewing", "offer", "not", "mine")
 
 
-def set_stage(conn, user_id, posting_id, stage):
+def set_stage(conn, user_id, posting_id, stage, source="panel"):
     """Move one of this person's applications to a stage (SC-73). Returns the new history row's id, or None when
-    nothing changed (not applied to, an unknown stage, or already there). Caller commits."""
+    nothing changed (not applied to, an unknown stage, or already there). `source` is where the change was made: "panel"
+    (the select) or "checkin" (an answer on the row), which words the history. Back to waiting starts its check-ins
+    over (the pushes already sent still count). Caller commits."""
     if stage not in STAGES:
         return None
+    source = "checkin" if source == "checkin" else "panel"
     with conn.cursor() as cur:
         cur.execute("SELECT COALESCE(stage, 'waiting'), stage_changed_at FROM user_postings "
                     "WHERE user_id = %s AND posting_id = %s AND applied FOR UPDATE", (user_id, posting_id))
         row = cur.fetchone()
         if row is None or row[0] == stage:
             return None
-        cur.execute("UPDATE user_postings SET stage = %s, stage_changed_at = now() WHERE user_id = %s AND posting_id = %s",
-                    (stage, user_id, posting_id))
-        cur.execute("INSERT INTO application_stage_log (user_id, posting_id, stage, prev_stage, prev_changed_at) "
-                    "VALUES (%s, %s, %s, %s, %s) RETURNING id", (user_id, posting_id, stage, row[0], row[1]))
+        cur.execute("UPDATE user_postings SET stage = %s, stage_changed_at = now()"
+                    + (", heard_at = NULL, heard_not_yet_at = NULL, close_not_yet_at = NULL" if stage == "waiting" else "")
+                    + " WHERE user_id = %s AND posting_id = %s", (stage, user_id, posting_id))
+        cur.execute("INSERT INTO application_stage_log (user_id, posting_id, stage, prev_stage, prev_changed_at, source) "
+                    "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id", (user_id, posting_id, stage, row[0], row[1], source))
         return cur.fetchone()[0]
 
 
@@ -1172,9 +1181,9 @@ def undo_stage(conn, user_id, posting_id, log_id):
 
 
 def get_stage_history(conn, user_id, posting_id):
-    """[(stage, when)] for the changes this person made to one application, newest first."""
+    """[(stage, when, source)] for the changes this person made to one application, newest first."""
     with conn.cursor() as cur:
-        cur.execute("SELECT stage, created_at FROM application_stage_log WHERE user_id = %s AND posting_id = %s "
+        cur.execute("SELECT stage, created_at, source FROM application_stage_log WHERE user_id = %s AND posting_id = %s "
                     "ORDER BY id DESC", (user_id, posting_id))
         return cur.fetchall()
 
@@ -1673,6 +1682,55 @@ def applied_tailorings(conn, user_id):
                     "FROM tailorings WHERE user_id = %s AND applied_at IS NOT NULL AND status = 'ready' AND posting_id IS NOT NULL "
                     "ORDER BY posting_id, applied_at DESC", (user_id,))
         return {r[0]: {"id": r[1], "has_letter": bool(r[2])} for r in cur.fetchall()}
+
+
+CHECKIN_ANSWERS = {"heard_yes": "heard_at", "heard_no": "heard_not_yet_at", "close_no": "close_not_yet_at"}
+
+
+def record_checkin(conn, user_id, posting_id, answer):
+    """An answer to a check-in question on the row (SC-73): "heard_yes" (they heard back: the row then asks what they
+    said), "heard_no" (Not yet to Did you hear back?) or "close_no" (Not yet to Should I close it?). Only for an
+    application that is still waiting. Returns True when it was recorded. Caller commits."""
+    column = CHECKIN_ANSWERS.get(answer)
+    if column is None:
+        return False
+    with conn.cursor() as cur:
+        cur.execute(f"UPDATE user_postings SET {column} = now() WHERE user_id = %s AND posting_id = %s AND applied "
+                    "AND COALESCE(stage, 'waiting') = 'waiting'", (user_id, posting_id))
+        return cur.rowcount == 1
+
+
+def get_checkin_candidates(conn):
+    """Every waiting application on a role the employer still has open, with what the collector needs to decide on a
+    check-in push (checkins.push_level) and where to send it: one row per application, oldest application first."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT up.user_id, up.posting_id, u.ntfy_topic, u.checkin_pushed_on, c.name AS company_name, p.title,
+                   COALESCE(up.stage, 'waiting') AS stage, p.status AS posting_status,
+                   up.heard_at, up.heard_not_yet_at, up.close_not_yet_at, up.checkin_pushes,
+                   (SELECT max(e.created_at) FROM user_events e
+                     WHERE e.user_id = up.user_id AND e.posting_id = up.posting_id AND e.event_type = 'applied') AS applied_at
+            FROM user_postings up
+            JOIN users u ON u.id = up.user_id
+            JOIN postings p ON p.id = up.posting_id
+            JOIN companies c ON c.id = p.company_id
+            WHERE up.applied AND COALESCE(up.stage, 'waiting') = 'waiting' AND p.status = 'open'
+              AND u.ntfy_topic IS NOT NULL AND up.checkin_pushes < 3
+            ORDER BY up.user_id, up.posting_id
+            """
+        )
+        return cur.fetchall()
+
+
+def mark_checkins_pushed(conn, user_id, levels, today):
+    """After a check-in push went out: each job's push count becomes the level it was sent for, and this person's one
+    push for `today` (a date in Central) is used. `levels` is {posting_id: level}. Caller commits."""
+    with conn.cursor() as cur:
+        for posting_id, level in levels.items():
+            cur.execute("UPDATE user_postings SET checkin_pushes = GREATEST(checkin_pushes, %s) "
+                        "WHERE user_id = %s AND posting_id = %s", (level, user_id, posting_id))
+        cur.execute("UPDATE users SET checkin_pushed_on = %s WHERE id = %s", (today, user_id))
 
 
 def has_tailored(conn, user_id):

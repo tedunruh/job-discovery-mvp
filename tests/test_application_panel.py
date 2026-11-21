@@ -20,7 +20,7 @@ def stored(stage="waiting", status="open", applied_days=20):
 
 class History(unittest.TestCase):
     def test_newest_first_ending_with_the_application_itself(self):
-        lines = application_history([("interviewing", datetime(2026, 11, 4, 18, tzinfo=timezone.utc))],
+        lines = application_history([("interviewing", datetime(2026, 11, 4, 18, tzinfo=timezone.utc), "panel")],
                                     datetime(2026, 10, 28, 18, tzinfo=timezone.utc), tailored=True, letter=True)
         self.assertEqual(lines, [{"date": "Nov 4", "text": "Interviewing"},
                                  {"date": "Oct 28", "text": "Applied with a tailored resume and cover letter"}])
@@ -55,12 +55,12 @@ class Panel(Base):
             p.start()
             self.addCleanup(p.stop)
 
-    def fake_set(self, conn, user_id, posting_id, stage):
+    def fake_set(self, conn, user_id, posting_id, stage, source="panel"):
         self.set_calls.append((posting_id, stage))
         if stage == self.row["stage"] or stage not in dict(STAGE_OPTIONS):
             return None
         self.row["stage"] = stage
-        self.changes.insert(0, (stage, NOW))
+        self.changes.insert(0, (stage, NOW, "panel"))
         return self.next_log
 
     def panel(self, url="/application/9"):
@@ -159,7 +159,7 @@ class Storing(unittest.TestCase):
         statements = [c.args for c in cur.execute.call_args_list]
         self.assertIn("FOR UPDATE", statements[0][0])
         self.assertIn("stage_changed_at = now()", statements[1][0])
-        self.assertEqual(statements[2][1], (7, 9, "interviewing", "waiting", before))
+        self.assertEqual(statements[2][1], (7, 9, "interviewing", "waiting", before, "panel"))
 
     def test_nothing_changes_for_the_same_stage_an_unapplied_job_or_an_unknown_stage(self):
         conn, cur = self.conn(("offer", None))

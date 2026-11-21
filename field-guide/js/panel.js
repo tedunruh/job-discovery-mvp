@@ -292,38 +292,10 @@
   }
 
   /* Where it stands (SC-73). The answer is the whole panel; only its History is put in the old one (so the panel keeps its
-     scroll), the select takes the server's value (an Undo changes it), and the list is asked for again. A change that
-     just happened carries the toast's words and which change an Undo takes back. */
-  function refreshList() {
-    return fetch("/applications/list", { credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
-      .then(function (response) { if (!response.ok) throw new Error("no list"); return response.text(); })
-      .then(function (html) {
-        var fresh = new DOMParser().parseFromString(html, "text/html").querySelector("[data-applications-list]");
-        var old = board.querySelector("[data-applications-list]");
-        if (!fresh || !old) return;
-        old.replaceWith(document.importNode(fresh, true));
-        select(current);
-        var voice = document.querySelector("[data-voice]");
-        var wrap = voice && voice.closest(".voice-wrap");
-        var text = fresh.getAttribute("data-voice-text") || "";
-        if (voice) voice.textContent = text;
-        if (wrap) wrap.hidden = !text;
-      });
-  }
-
-  function undoStage(id, url, log) {
-    var data = new FormData();
-    data.append("log", log);
-    return fetch(url, { method: "POST", body: data, credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
-      .then(function (response) { if (!response.ok) throw new Error("no answer"); return response.text(); })
-      .then(function (html) {
-        if (current === id) swapStage(html, id);
-        return refreshList();
-      })
-      .catch(function () { say("I couldn’t undo that. Check your connection and try again."); });
-  }
-
-  function swapStage(html, id) {
+     scroll), the select takes the server's value, and js/applications.js asks for the list again (the row moves to its new
+     group) and shows the toast with Undo. A change that just happened carries the toast's words and which change an Undo
+     takes back. An Undo, or an answer on a row, redraws the panel through "fg:application-changed". */
+  function swapStage(html) {
     var next = new DOMParser().parseFromString(html, "text/html");
     var fresh = next.querySelector("[data-history]");
     var old = panel.querySelector("[data-history]");
@@ -337,18 +309,20 @@
   }
 
   function stageChanged(html, id) {
-    var fresh = swapStage(html, id);
+    var fresh = swapStage(html);
     var box = panel.querySelector("[data-stage-select]");
     if (box) box.focus();
     if (!fresh) return render(html, id, true);
-    var text = fresh.getAttribute("data-toast");
-    refreshList().catch(function () { /* the list catches up on the next visit */ });
-    var template = document.getElementById("toast-simple-template");
-    if (text && window.fgToast && template) {
-      var url = fresh.getAttribute("data-undo-url"), log = fresh.getAttribute("data-undo-log");
-      window.fgToast.show(template, { text: text, onUndo: function () { undoStage(id, url, log); } });
-    }
+    var apps = window.fgApplications;
+    if (!apps) return;
+    apps.refresh().catch(function () { /* the list catches up on the next visit */ });
+    apps.offerUndo(id, fresh.getAttribute("data-toast"), fresh.getAttribute("data-undo-url"), fresh.getAttribute("data-undo-log"));
   }
+
+  document.addEventListener("fg:applications-refreshed", function () { select(current); });   // the new list has new rows
+  document.addEventListener("fg:application-changed", function (event) {
+    if (current && String(current) === event.detail.id) load(current, false).catch(function () { /* the panel stays as it was */ });
+  });
 
   var saving = Promise.resolve();   // the letter's latest save: other buttons wait for it, so nothing is lost
 

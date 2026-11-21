@@ -7,7 +7,9 @@ the page then asks /applications/list for the grouped list so the row moves to i
 from flask import g, render_template, request
 
 from dashboard.elevate import STAGE_OPTIONS, application_history, monogram, short_date, stage_toast, tint
-from db.db import applied_tailoring, get_applications, get_conn, get_stage_history, set_stage, undo_stage
+from db.db import (
+    CHECKIN_ANSWERS, applied_tailoring, get_applications, get_conn, get_stage_history, record_checkin, set_stage, undo_stage,
+)
 
 
 def build(conn, user_id, posting_id, toast="", undo_log=None):
@@ -56,10 +58,27 @@ def register(app, require_login):
         stage = request.form.get("stage", "")
         conn = get_conn()
         try:
-            log_id = set_stage(conn, g.user_id, posting_id, stage)
+            log_id = set_stage(conn, g.user_id, posting_id, stage, request.form.get("source", "panel"))
             return answer(conn, posting_id, stage_toast(stage) if log_id else "", log_id)
         finally:
             conn.close()
+
+    @app.route("/application/<int:posting_id>/checkin", methods=["POST"])
+    @require_login
+    def application_checkin(posting_id):
+        """An answer on the row's check-in question (SC-73): heard_yes, heard_no or close_no. Yes, close it and What did they
+        say? are stage changes and go through /stage with source=checkin. Nothing comes back (204): the row's script
+        already shows what it needs."""
+        answer = request.form.get("answer", "")
+        if answer not in CHECKIN_ANSWERS:
+            return "", 400
+        conn = get_conn()
+        try:
+            record_checkin(conn, g.user_id, posting_id, answer)
+            conn.commit()
+        finally:
+            conn.close()
+        return "", 204
 
     @app.route("/application/<int:posting_id>/stage/undo", methods=["POST"])
     @require_login

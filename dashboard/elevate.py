@@ -181,15 +181,20 @@ _STAGE_HISTORY = {"waiting": "Back to waiting to hear", "interviewing": "Intervi
                   "not": "Not moving forward", "mine": "Closed by me"}
 
 
+# An answer on the row ("What did they say?") reads as hearing back; the panel's select reads as the stage.
+_HEARD_BACK = {"interviewing": "Heard back: interview", "offer": "Heard back: offer", "not": "Heard back: not moving forward"}
+
+
 def stage_toast(stage):
     return _STAGE_TOAST.get(stage, "")
 
 
 def application_history(changes, applied_at, tailored=False, letter=False):
-    """The lines under History, newest first: [{"date": "Nov 4", "text": "Interviewing"}, …]. `changes` is [(stage, when)]
+    """The lines under History, newest first: [{"date": "Nov 4", "text": "Interviewing"}, …]. `changes` is [(stage, when, source)]
     newest first (the person's own changes); the last line is the application itself ("Applied with a tailored resume
     and cover letter"), dated by `applied_at` or, for an application from before dates were kept, with no date."""
-    lines = [{"date": short_date(when), "text": _STAGE_HISTORY.get(stage, "")} for stage, when in changes]
+    lines = [{"date": short_date(when), "text": (_HEARD_BACK.get(stage) if source == "checkin" else None) or _STAGE_HISTORY.get(stage, "")}
+             for stage, when, source in changes]
     sent = "Applied with a tailored resume" + (" and cover letter" if letter else "") if tailored else "Applied"
     lines.append({"date": short_date(applied_at) if applied_at else "", "text": sent})
     return lines

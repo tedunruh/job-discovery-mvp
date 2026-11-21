@@ -128,6 +128,8 @@ class Storing(unittest.TestCase):
         sql, params = self.sql(False)
         self.assertEqual(params, (7, 5, False, False, False))
         self.assertIn("stage = CASE WHEN EXCLUDED.applied THEN", sql)          # no ELSE: NULL when not applied
+        self.assertIn("heard_at = CASE WHEN EXCLUDED.applied THEN user_postings.heard_at END", sql)   # SC-73 slice 3: answers go too
+        self.assertIn("checkin_pushes = CASE WHEN EXCLUDED.applied THEN user_postings.checkin_pushes ELSE 0 END", sql)
 
     def test_undoing_applied_lets_go_of_the_history(self):
         conn = mock.MagicMock()

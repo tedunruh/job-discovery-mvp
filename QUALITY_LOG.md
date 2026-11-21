@@ -1734,3 +1734,18 @@ not see that the page's select was named `stage-<id>` (the select macro names a 
 posted form. **Lesson for the log:** a test that bypasses the page cannot prove the page sends what the route expects; when a new control posts a form, one test must
 click it.
 **Not verified:** a real iPhone (the sheet), VoiceOver reading the select and History, the Copy button on Safari (the clipboard fallback is untested there).
+### 2026-11-21 — SC-73 slice 3: check-ins (SC-64 built)
+**What shipped.** A waiting application asks on its row: *Did you hear back?* from day 5 (Yes asks *What did they say?*: Interview, Offer, Not moving forward, which
+moves the row with a toast and Undo and writes "Heard back: interview" in History; Not yet says "I'll check back in a week." and asks again on day 12), then *Should I
+close it?* on day 21 (Yes, close it: closed by you; Not yet: no more check-ins). The rules are one pure module, `checkins.py`, used by the dashboard and the collector so
+the row and the push cannot disagree. The collector (`scheduler/checkin_push.py`, after the new-role alerts) sends the push on days 5, 12 and 21 (so at most 3 per job):
+one a day per person, jobs due together grouped ("Any word on 3 applications?", no buttons), only after 9 AM Central, never while alerts are paused or not started, and a
+failed push is retried next run. A tap goes through Scout (`/a/<token>/checkin`), is counted as its own event (`opened_checkin`, not a posting opened) and lands on the row.
+Columns `heard_at`, `heard_not_yet_at`, `close_not_yet_at`, `checkin_pushes` on `user_postings`, `users.checkin_pushed_on`, `application_stage_log.source` (additive, applied to
+Neon first). New script `field-guide/js/applications.js` owns the list refresh and the row questions; `panel.js` uses it. Undoing "applied" now clears the answers and the push
+count. Verification: 786 unit tests (37 new: every day boundary, the one-a-day and 9 AM and paused rules, the message copy, the tap, the SQL).
+**Rework count:** 2 caught by the real run before "done". (1) The quality check passed its first width and failed the second: unapplying left `heard_at` on the row, so a
+re-apply asked the wrong question. **Root cause:** state added to a row was not listed in the one place that resets the row (`set_applied`); a unit test that applies once
+cannot see it, a run that applies, undoes and applies again can. (2) A check of mine read the panel before it had redrawn after Undo (the panel now redraws on an event,
+after the list); the check waits for the value instead of the group. **Standing rule added in code:** every column that belongs to "this application" is cleared in `set_applied(false)`.
+**Not verified:** a real push on a phone (the tests stop at the payload; the first real one will be the first check-in a person is due), VoiceOver on the row questions, a real iPhone.

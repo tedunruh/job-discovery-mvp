@@ -1,13 +1,36 @@
 {#- The Applications tab's groups (SC-73): the part the page swaps after a stage changes. `application_groups` is
-    [(label, count, rows)] from dashboard/elevate.py; `voice` is Scout's line, carried in data-voice-text so the page can update it. -#}
+    [(label, count, rows)] from dashboard/elevate.py; `voice` is Scout's line, carried in data-voice-text so the page can update it.
+    A row that has a check-in to ask (p.ask: heard, say or close; the rules are in checkins.py) shows it in the card's action
+    spot, the same way Open roles asks "Did you apply?". The pieces js/applications.js copies are <template>s here, so the page
+    and the script never disagree on markup. -#}
 {% import "_fg.html" as fg %}
+{% macro heard_actions() -%}
+<p class="fg-voice fg-job-question">Did you hear back?</p>
+<span class="fg-job-group"><button class="fg-button fg-button--secondary" type="button" data-checkin="heard_yes">Yes</button><button class="fg-button fg-button--secondary" type="button" data-checkin="heard_no" data-note="I’ll check back in a week.">Not yet</button></span>
+{%- endmacro %}
+{% macro say_actions(id) -%}
+<label class="fg-voice fg-job-question" for="say-{{ id }}">What did they say?</label>
+<span class="fg-job-group"><span class="fg-select fg-job-select"><select id="say-{{ id }}" data-checkin-say><option value="" disabled selected>Select</option><option value="interviewing">Interview</option><option value="offer">Offer</option><option value="not">Not moving forward</option></select><svg width="14" height="8" viewBox="0 0 14 8" fill="none" aria-hidden="true"><path d="M1 1L7 7L13 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></span>
+{%- endmacro %}
+{% macro close_actions() -%}
+<p class="fg-voice fg-job-question">Should I close it?</p>
+<span class="fg-job-group"><button class="fg-button fg-button--secondary" type="button" data-checkin="close_yes">Yes, close it</button><button class="fg-button fg-button--secondary" type="button" data-checkin="close_no" data-note="No problem. I’ll leave it here.">Not yet</button></span>
+{%- endmacro %}
 <div data-applications-list data-voice-text="{{ voice }}">
+  <template id="checkin-say-template">{{ say_actions("__id__") }}</template>
+  <template id="checkin-note-template"><p class="fg-voice fg-job-question" role="status" tabindex="-1" data-checkin-note></p></template>
   {%- for label, count, rows in application_groups %}
   <section class="fg-day" aria-label="{{ label }}">
     {{ fg.day(label, count) }}
     <ul class="fg-job-list">
       {%- for p in rows %}
+      {%- if p.ask %}
+      {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, p.status_top, p.status_bottom, tailored=(p.files is not none), mono=p.mono, tint=p.tint, pay=p.pay, closed=p.closed, panel=True) %}
+        {%- if p.ask == "heard" %}{{ heard_actions() }}{% elif p.ask == "say" %}{{ say_actions(p.id) }}{% else %}{{ close_actions() }}{% endif %}
+      {% endcall %}
+      {%- else %}
       {{ fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, p.status_top, p.status_bottom, tailored=(p.files is not none), mono=p.mono, tint=p.tint, pay=p.pay, closed=p.closed, panel=True) }}
+      {%- endif %}
       {%- endfor %}
     </ul>
   </section>
