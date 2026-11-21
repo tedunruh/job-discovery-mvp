@@ -38,14 +38,27 @@
     Constraint: value always shows the current choice ("Any" when unfiltered).
     static=True (gallery specimens only) keeps it out of filter.js's one-open /
     close-on-outside-click behaviour. -#}
-{% macro filter(id, label, value, open=False, static=False) -%}
-<details class="fg-filter" id="{{ id }}"{% if open %} open{% endif %}{% if static %} data-fg-static{% endif %}>
+{% macro filter(id, label, value, open=False, static=False, compact=False, short="") -%}
+<details class="fg-filter{% if compact %} fg-filter--compact{% endif %}" id="{{ id }}"{% if open %} open{% endif %}{% if static %} data-fg-static{% endif %}>
   <summary class="fg-filter-pill">
-    <span class="fg-filter-label">{{ label }}</span>
-    <span class="fg-filter-value">{{ value }}</span>
+    <span class="fg-filter-label">{{ label }}{% if compact %}<span class="fg-visually-hidden">: </span>{% endif %}</span>
+    <span class="fg-filter-value">{% if short %}<span class="fg-filter-full">{{ value }}</span><span class="fg-filter-short">{{ short }}</span>{% else %}{{ value }}{% endif %}</span>
     {{ chevron() }}
   </summary>
   {{ caller() }}
+</details>
+{%- endmacro %}
+{#- A link in the filter row (Viewed jobs): a plain link on a wide screen, a pill with a shorter word on a phone. -#}
+{% macro filter_link(href, label, short, attrs="") -%}
+<a class="fg-link fg-filter-link" href="{{ href }}"{{ attrs|safe }}><span class="fg-filter-link-full">{{ label }}</span><span class="fg-filter-link-short">{{ short }}</span></a>
+{%- endmacro %}
+{#- Account menu: one icon button that opens the actions the header has no room for on a phone. A call block holds the
+    rows: <a class="fg-menu-item" role="menuitem"> or <form role="none"><button class="fg-menu-item" role="menuitem">.
+    The page decides where it shows (the header shows the plain buttons on a wide screen). -#}
+{% macro account(id, label, open=False, static=False) -%}
+<details class="fg-filter fg-account" id="{{ id }}"{% if open %} open{% endif %}{% if static %} data-fg-static{% endif %}>
+  <summary class="fg-icon-button" aria-label="{{ label }}" aria-haspopup="menu">{{ icon_person() }}</summary>
+  <div class="fg-menu" role="menu" aria-label="{{ label }}">{{ caller() }}</div>
 </details>
 {%- endmacro %}
 
@@ -129,6 +142,9 @@
 {#- Icons (aria-hidden; the control around them carries the name). -#}
 {% macro icon_close() -%}
 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+{%- endmacro %}
+{% macro icon_person() -%}
+<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="8" r="3.6" stroke="currentColor" stroke-width="1.6"/><path d="M4 18.5c1.4-3 4-4.5 7-4.5s5.6 1.5 7 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
 {%- endmacro %}
 {% macro icon_plus() -%}
 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -314,8 +330,10 @@
     {%- endif %}
     <p class="fg-job-company">{{ company }}</p>
     <p class="fg-job-title"><a class="fg-job-link" href="{{ href }}" target="_blank" rel="noopener"{% if panel %} aria-controls="apply-panel"{% endif %}>{{ title }}</a></p>
-    <p class="fg-job-subline">{{ place }}</p>
-    <p class="fg-job-pay">{{ pay or "\u00a0" }}</p>
+    <div class="fg-job-where">
+      <p class="fg-job-subline">{{ place }}</p>
+      <p class="fg-job-pay{% if not pay %} fg-job-pay--none{% endif %}">{{ pay or "\u00a0" }}</p>
+    </div>
     {%- if skills %}
     <p class="fg-job-skills">{{ skills }}</p>
     {%- endif %}
@@ -325,7 +343,7 @@
   </div>
   <div class="fg-job-second">
     <div class="fg-job-state" data-state>
-      <p data-state-top>{{ state_top }}</p>
+      <p data-state-top>{% if state_top.startswith("Discovered on ") %}<span class="fg-job-pre">Discovered on </span>{{ state_top[14:] }}{% else %}{{ state_top }}{% endif %}</p>
       {%- if state_bottom %}
       <p class="fg-job-when" data-state-when>{{ state_bottom }}{% if viewed %}{{ job_viewed() }}{% endif %}{% if tailored %}{{ job_tailored() }}{% endif %}</p>
       {%- endif %}

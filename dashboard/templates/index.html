@@ -1,6 +1,8 @@
 {% import "_fg.html" as fg %}
 {#- The things a card's action spot can say (SC-63, SC-59). They are drawn on the server for the rows that need them and also
     sit in <template>s, which the page's scripts copy, so the page and the scripts never disagree on markup. -#}
+{#- What the Posted pill says on a phone, where the label drops out: the value has to read alone. -#}
+{% set posted_short = {"24h": "Last 24 hours", "week": "This week", "month": "This month", "all": "Any time"} %}
 {% macro apply_group(id, title) -%}
 <span class="fg-job-group"><a class="fg-button fg-button--suggested" href="/open/{{ id }}" target="_blank" rel="noopener" data-apply>Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a><form method="post" action="/hide/{{ id }}" data-hide><button class="fg-button fg-button--secondary" type="submit">Hide<span class="fg-visually-hidden"> {{ title }}</span></button></form></span>
 {%- endmacro %}
@@ -203,12 +205,36 @@
     .empty-title { font-size: var(--fg-font-size-xl); }
     .empty .fg-card-help { margin: 0; }
 
+    /* The account menu is for phones; a wide screen keeps the two buttons (the wrapper takes no box of its own). */
+    .fg-header-actions > .fg-account { display: none; }
+    .fg-header-actions > .header-wide { display: contents; }
+    /* An open account menu sits above the board, which paints later at the same level. */
+    body > .fg-header:has(.fg-account[open]) { z-index: 3; }
+
+    /* Phone (SC-75): more jobs above the fold. The page itself scrolls (not a box inside it), so Safari's toolbar can
+       shrink; the tabs pin to the top; the header, Scout's line, the filters and the cards give back the room they were
+       taking. The panel stays a full screen sheet. */
     @media (max-width: 680px) {
-      body > .fg-header { padding-inline: 0; }
-      .board > .fg-tabs { margin-inline: var(--fg-space-3); }
-      .board > [role="tabpanel"] { padding: 0 var(--fg-space-3) var(--fg-space-3); }
-      .workspace, .voice-wrap + .workspace { margin-top: var(--fg-space-4); }
-      .voice-intro { padding-inline: 0; }
+      body { padding: 0; }
+      body.fg-page { display: block; height: auto; min-height: 100vh; min-height: 100dvh; overflow: visible; }
+      body:has(.workspace > .fg-panel:not([hidden])) { overflow: hidden; }   /* the sheet is open: nothing scrolls behind it */
+      body > .fg-header { padding-inline: var(--fg-space-4); }
+      .fg-header-actions > .header-wide { display: none; }
+      .fg-header-actions > .fg-account { display: block; }
+      .band { height: 150px; }
+      .voice-intro { padding-inline: var(--fg-space-4); font-size: var(--fg-font-size-lg); }
+      .workspace, .voice-wrap + .workspace { display: block; margin-top: var(--fg-space-3); }
+      /* The board runs edge to edge: a top border and rounded top corners, no sides or bottom. */
+      .board { display: block; overflow: visible; border-width: 1px 0 0; border-radius: var(--fg-radius-md) var(--fg-radius-md) 0 0; }
+      .board > .fg-tabs { position: sticky; top: 0; z-index: 2; margin-inline: 0; padding-inline: var(--fg-space-3); background: var(--fg-color-surface-page); margin-bottom: var(--fg-space-2); }
+      .board > [role="tabpanel"] { overflow: visible; padding: 0 var(--fg-space-3) var(--fg-space-3); }
+      /* One row of pills that scrolls sideways, bleeding to the board's edges; Viewed joins it as a pill and the count
+         goes (the tab already shows it). */
+      .toolbar--filters { flex-wrap: nowrap; justify-content: flex-start; gap: var(--fg-space-2); margin-inline: calc(-1 * var(--fg-space-3)); padding: var(--fg-space-1) var(--fg-space-3); overflow-x: auto; scrollbar-width: none; }
+      .toolbar--filters::-webkit-scrollbar { display: none; }
+      .toolbar--filters .filters { flex-wrap: nowrap; flex: none; }
+      .toolbar--filters .toolbar-end { display: contents; }
+      .toolbar--filters .role-count { display: none; }
       .caught-up .contour { width: 360px; right: -120px; }
       .more { margin-left: var(--fg-space-3); }
     }
@@ -217,8 +243,12 @@
 <body class="fg-page">
   <div class="band" aria-hidden="true">{% include "_topography.svg" %}</div>
   {% call fg.header(current=True) %}
-    <a class="fg-button fg-button--ghost" href="/profile">Role preferences</a>
-    <form method="post" action="/logout"><button class="fg-button fg-button--secondary" type="submit">Sign out</button></form>
+    <span class="header-wide"><a class="fg-button fg-button--ghost" href="/profile">Role preferences</a>
+    <form method="post" action="/logout"><button class="fg-button fg-button--secondary" type="submit">Sign out</button></form></span>
+    {%- call fg.account("account-menu", "Account: role preferences and sign out") %}
+      <a class="fg-menu-item" role="menuitem" href="/profile">Role preferences</a>
+      <form role="none" method="post" action="/logout"><button class="fg-menu-item" role="menuitem" type="submit">Sign out</button></form>
+    {%- endcall %}
   {% endcall %}
   <h1 class="fg-visually-hidden">Your jobs</h1>
   {%- if voice and tab == "open" and view == "open" %}
@@ -276,9 +306,9 @@
       {% endfor %}
     </ul>
     {% elif tab == "open" %}
-    <div class="toolbar">
+    <div class="toolbar toolbar--filters" role="group" aria-label="Filters">
       <div class="filters">
-        {% call fg.filter("filter-work", "Work type", work_label) %}
+        {% call fg.filter("filter-work", "Work type", work_label, compact=True) %}
           <form class="fg-menu" method="get" action="/">
             <input type="hidden" name="work_set" value="1">
             {% for key, label in work_type_options.items() %}
@@ -290,7 +320,7 @@
           </form>
         {% endcall %}
 
-        {% call fg.filter("filter-posted", "Posted", ranges[posted_range][1]) %}
+        {% call fg.filter("filter-posted", "Posted", ranges[posted_range][1], compact=True, short=posted_short[posted_range]) %}
           <form class="fg-menu" method="get" action="/">
             {% for key, (label, _, _) in ranges.items() %}
             <label class="fg-menu-item">
@@ -302,7 +332,7 @@
         {% endcall %}
       </div>
       <div class="toolbar-end">
-        <a class="fg-link" href="/?view=viewed" data-viewed-link>Viewed jobs</a>
+        {{ fg.filter_link("/?view=viewed", "Viewed jobs", "Viewed", " data-viewed-link") }}
         <p class="role-count" data-open-count>{{ total }} open role{{ "" if total == 1 else "s" }}</p>
       </div>
     </div>

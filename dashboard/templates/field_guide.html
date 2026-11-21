@@ -481,6 +481,25 @@
     </div>
   </section>
 
+  <section class="spec" data-component="filter-compact">
+    <div>
+      <h3>Compact filter pill, and a link in the filter row</h3>
+      <p class="spec-use">Use for a row of filters on a phone (SC-75). Under 680px the label drops out and only the value shows (the label stays in the page for a screen reader, so the pill is still "Work type: Remote"), and a value can carry a shorter wording for the phone ("within a week" becomes "This week"). A link in the same row (Viewed jobs) becomes one more pill with a shorter word. On a wide screen both keep their labels. The row itself is the page's: one line that scrolls sideways. A menu opened from a pill on a phone sits at the foot of the screen, not under the pill, so the row never clips it. Shown here at your current width: narrow the window under 680px to see the compact state.</p>
+      <code class="spec-code">{% raw %}{% call fg.filter(id, label, value, compact=True, short="This week") %}…{% endcall %} · {{ fg.filter_link(href, label, short) }}{% endraw %} · .fg-filter--compact .fg-filter-full .fg-filter-short .fg-filter-link .fg-filter-link-full .fg-filter-link-short</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Compact pill (value only under 680px)</span>
+        {% call fg.filter("g-filter-compact", "Posted", "within a week", compact=True, short="This week") %}
+        <div class="fg-menu">
+          <label class="fg-menu-item"><input class="fg-radio" type="radio" name="g-menu-compact" checked> Last week</label>
+          <label class="fg-menu-item"><input class="fg-radio" type="radio" name="g-menu-compact"> Last month</label>
+        </div>
+        {% endcall %}
+      </div>
+      <div class="state"><span class="state-label">Link in the filter row (a pill under 680px)</span>{{ fg.filter_link("#filters", "Viewed jobs", "Viewed") }}</div>
+    </div>
+  </section>
+
   <h2 id="messages" class="fg-display">Messages</h2>
   <p class="gallery-lede">Color supports meaning; it never carries it alone. The signal color sits in the fill and left rule; the words stay Ink.</p>
 
@@ -527,6 +546,28 @@
       <div class="state state--wide"><span class="state-label">Dashboard: two actions</span><div class="fg-shell" style="padding: 0">{% call fg.header(href="#layout", current=True) %}<a class="fg-button fg-button--ghost" href="#layout">Role preferences</a><form action="#layout" onsubmit="return false"><button class="fg-button fg-button--secondary" type="submit">Sign out</button></form>{% endcall %}</div></div>
       <div class="state state--wide"><span class="state-label">Settings: one action</span><div class="fg-shell" style="padding: 0">{% call fg.header(href="#layout") %}<a class="fg-button fg-button--ghost" href="#layout">Back to dashboard</a>{% endcall %}</div></div>
       <div class="state state--wide"><span class="state-label">Onboarding: context</span><div class="fg-shell" style="padding: 0">{{ fg.header("Getting started", href="#layout") }}</div></div>
+    </div>
+  </section>
+
+  <section class="spec" data-component="account">
+    <div>
+      <h3>Account menu</h3>
+      <p class="spec-use">Use in a header that has no room for its actions, as on a phone (SC-75): one 44px icon button that opens Role preferences and Sign out. A real menu: opening it puts focus on the first row, the arrow keys, Home and End move between rows, Escape closes it and returns focus to the button. The page decides where it shows; the dashboard shows it under 680px and the two plain buttons above.</p>
+      <code class="spec-code">{% raw %}{% call fg.account(id, label) %}{% endraw %}&lt;a class="fg-menu-item" role="menuitem"&gt;…{% raw %}{% endcall %}{% endraw %} · .fg-account · /field-guide/js/filter.js</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Closed</span>
+        {% call fg.account("g-account", "Account: role preferences and sign out") %}
+        <a class="fg-menu-item" role="menuitem" href="#layout">Role preferences</a>
+        <form role="none" action="#layout" onsubmit="return false"><button class="fg-menu-item" role="menuitem" type="submit">Sign out</button></form>
+        {% endcall %}
+      </div>
+      <div class="state state--menu"><span class="state-label">Open</span>
+        {% call fg.account("g-account-open", "Account: role preferences and sign out", open=True, static=True) %}
+        <a class="fg-menu-item" role="menuitem" href="#layout">Role preferences</a>
+        <form role="none" action="#layout" onsubmit="return false"><button class="fg-menu-item" role="menuitem" type="submit">Sign out</button></form>
+        {% endcall %}
+      </div>
     </div>
   </section>
 
@@ -649,7 +690,7 @@
       <code class="spec-code">.fg-job.is-selected · .fg-has-panel (on the workspace that holds the list and the panel)</code>
     </div>
     <div class="states">
-      <div class="state state--wide fg-has-panel" style="max-width: 720px; flex: 0 0 100%"><span class="state-label">Selected, in a narrower list</span><ul class="fg-job-list"><li class="fg-job is-selected" aria-current="true" id="g-job-sel"><div class="fg-job-lead"><span class="fg-mono fg-mono--sage" aria-hidden="true">JL</span><p class="fg-job-company">Juniper Labs</p><p class="fg-job-title"><a class="fg-job-link" href="#layout" aria-controls="g-panel-ok">Staff Product Designer, Design Systems</a></p><p class="fg-job-subline">Hybrid, Denver, CO</p><p class="fg-job-pay">$172,000 - $205,000</p><p class="fg-job-fit">{{ fg.fit(4) }}</p></div><div class="fg-job-second"><div class="fg-job-state"><p>Discovered on Ashby</p><p class="fg-job-when">9:40 AM</p></div><div class="fg-job-action"><span class="fg-job-group"><a class="fg-button fg-button--suggested" href="#layout">Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a><button class="fg-button fg-button--secondary" type="button">Hide</button></span></div></div></li></ul></div>
+      <div class="state state--wide fg-has-panel" style="max-width: 720px; flex: 0 0 100%"><span class="state-label">Selected, in a narrower list</span><ul class="fg-job-list"><li class="fg-job is-selected" aria-current="true" id="g-job-sel"><div class="fg-job-lead"><span class="fg-mono fg-mono--sage" aria-hidden="true">JL</span><p class="fg-job-company">Juniper Labs</p><p class="fg-job-title"><a class="fg-job-link" href="#layout" aria-controls="g-panel-ok">Staff Product Designer, Design Systems</a></p><div class="fg-job-where"><p class="fg-job-subline">Hybrid, Denver, CO</p><p class="fg-job-pay">$172,000 - $205,000</p></div><p class="fg-job-fit">{{ fg.fit(4) }}</p></div><div class="fg-job-second"><div class="fg-job-state"><p>Discovered on Ashby</p><p class="fg-job-when">9:40 AM</p></div><div class="fg-job-action"><span class="fg-job-group"><a class="fg-button fg-button--suggested" href="#layout">Apply<span class="fg-visually-hidden"> (opens the posting in a new tab)</span></a><button class="fg-button fg-button--secondary" type="button">Hide</button></span></div></div></li></ul></div>
     </div>
   </section>
 

@@ -29,8 +29,10 @@
   var FOLD_AT = 8;        // px scrolled before it folds
   var MIN_RANGE = 250;    // a pane must have this much to scroll, or the fold would take its own scrolling away
   var body = document.body;
+  var phone = window.matchMedia("(max-width: 680px)");   // on a phone the whole page scrolls and nothing folds (SC-75)
 
   function sync() {
+    if (phone.matches) { body.classList.remove("is-collapsed"); return; }
     var scrolled = 0, range = 0;
     Array.prototype.forEach.call(workspace.querySelectorAll(".board > [role=tabpanel], .fg-panel-body"), function (pane) {
       scrolled = Math.max(scrolled, pane.scrollTop);

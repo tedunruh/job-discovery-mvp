@@ -1687,3 +1687,21 @@ for either" note: the company line is now on a token in both places.
 value with no token is a drift waiting to happen. **Standing check to add:** when a value read from Figma is not a token, ask which side moves before building;
 do not add a one-off value or round it silently. **Verification:** `scripts/quality_check.py` 564/564 on a warmed Neon branch; the first run lost the Neon connection mid-run and did not count.
 **Rework count:** 0 in code. **Root cause of the original drift:** values built from Figma's raw numbers with no token behind them.
+### 2026-11-21 — SC-75: open roles on a phone, more jobs above the fold
+**What shipped.** Under 680px: the whole page scrolls (the list's own 100dvh box is off, the tabs are `position: sticky`, the open panel locks the page behind it);
+every page's header is a 24px wordmark with 8px above and below, and the dashboard's two header buttons become one 44px account menu (a real menu: focus to the
+first row, arrows, Escape returns focus); Scout's line is 16px; the filters are one row that scrolls sideways with value-only pills ("This week") and Viewed as a
+pill, the open-roles count is hidden, and a filter menu opens as a sheet at the foot of the screen so the row cannot clip it; the board runs edge to edge (top border,
+rounded top corners); a card's place and pay share one line (the pay wraps only if it must) and its source, time and Viewed share another ("Discovered on" stays
+for a screen reader). New Field Guide pieces: `fg.filter(compact, short)`, `fg.filter_link`, `fg.account`, `.fg-job-where`, `.fg-job-pre`, `.fg-job-pay--none`, all with
+gallery specimens. Desktop is unchanged (measured). Verification: 717 unit tests, `quality_check.py` 603/603 on a warmed Neon branch; the new `check_phone` measures every
+item above, the fold (the first card and its buttons end above 640px, part of the second shows), the sticky tabs, the account menu's keyboard and layering, and that a wide
+screen kept its header, labels, count, bordered board and place-above-pay column.
+**Rework count:** 0 after "done", but four mid-build catches, each by a measurement and not by eye: (1) a long place pushed the pay to zero width in a grid, so the
+place and pay moved into a flex-wrap wrapper; (2) with the body no longer clipping, a hidden-in-a-code-block `<a>` in a gallery spec widened the layout viewport to 415px
+(an unescaped tag inside `<code>`); (3) the wrapper broke the card's `> p` column rule on desktop (the place fell under the monogram): the screenshot caught it and a
+desktop column check now guards it; (4) the header size had to change on every page, not only the dashboard, because `check_headers_match` requires one header everywhere.
+**Root causes:** *a layout rule written against one child combinator, then a wrapper added* (`.fg-job-lead > p` stops matching once a `display: contents` wrapper sits
+between), and *removing `overflow: hidden` from the body exposed overflow it had been hiding*. **Standing check added:** a wide-screen column check for the card; the
+horizontal-overflow check already caught the gallery. **Not verified:** a real iPhone (Safari's toolbar behaviour is modelled by a 640px fold, not observed); the account
+menu with VoiceOver; the sheet-style filter menus by touch.

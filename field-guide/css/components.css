@@ -317,6 +317,58 @@ button.fg-link {
   transition: transform 120ms ease;
 }
 .fg-filter[open] .fg-filter-chevron { transform: rotate(180deg); }
+/* Compact pill (SC-75): on a phone the label drops out and only the value shows, so a row of filters fits one line.
+   The label stays in the page for a screen reader ("Work type: Remote"). `fg.filter(…, compact=True)`; wider screens
+   keep the label. A value can carry a shorter wording for the phone (`short=`): "within a week" becomes "This week". */
+.fg-filter-short { display: none; }
+@media (max-width: 680px) {
+  .fg-filter--compact .fg-filter-pill { padding-block: var(--fg-space-1); }
+  .fg-filter--compact .fg-filter-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .fg-filter--compact .fg-filter-full { display: none; }
+  .fg-filter--compact .fg-filter-short { display: inline; }
+  /* A menu in a scrolling row of pills would be clipped by the row, so on a phone it opens as a sheet at the foot of the
+     screen, within thumb reach. The gallery's static specimens stay where they are. */
+  .fg-filter:not([data-fg-static]):not(.fg-account) > .fg-menu {
+    position: fixed;
+    top: auto;
+    bottom: var(--fg-space-4);
+    left: var(--fg-space-3);
+    right: var(--fg-space-3);
+    min-width: 0;
+    z-index: 20;
+  }
+}
+/* A link that sits in the filter row (Viewed jobs). A plain link on a wide screen; on a phone it takes the pill shape
+   and its shorter word, so it reads as one more filter. `fg.filter_link(href, label, short)`. */
+.fg-filter-link-short { display: none; }
+@media (max-width: 680px) {
+  .fg-filter-link {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--fg-space-1) var(--fg-space-3);
+    border: 1px solid var(--fg-color-action-outline);
+    border-radius: var(--fg-radius-xl);
+    font-size: var(--fg-font-size-lg);
+    font-weight: var(--fg-font-weight-medium);
+    line-height: var(--fg-font-line-height-body);
+    color: var(--fg-color-text-primary);
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .fg-filter-link:hover { background: var(--fg-color-signal-progress-subtle); }
+  .fg-filter-link-full { display: none; }
+  .fg-filter-link-short { display: inline; }
+}
 
 .fg-menu {
   position: absolute;
@@ -344,6 +396,30 @@ button.fg-link {
   cursor: pointer;
 }
 .fg-menu-item:has(:checked) { color: var(--fg-color-text-primary); }
+/* Account menu (SC-75): one icon button that holds the actions a phone has no room for in the header (Role preferences,
+   Sign out). A <details>, so it opens without script; js/filter.js closes it and moves focus like a menu button. The page
+   decides where it shows: the Field Guide only draws it. */
+.fg-account > summary { list-style: none; }
+.fg-account > summary::-webkit-details-marker { display: none; }
+.fg-account > summary:focus-visible { outline: 3px solid var(--fg-color-action-focus-ring); outline-offset: 2px; }
+.fg-account[open] > summary { background: var(--fg-color-signal-progress-subtle); color: var(--fg-color-text-primary); }
+.fg-account .fg-menu { left: auto; right: 0; min-width: 220px; }
+.fg-account .fg-menu form { display: contents; }
+/* Menu rows that are links or buttons look like the checkbox rows: the same height, type and spacing. */
+.fg-menu a.fg-menu-item,
+.fg-menu button.fg-menu-item {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: 0;
+  font-family: var(--fg-font-family-ui);
+  text-align: left;
+  text-decoration: none;
+  color: var(--fg-color-text-primary);
+}
+.fg-menu a.fg-menu-item:focus-visible,
+.fg-menu button.fg-menu-item:focus-visible { outline: 3px solid var(--fg-color-action-focus-ring); outline-offset: 2px; border-radius: var(--fg-radius-sm); }
 
 /* ---------- Toggle ---------- */
 /* A single on/off state on one item, shown as a check-disc plus a label (the
@@ -425,6 +501,12 @@ button.fg-link {
   margin-left: auto;
 }
 .fg-header-actions form { display: contents; }
+/* A phone gives the header less room (SC-75): a 24px wordmark and 8px above and below, on every page, so the pages' headers
+   still match. */
+@media (max-width: 680px) {
+  .fg-header { padding-block: var(--fg-space-2); }
+  .fg-header .fg-wordmark { font-size: var(--fg-font-size-2xl); }
+}
 /* A ghost button at the end of the row lines its text up with the edge of the content below. */
 .fg-header-actions > .fg-button--ghost:last-child { margin-inline-end: calc(-1 * var(--fg-space-4)); }
 .fg-wordmark {
@@ -1243,7 +1325,10 @@ button.fg-link {
   row-gap: 2px;
   align-items: center;
 }
-.fg-job-lead > p { grid-column: 2; }
+.fg-job-lead > p, .fg-job-where > p { grid-column: 2; }
+/* The place and the pay: two lines in the card's column. A wrapper that takes no box of its own, so the phone can put them
+   on one line (below). */
+.fg-job-where { display: contents; }
 .fg-job-title { font-size: var(--fg-font-size-title); line-height: var(--fg-font-line-height-tight); max-width: 520px; }
 .fg-job-link { color: inherit; text-decoration: none; outline: none; }
 .fg-job-link::after { content: ""; position: absolute; inset: 0; }
@@ -1316,13 +1401,32 @@ button.fg-link {
 @media (max-width: 680px) {
   .fg-job {
     padding: var(--fg-space-3);
+    row-gap: var(--fg-space-2);
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "lead" "state" "action";
   }
+  /* SC-75: the place and the pay share one line ("Remote, US · $159,600 – $239,400"); the pay drops to its own line only
+     when the two don't fit, and with no pay it is just the place. A card is then short enough for more than one to show. */
   .fg-job-lead { grid-area: lead; grid-template-columns: var(--fg-size-mono-phone) minmax(0, 1fr); }
+  .fg-job-lead > .fg-job-where { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--fg-space-1); grid-column: 2; }
+  .fg-job-pay::before { content: "·"; margin-right: var(--fg-space-1); content: "·" / ""; }
+  .fg-job-pay--none { display: none; }
   .fg-job-second { display: contents; }
-  /* On a phone the monogram sits alone on the left; the state and the action line up with the text, not under it. */
-  .fg-job-state { grid-area: state; padding-left: calc(var(--fg-size-mono-phone) + var(--fg-space-3)); }
+  /* On a phone the monogram sits alone on the left; the state and the action line up with the text, not under it. The
+     state is one line ("Greenhouse · 7:33 PM · Viewed"); "Discovered on" stays for a screen reader. */
+  .fg-job-state { grid-area: state; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0 var(--fg-space-1); padding-left: calc(var(--fg-size-mono-phone) + var(--fg-space-3)); }
+  .fg-job-when::before { content: "·"; content: "·" / ""; }
+  .fg-job-pre {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
   .fg-job-action { grid-area: action; justify-content: flex-start; flex-direction: column; align-items: stretch; padding-left: calc(var(--fg-size-mono-phone) + var(--fg-space-3)); }
   .fg-job-action .fg-job-question { margin-right: 0; }
   /* Phone: the question on its own line, then the group fills the width with equal buttons. */

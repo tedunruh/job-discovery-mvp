@@ -56,6 +56,10 @@ MIN_SIDE_PADDING_PX = 16
 STYLE_PROPS = ["font-size", "line-height", "font-weight", "color", "display", "padding", "margin"]
 STYLE_SELECTORS = [".toolbar", ".fg-filter-pill", ".fg-filter-label", ".fg-filter-value", ".role-count"]
 TOOLBAR_ITEMS = ".toolbar .fg-filter-pill, .toolbar .role-count"
+PHONE_TOOLBAR_ITEMS = ".toolbar .fg-filter-pill, .toolbar .fg-filter-link"   # the count is gone on a phone; Viewed is a pill
+PHONE_MAX_WIDTH = 680
+PHONE_SIDE_PADDING_PX = 12   # the board's own padding on a phone
+PHONE_FOLD_PX = 640          # content height of a 390pt phone with Safari's toolbar showing (SC-75)
 
 logging.getLogger("werkzeug").setLevel(logging.ERROR)  # quiet the per-request access log
 
@@ -150,16 +154,17 @@ def check_toolbar(page, w):
             const lh = parseFloat(cs.lineHeight) || r.height;
             const inner = r.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
                           - parseFloat(cs.borderTopWidth) - parseFloat(cs.borderBottomWidth);
-            return { s: e.className, top: r.top, bottom: r.bottom, cy: r.top + r.height / 2, lines: inner / lh };
-          });
-          return { items, toolbarLeft: document.querySelector('.toolbar')?.getBoundingClientRect().left };
+            return { s: e.className, top: r.top, bottom: r.bottom, left: r.left, w: r.width, cy: r.top + r.height / 2, lines: inner / lh };
+          }).filter(i => i.w > 0);   // a hidden item (the count on a phone) is not in the row
+          return { items, toolbarLeft: Math.min(...items.map(i => i.left)) };
         }
         """,
-        TOOLBAR_ITEMS,
+        PHONE_TOOLBAR_ITEMS if w <= PHONE_MAX_WIDTH else TOOLBAR_ITEMS,
     )
     items = info["items"]
-    if len(items) < 3:
-        check(False, f"toolbar elements found  [@{w}]", f"expected 2 filter pills + role count, found {len(items)}")
+    want = 3
+    if len(items) < want:
+        check(False, f"toolbar elements found  [@{w}]", f"expected 2 filter pills + {'Viewed' if w <= PHONE_MAX_WIDTH else 'role count'}, found {len(items)}")
         return
     rows = []
     for it in sorted(items, key=lambda i: i["top"]):
@@ -170,7 +175,8 @@ def check_toolbar(page, w):
     check(worst <= ALIGN_TOLERANCE_PX, f"toolbar items in a row share a centerY  [@{w}]", f"spread {worst:.2f}px ({detail})")
     wrapped = [f"{i['s'].split()[0]} ({i['lines']:.1f} lines)" for i in items if i["lines"] > 1.5]
     check(not wrapped, f"toolbar text stays on one line  [@{w}]", "wrapped: " + ", ".join(wrapped))
-    check(info["toolbarLeft"] >= MIN_SIDE_PADDING_PX - 0.5, f"toolbar side padding >= {MIN_SIDE_PADDING_PX}px  [@{w}]",
+    side = PHONE_SIDE_PADDING_PX if w <= PHONE_MAX_WIDTH else MIN_SIDE_PADDING_PX
+    check(info["toolbarLeft"] >= side - 0.5, f"toolbar side padding >= {side}px  [@{w}]",
           f"left edge at {info['toolbarLeft']:.1f}px")
 
 
@@ -916,7 +922,7 @@ def check_elevated(browser, base, token):
     mp.goto(base + "/", wait_until="load")
     geo = mp.evaluate("""() => { const li = document.querySelector('li.fg-job'); const m = li.querySelector('.fg-mono').getBoundingClientRect();
         const t = li.querySelector('.fg-job-title').getBoundingClientRect(), st = li.querySelector('[data-state-top]').getBoundingClientRect();
-        const ac = li.querySelector('[data-action] .fg-button').getBoundingClientRect(), c = li.getBoundingClientRect(), pay = li.querySelector('.fg-job-pay').getBoundingClientRect();
+        const ac = li.querySelector('[data-action] .fg-button').getBoundingClientRect(), c = li.getBoundingClientRect(), pay = li.querySelector('.fg-job-subline').getBoundingClientRect();
         return {mono: Math.round(m.width), monoLeft: m.left >= c.left, textAfterMono: t.left >= m.right, stateAligned: Math.abs(st.left - t.left) <= 1,
                 actionAligned: Math.abs(ac.left - t.left) <= 1, payAligned: Math.abs(pay.left - t.left) <= 1, sw: document.documentElement.scrollWidth, vw: innerWidth} }""")
     check(geo["mono"] == 36 and geo["textAfterMono"] and geo["stateAligned"] and geo["actionAligned"] and geo["payAligned"] and geo["sw"] <= geo["vw"],
@@ -978,8 +984,9 @@ HEADER_INFO_JS = """() => {
   if (!h) return null;
   const pick = (el, keys) => { const cs = getComputedStyle(el); return Object.fromEntries(keys.map(k => [k, cs[k]])); };
   const wm = h.querySelector('.fg-wordmark');
-  const actions = [...h.querySelectorAll('.fg-header-actions .fg-button')].map(b => ({
-    text: b.textContent.trim(), cls: b.className, rect: b.getBoundingClientRect().toJSON(),
+  // what is shown: the two buttons, or on a phone the dashboard's one account button (the other is not drawn)
+  const actions = [...h.querySelectorAll('.fg-header-actions .fg-button, .fg-header-actions > .fg-account > .fg-icon-button')].filter(b => b.getBoundingClientRect().width > 0).map(b => ({
+    text: (b.textContent.trim() || b.getAttribute('aria-label')), cls: b.className, rect: b.getBoundingClientRect().toJSON(),
     style: pick(b, ['fontFamily', 'fontSize', 'fontWeight', 'color', 'paddingLeft', 'paddingRight', 'borderRadius', 'height']),
   }));
   return { wordmark: wm && pick(wm, ['fontFamily', 'fontSize', 'fontWeight', 'letterSpacing', 'color']),
@@ -995,9 +1002,10 @@ def header_info(page, path, w):
     check(info is not None and info["wordmark"] is not None, f"page uses the Field Guide header  [{path} @{w}]")
     if not info or not info["wordmark"]:
         return None
-    check(info["wordmark"]["fontSize"] == "36px", f"wordmark is 36px  [{path} @{w}]", info["wordmark"]["fontSize"])
+    size = "24px" if w <= PHONE_MAX_WIDTH else "36px"   # a phone gives the header less room (SC-75)
+    check(info["wordmark"]["fontSize"] == size, f"wordmark is {size}  [{path} @{w}]", info["wordmark"]["fontSize"])
     if info["headline"]:
-        check(info["headline"] == "28px", f"page headline (h1) is 28px, under the 36px wordmark  [{path} @{w}]", info["headline"])
+        check(info["headline"] == "28px", f"page headline (h1) is 28px, under the wordmark  [{path} @{w}]", info["headline"])
     n = len(info["actions"])
     check(1 <= n <= 2, f"header has one or two actions  [{path} @{w}]", f"{n}: {[a['text'] for a in info['actions']]}")
     for a in info["actions"]:
@@ -1019,6 +1027,8 @@ def check_headers_match(infos):
               f"{a['wordmark']} vs {b['wordmark']}")
         check(abs(a["wordmarkTop"] - b["wordmarkTop"]) <= 1, f"the wordmark sits at the same height on both pages  [@{w}]",
               f"{a['wordmarkTop']:.1f} vs {b['wordmarkTop']:.1f}")
+        if w <= PHONE_MAX_WIDTH:   # the dashboard has one account button instead of the two (SC-75); settings keeps its button
+            continue
         na, nb = a["actions"][0], b["actions"][0]
         check(na["cls"] == nb["cls"] and na["style"] == nb["style"],
               f"'{na['text']}' and '{nb['text']}' are the same button  [@{w}]",
@@ -1096,7 +1106,7 @@ def check_filter_menus(page, w):
     Measured against the requested width w, not innerWidth: on a mobile page an
     overflowing menu widens the layout viewport, so innerWidth grows to fit it
     and the menu would always look "inside"."""
-    for fid in page.evaluate("[...document.querySelectorAll('details.fg-filter')].map(d => d.id)"):
+    for fid in page.evaluate("[...document.querySelectorAll('details.fg-filter:not(.fg-account)')].map(d => d.id)"):
         page.click(f"#{fid} > summary")
         r = page.evaluate(
             f"(() => {{ const m = document.querySelector('#{fid} .fg-menu').getBoundingClientRect();"
@@ -1109,6 +1119,156 @@ def check_filter_menus(page, w):
         page.keyboard.press("Escape")
         closed = page.evaluate(f"!document.querySelector('#{fid}').open")
         check(closed, f"Escape closes filter menu  [#{fid} @{w}]")
+
+
+def check_phone(browser, base, token):
+    """Open roles on a phone (SC-75): more jobs above the fold. Under 680px the whole page scrolls (not a box inside it),
+    the tabs pin to the top, the header is one 24px wordmark and one account menu, Scout's line is 16px, the filters sit in
+    one row that scrolls sideways (Viewed is a pill, the count is gone), the board runs edge to edge, and a card's place and
+    pay, and its source, time and Viewed, are one line each. On a 390pt phone with Safari's toolbar showing (PHONE_FOLD_PX of
+    content) the first card, with its buttons, and part of the second show without scrolling. Wider screens do not change."""
+    w, h = 390, 844
+    tag = f"@{w}"
+    ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=True, has_touch=True)
+    ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+    page = ctx.new_page()
+    page.goto(base + "/", wait_until="load")
+    rows = page.evaluate("document.querySelectorAll('li.fg-job').length")
+    check(rows > 0, f"the dashboard has jobs to lay out on a phone  [{tag}]")
+    m = page.evaluate(
+        """
+        (fold) => {
+          const cs = (sel) => { const e = document.querySelector(sel); return e ? getComputedStyle(e) : null; };
+          const rect = (e) => e.getBoundingClientRect();
+          const out = {};
+          out.wordmark = cs('.fg-wordmark').fontSize;
+          out.band = rect(document.querySelector('.band')).height;
+          out.headerPad = [cs('body > .fg-header').paddingTop, cs('body > .fg-header').paddingLeft];
+          out.wide = [...document.querySelectorAll('.header-wide')].map(e => getComputedStyle(e).display);
+          const acct = document.querySelector('#account-menu > summary');
+          const ar = rect(acct);
+          out.account = { w: ar.width, h: ar.height, label: acct.getAttribute('aria-label'), popup: acct.getAttribute('aria-haspopup') };
+          const voice = document.querySelector('.voice-intro');
+          out.voice = voice ? { size: getComputedStyle(voice).fontSize, margin: getComputedStyle(voice).marginTop } : null;
+          const b = getComputedStyle(document.querySelector('.board')), br = rect(document.querySelector('.board'));
+          out.board = { l: br.left, r: br.right, bw: [b.borderTopWidth, b.borderRightWidth, b.borderBottomWidth, b.borderLeftWidth], radius: b.borderTopLeftRadius, bottomRadius: b.borderBottomLeftRadius, overflow: b.overflowY };
+          out.tabs = getComputedStyle(document.querySelector('.board > .fg-tabs')).position;
+          out.list = getComputedStyle(document.querySelector('.board > [role=tabpanel]')).overflowY;
+          out.bodyHeight = document.body.getBoundingClientRect().height;
+          const tb = document.querySelector('.toolbar--filters'), tr = rect(tb), tcs = getComputedStyle(tb);
+          out.toolbar = { h: tr.height, overflowX: tcs.overflowX, wrap: tcs.flexWrap, l: tr.left, r: tr.right };
+          const pills = [...tb.querySelectorAll('.fg-filter-pill, .fg-filter-link')].filter(e => rect(e).width > 0);
+          const shown = (e) => { const l = e.querySelector('.fg-filter-label'); return !l || l.getBoundingClientRect().width <= 1; };
+          out.pills = pills.map(e => ({ text: (e.querySelector('.fg-filter-value') || e).innerText.trim(), labelHidden: shown(e), name: e.textContent.replace(/\s+/g, ' ').trim(), top: rect(e).top, radius: getComputedStyle(e).borderTopLeftRadius, border: getComputedStyle(e).borderTopWidth }));
+          out.count = cs('[data-open-count]').display;
+          const cards = [...document.querySelectorAll('li.fg-job')].slice(0, 2).map(rect);
+          out.cards = cards.map(r => ({ top: r.top, bottom: r.bottom }));
+          out.fold = fold;
+          const c = document.querySelector('li.fg-job');
+          const place = c.querySelector('.fg-job-subline'), pay = c.querySelector('.fg-job-pay');
+          out.place = rect(place).top; out.pay = getComputedStyle(pay).display === 'none' ? null : rect(pay).top;
+          const top = c.querySelector('[data-state-top]'), when = c.querySelector('[data-state-when]');
+          out.state = { top: rect(top).top, when: when ? rect(when).top : null, text: top.innerText.trim(), pre: rect(c.querySelector('.fg-job-pre')).width,
+                        full: top.textContent.trim() };
+          out.scrolls = document.documentElement.scrollHeight - innerHeight;
+          return out;
+        }
+        """,
+        PHONE_FOLD_PX,
+    )
+    check(m["wordmark"] == "24px", f"the wordmark is 24px  [{tag}]", m["wordmark"])
+    check(m["headerPad"] == ["8px", "16px"], f"the header pads 8px above and 16px at the sides  [{tag}]", str(m["headerPad"]))
+    check(abs(m["band"] - 150) <= 1, f"the Sage band is about 150px  [{tag}]", f"{m['band']}px")
+    check(m["wide"] and all(d == "none" for d in m["wide"]), f"the two header buttons give way to the account menu  [{tag}]", str(m["wide"]))
+    check(m["account"]["w"] >= 44 and m["account"]["h"] >= 44, f"the account button is at least 44px square  [{tag}]", str(m["account"]))
+    check(m["account"]["label"] == "Account: role preferences and sign out" and m["account"]["popup"] == "menu",
+          f"the account button has its name and says it opens a menu  [{tag}]", str(m["account"]))
+    if m["voice"]:
+        check(m["voice"]["size"] == "16px" and m["voice"]["margin"] == "0px", f"Scout's line is 16px with no margin  [{tag}]", str(m["voice"]))
+    check(abs(m["board"]["l"]) <= 0.5 and abs(m["board"]["r"] - w) <= 0.5, f"the board runs edge to edge  [{tag}]", str(m["board"]))
+    check(m["board"]["bw"] == ["1px", "0px", "0px", "0px"], f"the board has a top border only  [{tag}]", str(m["board"]["bw"]))
+    check(m["board"]["radius"] != "0px" and m["board"]["bottomRadius"] == "0px", f"the board's top corners are rounded and its bottom square  [{tag}]", str(m["board"]))
+    check(m["board"]["overflow"] == "visible" and m["list"] == "visible", f"no scroll box on the board or its list  [{tag}]", f"{m['board']['overflow']} / {m['list']}")
+    check(m["tabs"] == "sticky", f"the tabs are sticky  [{tag}]", m["tabs"])
+    check(m["toolbar"]["wrap"] == "nowrap" and m["toolbar"]["overflowX"] == "auto", f"the filters are one row that scrolls sideways  [{tag}]", str(m["toolbar"]))
+    check(abs(m["toolbar"]["l"]) <= 0.5 and abs(m["toolbar"]["r"] - w) <= 0.5, f"the filter row bleeds to the board's edges  [{tag}]", str(m["toolbar"]))
+    names = [p["name"] for p in m["pills"]]
+    check(len(m["pills"]) == 3 and len({round(p["top"]) for p in m["pills"]}) == 1, f"Work type, Posted and Viewed sit in one row  [{tag}]", str(m["pills"]))
+    check(names[0].startswith("Work type:") and names[1].startswith("Posted:"), f"the pills keep their labels for a screen reader  [{tag}]", str(names))
+    check(all(p["labelHidden"] for p in m["pills"]), f"...and show only the value  [{tag}]", str([(p["text"], p["labelHidden"]) for p in m["pills"]]))
+    check(m["pills"][1]["text"] in ("Last 24 hours", "This week", "This month", "Any time"), f"Posted says the short wording ('This week')  [{tag}]", m["pills"][1]["text"])
+    check(m["pills"][2]["text"] == "Viewed" and m["pills"][2]["radius"] != "0px" and m["pills"][2]["border"] == "1px", f"Viewed is a pill  [{tag}]", str(m["pills"][2]))
+    check(m["count"] == "none", f"the open-roles count line is gone  [{tag}]", m["count"])
+    check(m["place"] is not None, f"the card shows its place  [{tag}]")
+    if m["pay"] is not None:
+        check(abs(m["place"] - m["pay"]) <= 2, f"place and pay are one line  [{tag}]", f"place at {m['place']:.0f}, pay at {m['pay']:.0f}")
+    check(m["state"]["when"] is None or abs(m["state"]["top"] - m["state"]["when"]) <= 2, f"source and time are one line  [{tag}]", str(m["state"]))
+    check(m["state"]["pre"] <= 1 and m["state"]["full"].startswith("Discovered on"),
+          f"'Discovered on' stays for a screen reader and the source is what shows  [{tag}]", str(m["state"]))
+    if len(m["cards"]) >= 2:
+        check(m["cards"][0]["bottom"] <= m["fold"], f"the first card, with its buttons, is above the fold  [{tag}]", f"bottom {m['cards'][0]['bottom']:.0f} vs {m['fold']}")
+        check(m["cards"][1]["top"] < m["fold"] - 24, f"part of the second card shows too  [{tag}]", f"top {m['cards'][1]['top']:.0f} vs {m['fold']}")
+    over = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
+    check(over <= 0, f"no horizontal overflow  [{tag}]", f"{over}px")
+    # the page scrolls and the tabs stay pinned
+    if m["scrolls"] > 300:
+        page.evaluate("window.scrollTo(0, 300)")
+        page.wait_for_timeout(200)
+        pinned = page.evaluate("document.querySelector('.board > .fg-tabs').getBoundingClientRect().top")
+        check(abs(pinned) <= 1, f"the page scrolls and the tabs stay pinned at the top  [{tag}]", f"tabs at {pinned}px")
+        page.evaluate("window.scrollTo(0, 0)")
+    # the account menu: a real menu button
+    page.click("#account-menu > summary")
+    page.wait_for_function("document.querySelector('#account-menu').open")
+    page.wait_for_function("document.activeElement && document.activeElement.getAttribute('role') === 'menuitem'")
+    first_text = page.evaluate("document.activeElement.textContent.trim()")
+    check(first_text == "Role preferences", f"opening the account menu puts focus on its first row  [{tag}]", first_text)
+    page.keyboard.press("ArrowDown")
+    check(page.evaluate("document.activeElement.textContent.trim()") == "Sign out", f"the arrow key moves to the next row  [{tag}]")
+    page.keyboard.press("ArrowDown")
+    check(page.evaluate("document.activeElement.textContent.trim()") == "Role preferences", f"...and wraps around  [{tag}]")
+    box = page.evaluate("(() => { const m = document.querySelector('#account-menu .fg-menu').getBoundingClientRect(); const x = (m.left + m.right) / 2, y = m.top + 20; return { l: m.left, r: m.right, t: m.top, b: m.bottom, hit: !!document.elementFromPoint(x, y).closest('#account-menu .fg-menu') }; })()")
+    check(box["l"] >= -0.5 and box["r"] <= w + 0.5 and box["t"] >= -0.5, f"the account menu is inside the screen  [{tag}]", str(box))
+    check(box["hit"], f"the account menu is above the board, not under it  [{tag}]")
+    page.keyboard.press("Escape")
+    check(not page.evaluate("document.querySelector('#account-menu').open"), f"Escape closes the account menu  [{tag}]")
+    check(page.evaluate("document.activeElement === document.querySelector('#account-menu > summary')"), f"...and returns focus to its button  [{tag}]")
+    # a filter menu opens as a sheet at the foot of the screen, so the scrolling row cannot clip it
+    page.click("#filter-posted > summary")
+    sheet = page.evaluate("(() => { const m = document.querySelector('#filter-posted .fg-menu'), r = m.getBoundingClientRect(); return { pos: getComputedStyle(m).position, l: r.left, r: r.right, b: r.bottom, t: r.top }; })()")
+    check(sheet["pos"] == "fixed" and sheet["l"] >= 0 and sheet["r"] <= w and sheet["b"] <= h and sheet["t"] > 0,
+          f"a filter menu opens as a sheet at the foot of the screen  [{tag}]", str(sheet))
+    page.keyboard.press("Escape")
+    ctx.close()
+
+    # wider screens do not change
+    ctx = browser.new_context(viewport={"width": 1280, "height": 900})
+    ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+    page = ctx.new_page()
+    page.goto(base + "/", wait_until="load")
+    d = page.evaluate(
+        """
+        () => {
+          const cs = (sel) => getComputedStyle(document.querySelector(sel));
+          return { wide: [...document.querySelectorAll('.header-wide')].map(e => getComputedStyle(e).display),
+                   account: cs('.fg-header-actions > .fg-account').display, wordmark: cs('.fg-wordmark').fontSize,
+                   voice: document.querySelector('.voice-intro') ? cs('.voice-intro').fontSize : null,
+                   label: cs('#filter-work .fg-filter-label').position, value: document.querySelector('#filter-posted .fg-filter-value').innerText.trim(),
+                   count: cs('[data-open-count]').display, viewed: cs('[data-viewed-link]').borderTopWidth, viewedText: document.querySelector('[data-viewed-link]').innerText.trim(),
+                   board: [cs('.board').borderTopWidth, cs('.board').borderLeftWidth], boardOverflow: cs('.board').overflowY, body: cs('body').overflow,
+                   // the card's text column: title, place and pay all start at the same x, on their own lines
+                   col: (() => { const c = document.querySelector('li.fg-job'), l = (q) => Math.round(c.querySelector(q).getBoundingClientRect().left), t = (q) => Math.round(c.querySelector(q).getBoundingClientRect().top);
+                                  return { x: [l('.fg-job-title'), l('.fg-job-subline'), l('.fg-job-pay')], y: [t('.fg-job-subline'), t('.fg-job-pay')] }; })() };
+        }
+        """
+    )
+    check(all(x != "none" for x in d["wide"]) and d["account"] == "none", "a wide screen keeps the two header buttons and has no account menu  [@1280]", str(d))
+    check(d["wordmark"] == "36px" and d["voice"] in (None, "18px"), "a wide screen keeps the 36px wordmark and the 18px line  [@1280]", str(d))
+    check(d["label"] != "absolute" and d["value"].startswith("within"), "a wide screen keeps the filter labels and values  [@1280]", str(d))
+    check(d["count"] != "none" and d["viewed"] == "0px" and d["viewedText"] == "Viewed jobs", "a wide screen keeps the open-roles count and the Viewed jobs link  [@1280]", str(d))
+    check(len(set(d["col"]["x"])) == 1 and d["col"]["y"][0] < d["col"]["y"][1], "a wide screen keeps title, place and pay in one column, place above pay  [@1280]", str(d["col"]))
+    check(d["board"] == ["1px", "1px"] and d["boardOverflow"] == "hidden" and d["body"] == "hidden", "a wide screen keeps the bordered board and the two-pane scroll  [@1280]", str(d))
+    ctx.close()
 
 
 def check_panel(browser, base, token):
@@ -1130,7 +1290,8 @@ def check_panel(browser, base, token):
             ctx.close()
             continue
         scroll_h = page.evaluate("document.documentElement.scrollHeight - innerHeight")
-        check(scroll_h <= 1, f"the page itself does not scroll  [{tag}]", f"{scroll_h}px taller than the window")
+        if not mobile:   # on a phone the page scrolls (SC-75); beside the panel on a wide screen only the panes do
+            check(scroll_h <= 1, f"the page itself does not scroll  [{tag}]", f"{scroll_h}px taller than the window")
         first = page.locator("li.fg-job").first
         row_id = first.get_attribute("id")
         first.locator(".fg-job-link").click()
@@ -1149,6 +1310,8 @@ def check_panel(browser, base, token):
         if mobile:
             check(abs(rect[0]) <= 1 and abs(rect[1]) <= 1 and abs(rect[2] - w) <= 1 and abs(rect[3] - h) <= 1,
                   f"on a phone the panel is a full screen sheet  [{tag}]", f"{rect} vs {w}x{h}")
+            check(page.evaluate("getComputedStyle(document.body).overflow") == "hidden",
+                  f"...and the page behind the sheet does not scroll  [{tag}]")
         else:
             tops = page.evaluate("[document.querySelector('.board').getBoundingClientRect().top, document.getElementById('apply-panel').getBoundingClientRect().top]")
             check(abs(tops[0] - tops[1]) <= 1, f"the list and the panel have their tops aligned  [{tag}]", f"{tops}")
@@ -1600,6 +1763,7 @@ def main():
             check_return_ask(browser, base, token)
             check_hide(browser, base, token)
             check_panel(browser, base, token)
+            check_phone(browser, base, token)
             check_tailor(browser, base, token, user_id)
             check_elevated(browser, base, token)
             check_pay(browser, base, token)

@@ -327,7 +327,7 @@ class Page(unittest.TestCase):
 
     def test_the_card_shows_the_range_and_a_blank_line_when_there_is_none(self):
         html = re.sub(r"<template.*?</template>", "", self.client.get("/", follow_redirects=True).get_data(as_text=True), flags=re.S)
-        pays = re.findall(r'<p class="fg-job-pay">([^<]*)</p>', html)
+        pays = re.findall(r'<p class="fg-job-pay[^"]*">([^<]*)</p>', html)
         self.assertEqual(pays, ["$150,000 - $188,000", " ", "$45 - $60 / hour"])
         self.assertNotIn("--", " ".join(pays))
         self.assertNotIn("Pay not listed", html)

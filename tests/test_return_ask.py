@@ -105,7 +105,7 @@ class Page(Base):
         html = self.live()
         for pid in (1, 2, 3):
             r = self.row_html(html, pid)
-            self.assertRegex(r, r'<p data-state-top>Discovered on Ashby</p>')
+            self.assertRegex(r, r'<p data-state-top><span class="fg-job-pre">Discovered on </span>Ashby</p>')
             self.assertRegex(r, r'<p class="fg-job-when" data-state-when>\d{1,2}:\d{2} [AP]M</p>')
             self.assertIn(f'href="/open/{pid}" target="_blank" rel="noopener" data-apply>Apply', r)
             self.assertIn(f'action="/hide/{pid}" data-hide', r)
@@ -217,7 +217,7 @@ class ViewedList(Base):
         return re.sub(r"<template.*?</template>", "", r.get_data(as_text=True), flags=re.S)
 
     def test_open_roles_links_to_it(self):
-        self.assertIn('href="/?view=viewed" data-viewed-link>Viewed jobs</a>', self.live())
+        self.assertIn('href="/?view=viewed" data-viewed-link><span class="fg-filter-link-full">Viewed jobs</span><span class="fg-filter-link-short">Viewed</span></a>', self.live())
 
     def test_it_lists_only_opened_jobs_last_opened_first(self):
         self.opens = {1: self.now - timedelta(days=2), 3: self.now - timedelta(minutes=5)}
