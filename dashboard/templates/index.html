@@ -251,12 +251,12 @@
     {%- endcall %}
   {% endcall %}
   <h1 class="fg-visually-hidden">Your jobs</h1>
-  {%- if voice and view == "open" %}
-  <div class="voice-wrap"><p class="fg-voice voice-intro" data-voice>{{ voice }}</p></div>
+  {%- if (voice and view == "open") or tab == "applications" %}
+  <div class="voice-wrap"{% if not voice %} hidden{% endif %}><p class="fg-voice voice-intro" data-voice>{{ voice }}</p></div>
   {%- endif %}
 
   <div class="workspace" data-workspace>
-  <section class="board" aria-label="Your jobs"{% if tab == "open" and view != "hidden" %} data-return-url="/return.json"{% endif %}{% if tab == "open" %} data-hide-board{% endif %}{% if tab == "open" and view == "open" %} data-panels{% endif %}>
+  <section class="board" aria-label="Your jobs"{% if tab == "open" and view != "hidden" %} data-return-url="/return.json"{% endif %}{% if tab == "open" %} data-hide-board{% endif %}{% if tab == "open" and view == "open" %} data-panels data-panel-url="/prep/"{% elif tab == "applications" %} data-panels data-panel-url="/application/"{% endif %}>
     {{ fg.tabs("Your jobs", [("Open roles", total, "/", tab == "open"), ("Applications", applications|length, "/?tab=applications", tab == "applications")]) }}
     {#- A live region that is always in the page, so a screen reader hears the question when it appears. -#}
     <p class="fg-visually-hidden" role="status" aria-live="polite" id="return-live"></p>
@@ -399,34 +399,14 @@
       <p class="fg-card-help">When you apply to a role from Open roles, it moves here.</p>
     </div>
     {% endif %}
-    {#- SC-73: grouped by where each one stands; a row shows only its current status. The files that went with an
-        application stay in the action spot until the panel (next slice) shows them. -#}
-    {% for label, count, rows in application_groups %}
-    <section class="fg-day" aria-label="{{ label }}">
-      {{ fg.day(label, count) }}
-      <ul class="fg-job-list">
-        {% for p in rows %}
-        {%- if p.files %}
-        {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, p.status_top, p.status_bottom, tailored=true, mono=p.mono, tint=p.tint, pay=p.pay, closed=p.closed) %}
-          <span class="fg-job-group" role="group" aria-label="Tailored files for {{ p.company_name }}">
-            <a class="fg-link" href="/tailor/{{ p.files.id }}/resume.pdf" download>Resume PDF</a>
-            <a class="fg-link" href="/tailor/{{ p.files.id }}/resume.docx" download>Word</a>
-            {%- if p.files.has_letter %}<a class="fg-link" href="/tailor/{{ p.files.id }}/letter.txt" download>Cover letter</a>{% endif %}
-          </span>
-        {% endcall %}
-        {%- else %}
-        {{ fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, p.status_top, p.status_bottom, mono=p.mono, tint=p.tint, pay=p.pay, closed=p.closed) }}
-        {%- endif %}
-        {% endfor %}
-      </ul>
-    </section>
-    {% endfor %}
+    {#- SC-73: grouped by where each one stands; a row shows only its current status and opens the panel. -#}
+    {% include "_applications_list.html" %}
     {% endif %}
     </div>
   </section>
   {#- SC-72: the panel for one job (Prep, Tailor, Review), filled from /prep/<id> when a card is opened. Closed until then.
     #panel-live says, once, that a tailoring finished while the person was elsewhere on the page. -#}
-  {%- if tab == "open" and view == "open" %}
+  {%- if (tab == "open" and view == "open") or tab == "applications" %}
   <aside class="fg-panel" id="apply-panel" aria-labelledby="panel-title" data-panel hidden></aside>
   <p class="fg-visually-hidden" role="status" aria-live="polite" id="panel-live"></p>
   <template id="panel-loading-template">{% include "_prep_loading.html" %}</template>

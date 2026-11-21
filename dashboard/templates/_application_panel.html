@@ -1,0 +1,47 @@
+{#- The inside of the panel for one application (SC-73), drawn on the server; the page puts it in <aside id="apply-panel">.
+    `a` comes from dashboard/applications.py. Where it stands is a select that saves as it changes (js/panel.js posts its
+    form); History is the only part that is swapped when it does, so the panel keeps its place. The toast's words and the
+    change an Undo takes back ride on the history section while a change has just been made. -#}
+{% import "_fg.html" as fg %}
+<div class="fg-panel-head">
+  <span class="fg-mono fg-mono--{{ a.tint }}" aria-hidden="true">{{ a.mono }}</span>
+  <p class="fg-panel-company">{{ a.company }}</p>
+  <h2 class="fg-panel-title" id="{{ heading_id|default('panel-title') }}" tabindex="-1" data-panel-title>{{ a.title }}</h2>
+  <button class="fg-icon-button" type="button" aria-label="Close" data-panel-close><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3.5 3.5l11 11M14.5 3.5l-11 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+</div>
+<div class="fg-panel-body" data-application>
+  <section class="fg-panel-sec" aria-labelledby="stands-title-{{ a.id }}">
+    <h3 class="fg-visually-hidden" id="stands-title-{{ a.id }}">Where it stands</h3>
+    <form method="post" action="/application/{{ a.id }}/stage" data-panel-form="stage">
+      {{ fg.select("stage", "Where it stands", a.options, a.stage, attrs="data-stage-select") }}
+    </form>
+    {%- if a.employer_closed %}
+    <p class="fg-panel-help">The employer closed this role.</p>
+    {%- endif %}
+    <p class="fg-message fg-message--attention" role="alert" data-panel-error hidden>That didn’t work. Check your connection and try again.</p>
+  </section>
+  <section class="fg-panel-sec" aria-labelledby="history-title-{{ a.id }}" data-history
+           {%- if a.toast %} data-toast="{{ a.toast }}" data-undo-log="{{ a.undo_log }}" data-undo-url="/application/{{ a.id }}/stage/undo"{% endif %}>
+    <h3 class="fg-panel-sec-title" id="history-title-{{ a.id }}">History</h3>
+    {{ fg.history(a.history) }}
+  </section>
+  <section class="fg-panel-sec" aria-labelledby="sent-title-{{ a.id }}">
+    <h3 class="fg-panel-sec-title" id="sent-title-{{ a.id }}">What you sent</h3>
+    {%- if a.files %}
+    <div class="fg-files">
+      {%- call fg.file_row("Resume, tailored for " ~ a.company, ("Saved " ~ a.saved) if a.saved else "") %}
+      <a class="fg-button fg-button--secondary" href="/tailor/{{ a.files.id }}/resume.pdf" download>PDF<span class="fg-visually-hidden"> of your resume tailored for {{ a.company }}</span></a>
+      <a class="fg-button fg-button--secondary" href="/tailor/{{ a.files.id }}/resume.docx" download>Word<span class="fg-visually-hidden"> file of your resume tailored for {{ a.company }}</span></a>
+      {%- endcall %}
+      {%- if a.letter %}
+      {%- call fg.file_row("Cover letter", a.letter_words ~ (" word" if a.letter_words == 1 else " words")) %}
+      <button class="fg-button fg-button--secondary" type="button" data-copy-text="{{ a.letter }}">Copy<span class="fg-visually-hidden"> cover letter</span></button>
+      {%- endcall %}
+      {%- endif %}
+    </div>
+    {%- else %}
+    <p class="fg-panel-help">You applied with your saved resume.</p>
+    {%- endif %}
+  </section>
+  <p class="fg-panel-help"><a class="fg-link" href="/open/{{ a.id }}" target="_blank" rel="noopener">Open the posting<span class="fg-visually-hidden"> (opens in a new tab)</span></a></p>
+</div>

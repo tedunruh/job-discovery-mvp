@@ -175,11 +175,11 @@
 
 {#- Select: same box as a text field, with a chevron. options: list of
     strings or (value, label) pairs. -#}
-{% macro select(id, label, options, selected=None, disabled=False) -%}
+{% macro select(id, label, options, selected=None, disabled=False, attrs="") -%}
 <div class="fg-field">
   <label class="fg-label" for="{{ id }}">{{ label }}</label>
   <span class="fg-select">
-    <select id="{{ id }}" name="{{ id }}"{% if disabled %} disabled{% endif %}>
+    <select id="{{ id }}" name="{{ id }}"{% if disabled %} disabled{% endif %}{% if attrs %} {{ attrs|safe }}{% endif %}>
       {%- for opt in options %}
       {%- set value, text = (opt if opt is not string else (opt, opt)) %}
       <option value="{{ value }}"{% if value == selected %} selected{% endif %}>{{ text }}</option>
@@ -417,6 +417,16 @@
 {#- A box for writing a few paragraphs (the cover letter). Its name comes from the heading `labelledby` points at. -#}
 {% macro textarea(id, name, value="", labelledby="", rows=14, maxlength=0) -%}
 <textarea class="fg-input fg-textarea" id="{{ id }}" name="{{ name }}" rows="{{ rows }}"{% if labelledby %} aria-labelledby="{{ labelledby }}"{% endif %}{% if maxlength %} maxlength="{{ maxlength }}"{% endif %}>{{ value }}</textarea>
+{%- endmacro %}
+
+{#- History (SC-73): what happened to an application, newest first. entries = [{"date": "Nov 4", "text": "Interviewing"}, ...];
+    a line with no date (an application from before dates were kept) leaves the date blank. -#}
+{% macro history(entries) -%}
+<ol class="fg-history">
+  {%- for e in entries %}
+  <li class="fg-history-item"><span class="fg-history-date">{{ e.date }}</span><span class="fg-history-dot" aria-hidden="true"></span><p class="fg-history-text">{{ e.text }}</p></li>
+  {%- endfor %}
+</ol>
 {%- endmacro %}
 
 {#- File row: icon, name, meta; call block = actions (View, Replace). -#}

@@ -696,6 +696,18 @@
     </div>
   </section>
 
+  <section class="spec spec--stack" data-component="history">
+    <div>
+      <h3>History</h3>
+      <p class="spec-use">Use to say what happened to something, newest first: a date, a dot on a thin line, then the words. The newest line's dot is filled Forest and the others are hollow; the words carry the meaning, never the dot. Under it in the application panel sits what was sent. A line from before dates were kept has a blank date.</p>
+      <code class="spec-code">{% raw %}{{ fg.history([{"date": "Nov 4", "text": "Interviewing"}, …]) }}{% endraw %} · .fg-history .fg-history-item .fg-history-date .fg-history-dot .fg-history-text</code>
+    </div>
+    <div class="states">
+      <div class="state"><span class="state-label">Three lines</span>{{ fg.history([{"date": "Nov 12", "text": "Offer"}, {"date": "Nov 4", "text": "Interviewing"}, {"date": "Oct 28", "text": "Applied with a tailored resume and cover letter"}]) }}</div>
+      <div class="state"><span class="state-label">One line, no date kept</span>{{ fg.history([{"date": "", "text": "Applied"}]) }}</div>
+    </div>
+  </section>
+
   <section class="spec spec--stack" data-component="panel">
     <div>
       <h3>Panel</h3>

@@ -170,3 +170,26 @@ def applications_line(grouped):
     if counts.get("Waiting to hear"):
         parts.append(f"{counts['Waiting to hear']} still waiting to hear.")
     return " ".join(parts)
+
+
+# The application panel (SC-73 slice 2): the choices under "Where it stands", the toast words and the history lines.
+STAGE_OPTIONS = (("waiting", "Applied, waiting to hear"), ("interviewing", "Interviewing"), ("offer", "Offer"),
+                 ("not", "Not moving forward"), ("mine", "Closed by me"))
+_STAGE_TOAST = {"waiting": "Moved back to waiting to hear.", "interviewing": "Moved to Interviewing.",
+                "offer": "Moved to Offer.", "not": "Moved to Not moving forward.", "mine": "Closed by you."}
+_STAGE_HISTORY = {"waiting": "Back to waiting to hear", "interviewing": "Interviewing", "offer": "Offer",
+                  "not": "Not moving forward", "mine": "Closed by me"}
+
+
+def stage_toast(stage):
+    return _STAGE_TOAST.get(stage, "")
+
+
+def application_history(changes, applied_at, tailored=False, letter=False):
+    """The lines under History, newest first: [{"date": "Nov 4", "text": "Interviewing"}, …]. `changes` is [(stage, when)]
+    newest first (the person's own changes); the last line is the application itself ("Applied with a tailored resume
+    and cover letter"), dated by `applied_at` or, for an application from before dates were kept, with no date."""
+    lines = [{"date": short_date(when), "text": _STAGE_HISTORY.get(stage, "")} for stage, when in changes]
+    sent = "Applied with a tailored resume" + (" and cover letter" if letter else "") if tailored else "Applied"
+    lines.append({"date": short_date(applied_at) if applied_at else "", "text": sent})
+    return lines

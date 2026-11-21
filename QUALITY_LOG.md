@@ -1719,3 +1719,18 @@ screenshots of the tab at 1280 and 390 wide.
 separator (the same cause as any long source name plus Viewed plus Tailored on Open roles); it wants a separator that belongs to the piece before it, in Field Guide
 for every card, not a one-off here. **Not mechanically checked:** the grouped tab and the dimmed rows have no `quality_check.py` case (the check's seeded person
 has no applications in other stages); the unit tests and the screenshots cover them. Add one when slice 2 can set a stage through the page.
+### 2026-11-21 — SC-73 slice 2: the application panel
+**What shipped.** Clicking a card in Applications opens the same side panel (a phone sheet under 680px) with the application's own content, drawn on the server
+(`dashboard/applications.py`, `_application_panel.html`): *Where it stands* (Applied, waiting to hear / Interviewing / Offer / Not moving forward / Closed by me; it
+saves as it changes), *History* (newest first; the last line is the application and what went with it) and *What you sent* (the tailored resume as PDF and Word, the
+letter with Copy, or "You applied with your saved resume."), then Open the posting. A change moves the row to its group, updates Scout's line, shows "Moved to
+Interviewing." with an Undo that takes back exactly that change (only while it is still the latest), and keeps focus on the select. The file links left the row.
+`panel.js` serves both tabs (`data-panel-url` on the board). New Field Guide piece: `fg.history`; `fg.select` takes attributes. New table `application_stage_log` (additive;
+undoing "applied" deletes a person's rows for the job). Verification: 749 unit tests, `quality_check.py` 623/623 on a warmed Neon branch with the schema applied twice;
+the check opens the panel from a real application, downloads both files, changes the stage, watches the row move, reads the toast, Undoes, and does it at every width.
+**Rework count:** 1 caught before "done", by a real run and not by tests. **Root cause:** the unit tests posted `stage=interviewing` straight to the route, so they could
+not see that the page's select was named `stage-<id>` (the select macro names a field by its id), and that the script built its `FormData` *after* disabling the select
+(a disabled control sends nothing). The page sent an empty stage and nothing happened. **Standing check added:** the quality check now drives the real select, not a
+posted form. **Lesson for the log:** a test that bypasses the page cannot prove the page sends what the route expects; when a new control posts a form, one test must
+click it.
+**Not verified:** a real iPhone (the sheet), VoiceOver reading the select and History, the Copy button on Safari (the clipboard fallback is untested there).

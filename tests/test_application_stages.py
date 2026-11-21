@@ -106,7 +106,7 @@ class Page(Base):
         html = self.get("/?tab=applications")
         self.assertIn("No applications yet.", html)
         self.assertNotIn("fg-day-label", html)
-        self.assertNotIn("data-voice", html)
+        self.assertIn('<div class="voice-wrap" hidden>', html)   # the line's place is kept (a stage change can fill it) but empty
 
     def test_open_roles_keeps_its_own_line(self):
         self.assertIn("new since yesterday", self.get("/"))
@@ -117,7 +117,7 @@ class Storing(unittest.TestCase):
         conn = mock.MagicMock()
         cur = conn.cursor.return_value.__enter__.return_value
         _db.set_applied(conn, 5, applied, 7)
-        return cur.execute.call_args.args
+        return cur.execute.call_args_list[0].args
 
     def test_applying_starts_waiting_and_keeps_a_stage_it_already_has(self):
         sql, params = self.sql(True)
@@ -128,6 +128,14 @@ class Storing(unittest.TestCase):
         sql, params = self.sql(False)
         self.assertEqual(params, (7, 5, False, False, False))
         self.assertIn("stage = CASE WHEN EXCLUDED.applied THEN", sql)          # no ELSE: NULL when not applied
+
+    def test_undoing_applied_lets_go_of_the_history(self):
+        conn = mock.MagicMock()
+        cur = conn.cursor.return_value.__enter__.return_value
+        _db.set_applied(conn, 5, False, 7)
+        sql, params = cur.execute.call_args.args
+        self.assertIn("DELETE FROM application_stage_log", sql)
+        self.assertEqual(params, (7, 5))
 
 
 if __name__ == "__main__":

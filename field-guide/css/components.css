@@ -1620,6 +1620,37 @@ button.fg-link {
 }
 /* A text area the page has fitted to its text (panel.js adds is-fitted): no scroll of its own, no handle. */
 .fg-textarea.is-fitted { overflow-y: hidden; resize: none; }
+/* History (SC-73): what happened to an application, newest first. A date, a dot on a thin line, then the words. The newest
+   line's dot is filled Forest, the others are hollow; the words carry the meaning, the dot only marks the place. */
+.fg-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.fg-history-item { display: grid; grid-template-columns: 56px 12px minmax(0, 1fr); column-gap: var(--fg-space-3); align-items: start; padding-bottom: var(--fg-space-3); }
+.fg-history-item:last-child { padding-bottom: 0; }
+.fg-history-date { font-size: var(--fg-font-size-sm); color: var(--fg-color-text-secondary); font-variant-numeric: tabular-nums; line-height: var(--fg-font-line-height-body); }
+.fg-history-dot { position: relative; align-self: stretch; }
+.fg-history-dot::before {
+  content: "";
+  position: absolute;
+  top: var(--fg-space-1);
+  left: 0;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--fg-radius-full);
+  border: 1.5px solid var(--fg-color-border-strong);
+  background: var(--fg-color-surface-card);
+}
+.fg-history-item:first-child .fg-history-dot::before { background: var(--fg-color-action-primary); border-color: var(--fg-color-action-primary); }
+.fg-history-dot::after {
+  content: "";
+  position: absolute;
+  top: calc(var(--fg-space-1) + 12px);
+  bottom: calc(var(--fg-space-3) * -1);
+  left: 5px;
+  width: 1px;
+  background: var(--fg-color-border-subtle);
+}
+.fg-history-item:last-child .fg-history-dot::after { display: none; }
+.fg-history-text { margin: 0; line-height: var(--fg-font-line-height-body); }
 .fg-files { display: flex; flex-direction: column; gap: var(--fg-space-3); }
 .fg-files .fg-file-row {
   padding: var(--fg-space-3);
