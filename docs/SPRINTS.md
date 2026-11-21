@@ -106,6 +106,10 @@ and letter (reading stays on Haiku 5.5); 10 tailorings per person per month as t
 - **Panel header and Prep redesign (11/20, Figma Field Guide node 412:983):** the fit sits under the title with a focusable tooltip (hover, focus, tap;
   Escape puts it away); the horizontal stepper with connectors is the first thing in the scrolling body; Scout's line "You meet 6 of the 7 attributes <company>
   is looking for." heads the list; "What I would lead with" is a Goldenrod card. New Field Guide pieces `fg.fit_tip`, `fg.lead`, `.fg-tip*`, `.fg-lead*`.
+- **Open roles on a phone (SC-75, 11/21):** under 680px the page itself scrolls (tabs sticky, the panel sheet locks the page), the header is a 24px wordmark and one
+  account menu, Scout's line is 16px, the filters are one sideways-scrolling row of value-only pills with Viewed as a pill, the board runs edge to edge, and a card's
+  place and pay, and its source, time and Viewed, are one line each. The first card and part of the second fit above a 640px fold (Safari's toolbar showing). New Field
+  Guide pieces: `fg.filter(compact, short)`, `fg.filter_link`, `fg.account`. Every page's phone header shrank with it. Not yet seen on a real iPhone.
 - **Collector (same sprint):** Workday is asked less often (hot tenants every 4 runs, big ones every 8, core every 4, concurrency 3) and any ATS that
   keeps refusing is paused in `ats_cooloff` (60, 120, 240, 360 minutes; one success clears it); alerts fire on the second refusal in a row, then at
   most once a day, and once when it answers again (the hourly flood is gone). About 3,100 more Greenhouse, Ashby and Rippling boards were imported

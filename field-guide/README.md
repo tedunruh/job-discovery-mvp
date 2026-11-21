@@ -182,6 +182,10 @@ is for supporting text only (metadata, hints, counts, section notes).
 | `fg.job_tailored()` · `fg.job(…, tailored=True)` | The quiet "Tailored" marker after the time (with Viewed): a tailored resume is ready for this job. `js/job.js` `showTailored` adds and removes it when the panel's Ready step shows or leaves |
 | `fg.req(text, mark, state)` · `.fg-reqs` `.fg-req` | What a posting asks for, one per line: in your resume (filled check), not in it (dashed ring), not checked (dot). The words say it too |
 | `.fg-job.is-selected` · `.fg-has-panel` | The card whose panel is open gets the Forest edge; while a panel is open the list is narrower and cards stack |
+| `fg.filter(…, compact=True, short=)` · `.fg-filter--compact` | The compact filter pill (SC-75): under 680px the label drops out (it stays for a screen reader) and only the value shows, optionally in a shorter wording ("This week"). A menu opened from a pill on a phone is a sheet at the foot of the screen, so a scrolling row never clips it |
+| `fg.filter_link(href, label, short)` · `.fg-filter-link` | A link in the filter row (Viewed jobs): a plain link on a wide screen, a pill with the short word on a phone |
+| `fg.account(id, label)` · `.fg-account` · `js/filter.js` | One 44px icon button that opens the actions a phone header has no room for (Role preferences, Sign out). A real menu: focus goes to the first row, arrow keys, Home and End move, Escape closes and returns focus. The page decides where it shows |
+| `.fg-job-where` · `.fg-job-pre` · `.fg-job-pay--none` | Inside the job card: the place and pay (two lines, one on a phone, the pay wraps only if it must), the "Discovered on" words a phone hides from sight but not from a screen reader, and the blank pay line a phone drops |
 | `.fg-row` · `.fg-visually-hidden` · `button.fg-link` | Wrapping action row; screen-reader-only text; link look for an on-page action |
 
 Disabled buttons use the secondary fill with secondary text (5.1:1) rather than fading.

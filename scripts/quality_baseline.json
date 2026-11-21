@@ -100,7 +100,7 @@
    "font-size": "16px",
    "font-weight": "600",
    "line-height": "24px",
-   "margin": "0px",
+   "margin": "-1px",
    "padding": "0px"
   },
   ".fg-filter-pill": {
@@ -110,7 +110,7 @@
    "font-weight": "500",
    "line-height": "24px",
    "margin": "0px",
-   "padding": "6px 12px"
+   "padding": "4px 12px"
   },
   ".fg-filter-value": {
    "color": "rgba(53, 84, 71, 0.8)",
@@ -123,7 +123,7 @@
   },
   ".role-count": {
    "color": "rgba(41, 40, 36, 0.7)",
-   "display": "block",
+   "display": "none",
    "font-size": "14px",
    "font-weight": "500",
    "line-height": "18.9px",
@@ -136,8 +136,8 @@
    "font-size": "15px",
    "font-weight": "500",
    "line-height": "22.5px",
-   "margin": "0px",
-   "padding": "0px 0px 8px"
+   "margin": "0px -12px",
+   "padding": "4px 12px"
   }
  },
  "390": {
@@ -147,7 +147,7 @@
    "font-size": "16px",
    "font-weight": "600",
    "line-height": "24px",
-   "margin": "0px",
+   "margin": "-1px",
    "padding": "0px"
   },
   ".fg-filter-pill": {
@@ -157,7 +157,7 @@
    "font-weight": "500",
    "line-height": "24px",
    "margin": "0px",
-   "padding": "6px 12px"
+   "padding": "4px 12px"
   },
   ".fg-filter-value": {
    "color": "rgba(53, 84, 71, 0.8)",
@@ -170,7 +170,7 @@
   },
   ".role-count": {
    "color": "rgba(41, 40, 36, 0.7)",
-   "display": "block",
+   "display": "none",
    "font-size": "14px",
    "font-weight": "500",
    "line-height": "18.9px",
@@ -183,8 +183,8 @@
    "font-size": "15px",
    "font-weight": "500",
    "line-height": "22.5px",
-   "margin": "0px",
-   "padding": "0px 0px 8px"
+   "margin": "0px -12px",
+   "padding": "4px 12px"
   }
  },
  "768": {

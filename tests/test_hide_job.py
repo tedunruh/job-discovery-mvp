@@ -64,19 +64,20 @@ class Base(unittest.TestCase):
 class Card(Base):
     def test_the_job_column_is_company_title_place_and_a_pay_line(self):
         c = self.card(self.get(), 1)
-        lead = re.search(r'<div class="fg-job-lead">(.*?)</div>', c, re.S).group(1)
-        self.assertEqual(re.findall(r'<p class="(fg-job-\w+)"', lead), ["fg-job-company", "fg-job-title", "fg-job-subline", "fg-job-pay"])
+        lead = re.search(r'<div class="fg-job-lead">(.*?)<div class="fg-job-second">', c, re.S).group(1)
+        self.assertIn('<div class="fg-job-where">', lead)   # place and pay: two lines, or one on a phone (SC-75)
+        self.assertEqual(re.findall(r'<p class="(fg-job-\w+)', lead), ["fg-job-company", "fg-job-title", "fg-job-subline", "fg-job-pay"])
         self.assertIn('<p class="fg-job-company">Northwind Health</p>', c)
         self.assertIn('<p class="fg-job-subline">Remote, US</p>', c)
         self.assertNotIn("Found on", c)
         self.assertNotIn("•", c)
 
     def test_pay_is_a_blank_line_for_now_so_every_card_is_the_same_height(self):
-        self.assertIn('<p class="fg-job-pay"> </p>', self.card(self.get(), 1))
+        self.assertIn('<p class="fg-job-pay fg-job-pay--none"> </p>', self.card(self.get(), 1))
 
     def test_the_state_column_says_where_then_when(self):
         c = self.card(self.get(), 1)
-        self.assertIn("<p data-state-top>Discovered on Greenhouse</p>", c)
+        self.assertIn('<p data-state-top><span class="fg-job-pre">Discovered on </span>Greenhouse</p>', c)
         self.assertRegex(c, r'<p class="fg-job-when" data-state-when>\d{1,2}:\d{2} [AP]M</p>')   # the time of day, not "1 hour ago"
 
     def test_the_action_spot_is_apply_then_hide_with_the_job_named_for_screen_readers(self):
