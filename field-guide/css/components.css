@@ -1371,6 +1371,14 @@ button.fg-link {
    own: the list is sorted by when jobs were found, so the time on line two is always the discovery time. */
 .fg-job-viewed { display: inline-flex; align-items: center; gap: var(--fg-space-1); }
 .fg-job-viewed svg { flex: none; }
+/* An application that is over (SC-73: not moving forward, closed by you, closed by the employer): the card is quieter.
+   The company, title, place, pay and monogram soften (Ink at 70%, still readable); the status line, which says why in
+   words, stays at full strength. */
+.fg-job--closed .fg-job-company,
+.fg-job--closed .fg-job-link,
+.fg-job--closed .fg-job-subline,
+.fg-job--closed .fg-job-pay,
+.fg-job--closed .fg-mono { opacity: 0.7; }
 .fg-job-action {
   position: relative;
   z-index: 1;

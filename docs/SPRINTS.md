@@ -110,6 +110,10 @@ and letter (reading stays on Haiku 5.5); 10 tailorings per person per month as t
   account menu, Scout's line is 16px, the filters are one sideways-scrolling row of value-only pills with Viewed as a pill, the board runs edge to edge, and a card's
   place and pay, and its source, time and Viewed, are one line each. The first card and part of the second fit above a 640px fold (Safari's toolbar showing). New Field
   Guide pieces: `fg.filter(compact, short)`, `fg.filter_link`, `fg.account`. Every page's phone header shrank with it. Not yet seen on a real iPhone.
+- **Track applications, slice 1 of 3 (SC-73, 11/21):** a stage per person and job (`user_postings.stage`, `stage_changed_at`; schema block applied to Neon before the
+  code), the Applications tab grouped Waiting to hear, Interviewing, Offer, Closed with one status line per row and Scout's line counting what is going; over rows are
+  dimmed (`fg.job(closed=True)`). Everything is still "waiting": slice 2 adds the application panel (Where it stands, history, what was sent) and slice 3 the
+  check-ins (row questions, ntfy pushes, at most 3 per job).
 - **Collector (same sprint):** Workday is asked less often (hot tenants every 4 runs, big ones every 8, core every 4, concurrency 3) and any ATS that
   keeps refusing is paused in `ats_cooloff` (60, 120, 240, 360 minutes; one success clears it); alerts fire on the second refusal in a row, then at
   most once a day, and once when it answers again (the hourly flood is gone). About 3,100 more Greenhouse, Ashby and Rippling boards were imported

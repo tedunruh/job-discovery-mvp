@@ -1,4 +1,5 @@
-"""What makes the Open roles view feel like Scout (SC-69): day groups, short times, company monograms and Scout's line.
+"""What makes the Open roles view feel like Scout (SC-69): day groups, short times, company monograms and Scout's line;
+and (SC-73) the Applications tab's groups and status lines.
 Pure functions, so the rules can be tested without a page or a database.
 
 Days are the person's calendar days in APP_TZ (US Central, where Scout's people are), not UTC: a job found at 9:40 PM
@@ -95,3 +96,77 @@ def scout_line(new_today, total, caught_up, close=""):
         return ""
     first = f"{new_today} new since yesterday." if new_today else "Nothing new since yesterday."
     return f"{first} {close}" if close else first
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# SC-73: the Applications tab. A person's stage for a job (db: user_postings.stage) plus whether the employer still has
+# the role open decide which group a row is in and what its one status line says.
+# ---------------------------------------------------------------------------------------------------------------------
+APPLICATION_GROUPS = ("Waiting to hear", "Interviewing", "Offer", "Closed")
+_STAGE_GROUP = {"waiting": "Waiting to hear", "interviewing": "Interviewing", "offer": "Offer", "not": "Closed", "mine": "Closed"}
+_LONG_AGO = datetime.min.replace(tzinfo=timezone.utc)
+
+
+def short_date(when):
+    """"Nov 4": the date on a status line, in the person's calendar (APP_TZ)."""
+    return when.astimezone(APP_TZ).strftime("%b %-d")
+
+
+def application_group(a):
+    """Which group an application is in. A role the employer has closed is Closed, unless the person is already talking
+    to them (Interviewing, Offer), which is the better thing to show."""
+    stage = a.get("stage") or "waiting"
+    if stage == "waiting" and a.get("posting_status") == "closed":
+        return "Closed"
+    return _STAGE_GROUP.get(stage, APPLICATION_GROUPS[0])
+
+
+def application_status(a):
+    """(top, bottom): the one status a row shows, never its history. `applied_ago` is "5 days ago" or "" (an application
+    from before the date was kept). The bottom line is "" when there is nothing more to say."""
+    stage = a.get("stage") or "waiting"
+    changed = short_date(a["stage_changed_at"]) if a.get("stage_changed_at") else ""
+    if stage == "interviewing":
+        return "Interviewing", f"Since {changed}" if changed else ""
+    if stage == "offer":
+        return "Offer", f"Since {changed}" if changed else ""
+    if stage == "not":
+        return "Not moving forward", changed
+    if stage == "mine":
+        return "Closed by you", changed
+    if a.get("posting_status") == "closed":
+        return "The employer closed this role", ""
+    return "Waiting to hear", ("Applied " + a["applied_ago"]).strip() if a.get("applied_ago") else "Applied"
+
+
+def group_applications(applications):
+    """[(label, how many, [rows])] for the groups that have any, in APPLICATION_GROUPS order; inside a group the most
+    recent activity comes first. Each row gets `group`, `status_top`, `status_bottom` and `closed` (dimmed)."""
+    groups = {label: [] for label in APPLICATION_GROUPS}
+    for a in applications:
+        a["group"] = application_group(a)
+        a["status_top"], a["status_bottom"] = application_status(a)
+        a["closed"] = a["group"] == "Closed"
+        groups[a["group"]].append(a)
+    out = []
+    for label in APPLICATION_GROUPS:
+        rows = sorted(groups[label], key=lambda r: r.get("activity_at") or _LONG_AGO, reverse=True)
+        if rows:
+            out.append((label, len(rows), rows))
+    return out
+
+
+def applications_line(grouped):
+    """Scout's line above the applications: what is going, from real counts ("1 interview going. 3 still waiting to
+    hear."), or "" when nothing is going (an empty tab, or only closed ones)."""
+    counts = {label: count for label, count, _ in grouped}
+    parts = []
+    if counts.get("Offer"):
+        n = counts["Offer"]
+        parts.append(f"{n} offer{'s' if n != 1 else ''} to answer.")
+    if counts.get("Interviewing"):
+        n = counts["Interviewing"]
+        parts.append(f"{n} interview{'s' if n != 1 else ''} going.")
+    if counts.get("Waiting to hear"):
+        parts.append(f"{counts['Waiting to hear']} still waiting to hear.")
+    return " ".join(parts)
