@@ -74,17 +74,17 @@ lines appeared: both are fixed in `quality_check.py`); a ranking nobody asked fo
 
 Not done / yours: SC-20 (pricing question to users), SC-27 (alpha check-ins).
 
-## Sprint 4 (in progress; chat "Scout — 2026 Q4 Sprint 4")
-**SC-72, Apply with Scout, built in three PRs.** Decisions (Ted, 11/6): three PRs with the panel first; tailored files are PDF and Word
+## Sprint 4 (done on the engineering side; chat "Scout — 2026 Q4 Sprint 4")
+**SC-72, Apply with Scout, shipped and live.** Decisions (Ted, 11/6): three PRs with the panel first; tailored files are PDF and Word
 generated fresh in a Scout style (pure-Python libraries, so the pip-only Render build keeps working); Sonnet 5.5 writes the tailored resume
 and letter (reading stays on Haiku 5.5); 10 tailorings per person per month as the starting number.
-1. **Panel and Prep (built, in review):** the panel beside the list, Prep from stored data with no model call, the scroll fold, the focus
+1. **Panel and Prep (merged):** the panel beside the list, Prep from stored data with no model call, the scroll fold, the focus
    rules, the phone sheet, the edge states. Branch `sc-72-panel-prep`.
-2. **Tailor and Review (built, in review):** a structured resume read (Haiku, checked line by line against the PDF), the tailor call (Sonnet
+2. **Tailor and Review (merged):** a structured resume read (Haiku, checked line by line against the PDF), the tailor call (Sonnet
    5.5) returning edits that code checks (numbers, names, anything the resume lacks), 10 per person per month plus `TAILOR_MONTHLY_CAP_USD`
    (default 5), every call logged in `tailor_calls`, Working and Review in the panel with Undo and Redo and "Not added". Measured about
    $0.01 to $0.02 per tailoring. **Apply `db/schema.sql`'s SC-72 slice 2 block to Neon before pushing.** Branch `sc-72-tailor-review`.
-3. **Letter, Ready and export (built, in review):** the optional cover letter (Sonnet 5.5, written once per tailoring in the background,
+3. **Letter, Ready and export (merged):** the optional cover letter (Sonnet 5.5, written once per tailoring in the background,
    brackets for what Scout can't know, code-checked so it adds no number or name the resume lacks, edited freely and saved as you leave
    the box; free of the 10 but inside the Scout-wide dollar cap), "Looks good" to Ready, PDF (fpdf2, built-in Helvetica) and Word (written
    directly as zipped XML, no library) of the resume with the kept changes, the Tailored marker on the row, and Yes saving the files with
@@ -93,7 +93,37 @@ and letter (reading stays on Haiku 5.5); 10 tailorings per person per month as t
    `tailor_calls.kind` with a dropped-and-recreated CHECK, no data touched). `requirements.txt` gains `fpdf2==2.8.3` (Render's pip-only
    build installs it; nothing to change in Render). Branch `sc-72-letter-ready`, stacked on `sc-72-tailor-review`.
 
+**After the three slices (11/13 to 11/20), all merged to `main` and deployed:**
+- **Panel feel:** opens at once and halves the database round trips; only the list scrolls under the tabs; the PDF is laid out like the Word file so
+  both have the same page count; the panel and the list share the width 50/50 (panel never below 480px) and the letter box grows with its text (no
+  scroll inside the panel's scroll); gap between board and panel 8px, voice intro 18px with no margin, board and panel corners 8px.
+- **Cover letter:** a voice-first prompt (first person, one story told in order, facts in the model's own words, never a copied bullet), medium effort
+  (`LETTER_EFFORT`), a spelling check (`pyspellchecker`), and resume lines no longer cut mid-word (the 400-character hard cap is now a word-boundary cut with
+  generous limits). The letter is written only on request from Review or Ready and is free of the 10.
+- **Prep footer matches the card (11/20):** just Tailor my resume and Apply; one line only the first time ("To tailor, I send your resume and this posting
+  to Claude. I'll only say this once.", read from `tailor_calls`, no schema change) and when 2 or fewer remain; the same fact is on the profile page's
+  resume card.
+- **Panel header and Prep redesign (11/20, Figma Field Guide node 412:983):** the fit sits under the title with a focusable tooltip (hover, focus, tap;
+  Escape puts it away); the horizontal stepper with connectors is the first thing in the scrolling body; Scout's line "You meet 6 of the 7 attributes <company>
+  is looking for." heads the list; "What I would lead with" is a Goldenrod card. New Field Guide pieces `fg.fit_tip`, `fg.lead`, `.fg-tip*`, `.fg-lead*`.
+- **Collector (same sprint):** Workday is asked less often (hot tenants every 4 runs, big ones every 8, core every 4, concurrency 3) and any ATS that
+  keeps refusing is paused in `ats_cooloff` (60, 120, 240, 360 minutes; one success clears it); alerts fire on the second refusal in a row, then at
+  most once a day, and once when it answers again (the hourly flood is gone). About 3,100 more Greenhouse, Ashby and Rippling boards were imported
+  (cold tier, first scans silent) with every watched run finishing in 4.5 to 7 minutes.
+- **Quality check:** 564 checks, new ones for the letter box, 50/50 width, the footer, the fit tooltip, the stepper and the lead card. Its waits assume a
+  fast database link: on a slow link (about 0.3s per Neon round trip) it timed out on page loads and on the profile alerts switch's wait (now 20s), so run
+  it on a warmed throwaway branch from a stable network and read the printed totals, not a wrapper's exit code.
+
 ## Open items for the next sprint
+- **SC-72 leftovers:** the card's own text still has the older tooltip wording (the code follows Figma: "Estimate from posting and your resume."); mirror this sprint's spacing in Figma (8px gap, 18px voice intro, 8px corners);
+  the first real tailoring with the cover letter on the live site has not been read end to end since the letter rebuild; one letter inferred a situation
+  from the resume's facts (the prompt forbids invented reasons; a judgement call).
+- **Watch Workday:** the pause does not lift a block by itself. If it is still refused after a day or two, the fallback is sending it from another
+  network (costs money). Runbook: `DELETE FROM ats_cooloff WHERE ats = 'workday'` lifts a pause by hand.
+- **Health topic is public:** `NTFY_HEALTH_TOPIC` is a plain Actions variable printed in public run logs; make it a secret and rotate the topic.
+- **Resume text drops ligatures:** pypdf drops "ti", "tt" and "fi" letter pairs in `user_resumes.text` ("foundatons"), which can mislabel a requirement as
+  Not in your resume; not fixed.
+- **More boards:** a later Common Crawl crawl, or checking cold boards more often than the ~4h rotation.
 - **Build SC-64** (check-in pushes and the Did you hear back / Should I close it rows). It needs a card of its own and
   the "What did they say?" menu and stages from the pipeline mock (Interview, Offer, Not moving forward) for the Yes
   path, plus a place to store "closed by you". It also stops new-job alerts for jobs already applied to or hidden.

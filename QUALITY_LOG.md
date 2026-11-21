@@ -1663,3 +1663,15 @@ profile alerts switch's 5s wait (raised to 20s; untouched `main` failed the same
 **Rework count:** 1 (the weight). **Root cause:** I wrote a component's heading rule with one class and tested it only where no page rule competes; a
 gallery or page that styles bare `h3` beats it. **Standing check:** the typeface check already caught it; keep heading rules in components at two
 classes (`.fg-x .fg-x-title`) when the element is a bare h1-h3. **Not verified:** the new layout has not been looked at in a browser.
+
+### 2026-11-20 — SC-72: follow Figma for copy, spacing and the footer background
+**What shipped.** Ted: follow Figma (node 412:983) for everything, after PR #41. Copy: the fit tooltip is "Estimate from posting and your resume." and Scout's line
+has no "Worth a look before you apply." tail. Spacing and surfaces, read from `get_design_context` and compared with a render of the gallery specimen: the
+panel's radius is `--fg-radius-md` (6px, and the board matches); the header has 24px between monogram, title and close, a small uppercase Medium company line
+and 2px between the title and the fit; the body pads 16px top and bottom; the step circles are 20px; requirement rows are 15px; the footer is the page surface
+(it was the card surface) with 12px top, 16px bottom and 24px sides; the tooltip uses the raised surface, a subtle border and secondary text; the lead card's
+list is 15px in the secondary colour; Scout's line uses the font's own line height (it was already 20px Fraunces Regular). The gallery specimens say "You meet…".
+**Why it needed doing.** PR #41 built from the card's prose and a screenshot, not from the frame's numbers, so the footer background, padding and radius were
+my guesses. **Standing check to add:** when a card names a Figma node, read its `get_design_context` values before building and compare a render against the
+frame before opening the PR. **Not done:** the company line is 12px where Figma has 11px and the lead list indent is 20px where Figma has 22.5px (no tokens
+for either); a token change needs Ted.
