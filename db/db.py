@@ -224,14 +224,19 @@ def get_postings_by_ids(conn, user_id, posting_ids):
 
 
 def set_applied(conn, posting_id, applied, user_id):
+    """Mark a role applied (it starts at stage 'waiting', SC-73) or not (Undo: the stage is cleared). Applying again to
+    one that already has a stage keeps that stage."""
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO user_postings (user_id, posting_id, applied)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (user_id, posting_id) DO UPDATE SET applied = EXCLUDED.applied
+            INSERT INTO user_postings (user_id, posting_id, applied, stage, stage_changed_at)
+            VALUES (%s, %s, %s, CASE WHEN %s THEN 'waiting' END, CASE WHEN %s THEN now() END)
+            ON CONFLICT (user_id, posting_id) DO UPDATE SET
+                applied = EXCLUDED.applied,
+                stage = CASE WHEN EXCLUDED.applied THEN COALESCE(user_postings.stage, 'waiting') END,
+                stage_changed_at = CASE WHEN EXCLUDED.applied THEN COALESCE(user_postings.stage_changed_at, now()) END
             """,
-            (user_id, posting_id, applied),
+            (user_id, posting_id, applied, applied, applied),
         )
 
 
@@ -1102,21 +1107,25 @@ def get_hidden_among(conn, user_id, posting_ids):
 
 
 def get_applications(conn, user_id):
-    """The roles this person has marked applied, newest first, open or closed (a role that has since closed is
-    still something they applied to). applied_at is the time of their latest "applied" event for it, or None for a
-    role marked applied before events were kept."""
+    """The roles this person has marked applied, open or closed (a role that has since closed is still something they
+    applied to). applied_at is the time of their latest "applied" event for it, or None for a role marked applied
+    before events were kept. stage is where it stands (SC-73: waiting, interviewing, offer, not, mine), stage_changed_at
+    when that last changed and posting_status whether the employer still has the role open. Newest activity first."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
             SELECT p.id, c.name AS company_name, c.ats_type, p.title, p.location, p.remote_type,
-                   p.pay_min, p.pay_max, p.pay_currency, p.pay_period,
+                   p.pay_min, p.pay_max, p.pay_currency, p.pay_period, p.status AS posting_status,
+                   COALESCE(up.stage, 'waiting') AS stage, up.stage_changed_at,
                    (SELECT max(e.created_at) FROM user_events e
                     WHERE e.user_id = up.user_id AND e.posting_id = p.id AND e.event_type = 'applied') AS applied_at
             FROM user_postings up
             JOIN postings p ON p.id = up.posting_id
             JOIN companies c ON c.id = p.company_id
             WHERE up.user_id = %s AND up.applied
-            ORDER BY applied_at DESC NULLS LAST, p.id DESC
+            ORDER BY COALESCE(up.stage_changed_at, (SELECT max(e.created_at) FROM user_events e
+                       WHERE e.user_id = up.user_id AND e.posting_id = p.id AND e.event_type = 'applied')) DESC NULLS LAST,
+                     p.id DESC
             """,
             (user_id,),
         )

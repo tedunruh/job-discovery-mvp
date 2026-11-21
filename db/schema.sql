@@ -469,3 +469,22 @@ CREATE TABLE IF NOT EXISTS ats_cooloff (
 -- Cool-off alerts: say so once a day, not every hour. alerted_at is when this block was last announced (NULL: never),
 -- so a short blip stays quiet and a long one is mentioned about once every ALERT_EVERY_HOURS. Additive; apply before the code.
 ALTER TABLE ats_cooloff ADD COLUMN IF NOT EXISTS alerted_at TIMESTAMPTZ;
+
+-- ---------------------------------------------------------------------------
+-- SC-73 (Track applications): where each application stands, per person and job. Additive; apply to Neon before pushing.
+--   stage             waiting | interviewing | offer | not (not moving forward) | mine (closed by the person);
+--                     NULL while the job is not applied to. An employer-closed role is not a stage: it comes from
+--                     postings.status, so it needs no stored change.
+--   stage_changed_at  when the stage last changed (the "Since Nov 4" on a row, and the order within a group)
+-- ---------------------------------------------------------------------------
+ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS stage TEXT;
+ALTER TABLE user_postings ADD COLUMN IF NOT EXISTS stage_changed_at TIMESTAMPTZ;
+ALTER TABLE user_postings DROP CONSTRAINT IF EXISTS user_postings_stage_check;
+ALTER TABLE user_postings ADD CONSTRAINT user_postings_stage_check
+    CHECK (stage IS NULL OR stage IN ('waiting', 'interviewing', 'offer', 'not', 'mine'));
+-- Everything already applied to is waiting, dated by its latest "applied" event when one was kept.
+UPDATE user_postings up
+   SET stage = 'waiting',
+       stage_changed_at = (SELECT max(e.created_at) FROM user_events e
+                            WHERE e.user_id = up.user_id AND e.posting_id = up.posting_id AND e.event_type = 'applied')
+ WHERE up.applied AND up.stage IS NULL;

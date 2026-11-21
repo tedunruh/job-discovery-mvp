@@ -14,7 +14,9 @@ from dashboard.auth import (
     too_many_recent_links,
     verify_magic_link,
 )
-from dashboard.elevate import group_by_day, monogram, rows_by_day, scout_line, short_time, tint
+from dashboard.elevate import (
+    applications_line, group_applications, group_by_day, monogram, rows_by_day, scout_line, short_time, tint,
+)
 from dashboard.fit import apply_fit, close_phrase
 from dashboard.filters import WORK_TYPES, location_line, work_type
 from dashboard.pay_line import pay_line
@@ -421,6 +423,7 @@ def index():
         a["files"] = saved_files.get(a["id"])
         a["applied_ago"] = humanize_posted_at(a["applied_at"])
         a["place"] = location_line(a["location"], a["remote_type"])
+        a["activity_at"] = a.get("stage_changed_at") or a["applied_at"]
     for h in hidden:
         h["hidden_ago"] = humanize_posted_at(h["hidden_at"])
         h["place"] = location_line(h["location"], h["remote_type"])
@@ -435,12 +438,16 @@ def index():
     day_groups = rows_by_day(shown, day_counts, now)
     caught_up = total == 0 and posted_range == "all" and work_type_label(work_types) == "Any"
     voice = scout_line(day_counts.get("Today", 0), total, caught_up, close_phrase(close))
+    application_groups = group_applications(applications)   # SC-73: Waiting to hear, Interviewing, Offer, Closed
+    if request.args.get("tab") == "applications":
+        voice = applications_line(application_groups)
 
     return render_template(
         "index.html",
         tab="applications" if request.args.get("tab") == "applications" else "open",
         postings=shown,
         applications=applications,
+        application_groups=application_groups,
         hidden=hidden,
         day_groups=day_groups,
         voice=voice,

@@ -107,10 +107,10 @@ class Applications(Base):
         self.applications = [application(9, "Design Lead", 1), application(8, "Staff Designer", 8), application(7, "Old role")]
         html = self.get("/?tab=applications")
         self.assertEqual(self.titles(html), ["Design Lead", "Staff Designer", "Old role"])
-        self.assertIn("<p data-state-top>Applied 1 day ago</p>", html)
-        self.assertIn("<p data-state-top>Applied</p>", html)      # applied before the time was kept: no invented time
-        self.assertNotIn("data-state-when", html)                  # one line only: Applied [when]
-        self.assertIn("Newest first", html)
+        self.assertIn("<p data-state-top>Waiting to hear</p>", html)   # SC-73: the status, then when they applied
+        self.assertIn('<p class="fg-job-when" data-state-when>Applied 1 day ago</p>', html)
+        self.assertIn('<p class="fg-job-when" data-state-when>Applied</p>', html)   # applied before the time was kept: no invented time
+        self.assertIn("Most recent first", html)
         self.assertIn("3 applications", html)
 
     def test_a_row_has_nothing_to_click_but_the_job(self):
@@ -216,7 +216,9 @@ class Query(unittest.TestCase):
         self.assertEqual(params, (7,))
         self.assertIn("up.user_id = %s AND up.applied", sql)
         self.assertIn("event_type = 'applied'", sql)
-        self.assertIn("ORDER BY applied_at DESC NULLS LAST", sql)
+        self.assertIn("COALESCE(up.stage, 'waiting') AS stage", sql)       # SC-73: where it stands, and whether the employer closed it
+        self.assertIn("p.status AS posting_status", sql)
+        self.assertIn("DESC NULLS LAST", sql)
         self.assertNotIn("status = 'open'", sql)          # a role that has since closed is still something they applied to
 
 

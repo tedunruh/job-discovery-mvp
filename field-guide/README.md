@@ -186,6 +186,7 @@ is for supporting text only (metadata, hints, counts, section notes).
 | `fg.filter_link(href, label, short)` · `.fg-filter-link` | A link in the filter row (Viewed jobs): a plain link on a wide screen, a pill with the short word on a phone |
 | `fg.account(id, label)` · `.fg-account` · `js/filter.js` | One 44px icon button that opens the actions a phone header has no room for (Role preferences, Sign out). A real menu: focus goes to the first row, arrow keys, Home and End move, Escape closes and returns focus. The page decides where it shows |
 | `.fg-job-where` · `.fg-job-pre` · `.fg-job-pay--none` | Inside the job card: the place and pay (two lines, one on a phone, the pay wraps only if it must), the "Discovered on" words a phone hides from sight but not from a screen reader, and the blank pay line a phone drops |
+| `fg.job(…, closed=True)` · `.fg-job--closed` | An application that is over (not moving forward, closed by you, closed by the employer): the company, title, place, pay and monogram soften to 70%; the status line stays full strength and says why |
 | `.fg-row` · `.fg-visually-hidden` · `button.fg-link` | Wrapping action row; screen-reader-only text; link look for an on-page action |
 
 Disabled buttons use the secondary fill with secondary text (5.1:1) rather than fading.

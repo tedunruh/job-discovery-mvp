@@ -251,7 +251,7 @@
     {%- endcall %}
   {% endcall %}
   <h1 class="fg-visually-hidden">Your jobs</h1>
-  {%- if voice and tab == "open" and view == "open" %}
+  {%- if voice and view == "open" %}
   <div class="voice-wrap"><p class="fg-voice voice-intro" data-voice>{{ voice }}</p></div>
   {%- endif %}
 
@@ -390,7 +390,7 @@
 
     {% else %}
     <div class="toolbar">
-      <p class="role-count">Newest first</p>
+      <p class="role-count">Most recent first</p>
       <p class="role-count">{{ applications|length }} application{{ "" if applications|length == 1 else "s" }}</p>
     </div>
     {% if not applications %}
@@ -399,22 +399,28 @@
       <p class="fg-card-help">When you apply to a role from Open roles, it moves here.</p>
     </div>
     {% endif %}
-    <ul class="fg-job-list">
-      {% for p in applications %}
-      {%- set applied_line = "Applied" ~ ((" " ~ p.applied_ago) if p.applied_ago else "") %}
-      {%- if p.files %}
-      {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, applied_line, mono=p.mono, tint=p.tint, pay=p.pay) %}
-        <span class="fg-job-group" role="group" aria-label="Tailored files for {{ p.company_name }}">
-          <a class="fg-link" href="/tailor/{{ p.files.id }}/resume.pdf" download>Resume PDF</a>
-          <a class="fg-link" href="/tailor/{{ p.files.id }}/resume.docx" download>Word</a>
-          {%- if p.files.has_letter %}<a class="fg-link" href="/tailor/{{ p.files.id }}/letter.txt" download>Cover letter</a>{% endif %}
-        </span>
-      {% endcall %}
-      {%- else %}
-      {{ fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, applied_line, mono=p.mono, tint=p.tint, pay=p.pay) }}
-      {%- endif %}
-      {% endfor %}
-    </ul>
+    {#- SC-73: grouped by where each one stands; a row shows only its current status. The files that went with an
+        application stay in the action spot until the panel (next slice) shows them. -#}
+    {% for label, count, rows in application_groups %}
+    <section class="fg-day" aria-label="{{ label }}">
+      {{ fg.day(label, count) }}
+      <ul class="fg-job-list">
+        {% for p in rows %}
+        {%- if p.files %}
+        {% call fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, p.status_top, p.status_bottom, tailored=true, mono=p.mono, tint=p.tint, pay=p.pay, closed=p.closed) %}
+          <span class="fg-job-group" role="group" aria-label="Tailored files for {{ p.company_name }}">
+            <a class="fg-link" href="/tailor/{{ p.files.id }}/resume.pdf" download>Resume PDF</a>
+            <a class="fg-link" href="/tailor/{{ p.files.id }}/resume.docx" download>Word</a>
+            {%- if p.files.has_letter %}<a class="fg-link" href="/tailor/{{ p.files.id }}/letter.txt" download>Cover letter</a>{% endif %}
+          </span>
+        {% endcall %}
+        {%- else %}
+        {{ fg.job("posting-" ~ p.id, p.title, "/open/" ~ p.id, p.company_name, p.place, p.status_top, p.status_bottom, mono=p.mono, tint=p.tint, pay=p.pay, closed=p.closed) }}
+        {%- endif %}
+        {% endfor %}
+      </ul>
+    </section>
+    {% endfor %}
     {% endif %}
     </div>
   </section>

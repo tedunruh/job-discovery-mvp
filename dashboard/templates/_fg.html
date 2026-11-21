@@ -284,7 +284,8 @@
     The job column: a company monogram (mono = initials, tint = sage, gold, clay or forest), company (a small-caps overline),
     title (the link that opens the posting), place ("Remote, US"), pay (blank when not known) and, once fit scores
     exist, fit_score 1 to 5 (five pips and a word). The state column: state_top ("Discovered on Ashby", "Applied 3 days ago", "Hidden 2 days ago") and,
-    under it, state_bottom (when it was found, or why it was hidden); viewed=True adds the quiet Viewed marker after
+    under it, state_bottom (when it was found, or why it was hidden); closed=True dims the card (an application that is over: not moving
+    forward, closed by you, or closed by the employer); viewed=True adds the quiet Viewed marker after
     state_bottom. The call block is the one action spot on the right (Apply and Hide, the question "Did you apply?", the
     reason menu, Unhide); leave it out and the card has no action.
         {% call fg.job("posting-7", title, href, company, place, "Discovered on Ashby", "5 hours ago", viewed=True) %}...{% endcall %}
@@ -322,8 +323,8 @@
 {% macro day(label, count) -%}
 <div class="fg-day-head"><h2 class="fg-day-label">{{ label }} <span class="fg-day-count">· {{ count }}</span></h2><span class="fg-day-rule" aria-hidden="true"></span></div>
 {%- endmacro %}
-{% macro job(id, title, href, company, place, state_top, state_bottom="", viewed=False, tailored=False, pay="", skills="", mono="", tint="sage", fit_score=0, panel=False) -%}
-<li class="fg-job" id="{{ id }}">
+{% macro job(id, title, href, company, place, state_top, state_bottom="", viewed=False, tailored=False, pay="", skills="", mono="", tint="sage", fit_score=0, panel=False, closed=False) -%}
+<li class="fg-job{% if closed %} fg-job--closed{% endif %}" id="{{ id }}">
   <div class="fg-job-lead">
     {%- if mono %}
     <span class="fg-mono fg-mono--{{ tint }}" aria-hidden="true">{{ mono }}</span>

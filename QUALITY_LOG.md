@@ -1705,3 +1705,17 @@ desktop column check now guards it; (4) the header size had to change on every p
 between), and *removing `overflow: hidden` from the body exposed overflow it had been hiding*. **Standing check added:** a wide-screen column check for the card; the
 horizontal-overflow check already caught the gallery. **Not verified:** a real iPhone (Safari's toolbar behaviour is modelled by a 640px fold, not observed); the account
 menu with VoiceOver; the sheet-style filter menus by touch.
+### 2026-11-21 — SC-73 slice 1: stages and the grouped Applications list
+**What shipped.** Where each application stands is stored per person and job (`user_postings.stage`: waiting, interviewing, offer, not, mine; `stage_changed_at`;
+additive block at the end of `schema.sql`, existing applied rows backfilled to waiting). Applications is grouped Waiting to hear, Interviewing, Offer, Closed (empty
+groups hidden, most recent activity first inside a group), a row shows only its current status ("Waiting to hear" over "Applied 3 days ago · Tailored";
+"Interviewing" over "Since Nov 4"; "Not moving forward" over "Oct 30"; "The employer closed this role", which comes from `postings.status`, not a stored stage), and
+Scout's line counts what is going ("1 interview going. 3 still waiting to hear."). Over rows are dimmed by one new Field Guide piece, `fg.job(…, closed=True)` /
+`.fg-job--closed`, with gallery specimens for waiting, interviewing and over. The tailored file links stay in the action spot until slice 2's panel shows them. Nothing
+can move a row out of waiting yet: that is slices 2 (the panel's select) and 3 (the check-ins). Verification: 731 unit tests (14 new: grouping, status lines, the
+line, the page, the SQL for apply and Undo), schema applied twice on a warmed Neon branch (idempotent; 49 applied rows backfilled), `quality_check.py` 603/603, and
+screenshots of the tab at 1280 and 390 wide.
+**Rework count:** 0 so far. **Known rough edge, not fixed:** on a phone a long status plus the Tailored marker wraps onto a second line that starts with the "·"
+separator (the same cause as any long source name plus Viewed plus Tailored on Open roles); it wants a separator that belongs to the piece before it, in Field Guide
+for every card, not a one-off here. **Not mechanically checked:** the grouped tab and the dimmed rows have no `quality_check.py` case (the check's seeded person
+has no applications in other stages); the unit tests and the screenshots cover them. Add one when slice 2 can set a stage through the page.
