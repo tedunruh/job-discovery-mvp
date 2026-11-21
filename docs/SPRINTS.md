@@ -119,7 +119,7 @@ and letter (reading stays on Haiku 5.5); 10 tailorings per person per month as t
   it on a warmed throwaway branch from a stable network and read the printed totals, not a wrapper's exit code.
 
 ## Open items for the next sprint
-- **SC-72 leftovers:** the card's own text still has the older tooltip wording (the code follows Figma: "Estimate from posting and your resume."); mirror this sprint's spacing in Figma (8px gap, 18px voice intro, 8px corners);
+- **SC-72 leftovers:** the card's own text still has the older tooltip wording (the code follows Figma: "Estimate from posting and your resume."); mirror this sprint's spacing in Figma (8px gap, 18px voice intro, 8px corners); Figma lead-card list indent is 22.5px vs 20px in code (needs a redrawn list);
   the first real tailoring with the cover letter on the live site has not been read end to end since the letter rebuild; one letter inferred a situation
   from the resume's facts (the prompt forbids invented reasons; a judgement call).
 - **Watch Workday:** the pause does not lift a block by itself. If it is still refused after a day or two, the fallback is sending it from another

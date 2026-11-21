@@ -1676,6 +1676,17 @@ my guesses. **Standing check to add:** when a card names a Figma node, read its 
 frame before opening the PR. **Not done:** the company line is 12px where Figma has 11px and the lead list indent is 20px where Figma has 22.5px (no tokens
 for either); a token change needs Ted.
 
+### 2026-11-21 — SC-72: put the off-token panel values back on tokens
+**What shipped.** Ted: the panel had four values that matched Figma but not Field Guide's tokens, so Figma was changed instead of adding tokens. In Figma
+(node 412:983): the company line 11px → 12px (`--fg-font-size-xs`), the gap under the header title 2px → 4px (`--fg-space-1`), and Scout's line from the font's own
+line height to 135% (`--fg-font-line-height-snug`). In code: the header's row gap is `--fg-space-1` (it was half a token) and the `line-height: normal` override on
+Scout's line is gone. **Not done in Figma:** the lead card's list indent is 22.5px there (the list's own hanging indent, set by the 15px font size; the plugin API
+cannot change it) and 20px (`--fg-space-5`) in code; closing it means redrawing the list as one text row per point. This replaces the earlier "no tokens
+for either" note: the company line is now on a token in both places.
+**Why it needed doing.** The previous entry built to Figma's raw numbers, so two of them (11px, 22.5px) and the 2px gap had no token to point at; a design
+value with no token is a drift waiting to happen. **Standing check to add:** when a value read from Figma is not a token, ask which side moves before building;
+do not add a one-off value or round it silently. **Verification:** `scripts/quality_check.py` 564/564 on a warmed Neon branch; the first run lost the Neon connection mid-run and did not count.
+**Rework count:** 0 in code. **Root cause of the original drift:** values built from Figma's raw numbers with no token behind them.
 ### 2026-11-21 — SC-75: open roles on a phone, more jobs above the fold
 **What shipped.** Under 680px: the whole page scrolls (the list's own 100dvh box is off, the tabs are `position: sticky`, the open panel locks the page behind it);
 every page's header is a 24px wordmark with 8px above and below, and the dashboard's two header buttons become one 44px account menu (a real menu: focus to the
