@@ -352,6 +352,35 @@ def check_skills_minimum(ctx, base):
     page.close()
 
 
+def check_chip_scroll(browser, base, token):
+    """Removing a chip hands focus back to the add box, and a plain focus() scrolls that box into view: with the
+    box above the fold the page jumped away from the chips being removed ("scrolling seems off"). The page must
+    stay where it is."""
+    ctx = browser.new_context(viewport={"width": 1000, "height": 500})
+    ctx.add_cookies([{"name": "scout_session", "value": token, "url": base}])
+    page = ctx.new_page()
+    page.goto(base + "/profile", wait_until="load")
+    row = page.locator(".fg-add-row[data-chip-list]").first
+    list_id = row.get_attribute("data-chip-list")
+    box = row.locator("input[type=text]")
+    for i in range(24):  # enough chips that the add box and the last chip cannot share a screen
+        box.fill(f"Qc chip number {i}")
+        box.press("Enter")
+    page.wait_for_timeout(200)
+    last = page.locator(f"#{list_id} .fg-chip-remove").last
+    last.evaluate("el => el.scrollIntoView({block: 'center'})")
+    page.wait_for_timeout(200)
+    before = page.evaluate("window.scrollY")
+    box_top = box.evaluate("el => el.getBoundingClientRect().top")
+    last.click()
+    page.wait_for_timeout(300)
+    after = page.evaluate("window.scrollY")
+    check(box_top < 0, "chip scroll check: the add box starts above the fold", f"box top {box_top}")
+    check(abs(after - before) <= 1, "removing a chip leaves the page where it was",
+          f"scrollY {before} before, {after} after")
+    ctx.close()
+
+
 def check_signin_states(browser, base):
     """The sign-in page says what is happening (SC-62). The wordmark, field and button never move; the status area
     sits below the button; sending shows a working button of the same width; a sent link is named; "send another"
@@ -1167,6 +1196,8 @@ def check_phone(browser, base, token):
           const c = document.querySelector('li.fg-job');
           const place = c.querySelector('.fg-job-subline'), pay = c.querySelector('.fg-job-pay');
           out.place = rect(place).top; out.pay = getComputedStyle(pay).display === 'none' ? null : rect(pay).top;
+          const where = place.parentElement, gap = parseFloat(getComputedStyle(where).columnGap) || 0;
+          out.fits = rect(place).width + rect(pay).width + gap <= where.clientWidth + 1;   // false: too long to share a line, so the pay drops by design
           const top = c.querySelector('[data-state-top]'), when = c.querySelector('[data-state-when]');
           out.state = { top: rect(top).top, when: when ? rect(when).top : null, text: top.innerText.trim(), pre: rect(c.querySelector('.fg-job-pre')).width,
                         full: top.textContent.trim() };
@@ -1200,7 +1231,7 @@ def check_phone(browser, base, token):
     check(m["pills"][2]["text"] == "Viewed" and m["pills"][2]["radius"] != "0px" and m["pills"][2]["border"] == "1px", f"Viewed is a pill  [{tag}]", str(m["pills"][2]))
     check(m["count"] == "none", f"the open-roles count line is gone  [{tag}]", m["count"])
     check(m["place"] is not None, f"the card shows its place  [{tag}]")
-    if m["pay"] is not None:
+    if m["pay"] is not None and m["fits"]:   # the pay drops to its own line only when the two don't fit; that depends on the first card's wording
         check(abs(m["place"] - m["pay"]) <= 2, f"place and pay are one line  [{tag}]", f"place at {m['place']:.0f}, pay at {m['pay']:.0f}")
     check(m["state"]["when"] is None or abs(m["state"]["top"] - m["state"]["when"]) <= 2, f"source and time are one line  [{tag}]", str(m["state"]))
     check(m["state"]["pre"] <= 1 and m["state"]["full"].startswith("Discovered on"),
@@ -1840,6 +1871,7 @@ def main():
             check_skills_minimum(ctx, base)
             ctx.close()
             check_signin_states(browser, base)
+            check_chip_scroll(browser, base, token)
             check_return_ask(browser, base, token)
             check_hide(browser, base, token)
             check_panel(browser, base, token)

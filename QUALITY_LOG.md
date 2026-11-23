@@ -1750,3 +1750,17 @@ re-apply asked the wrong question. **Root cause:** state added to a row was not 
 cannot see it, a run that applies, undoes and applies again can. (2) A check of mine read the panel before it had redrawn after Undo (the panel now redraws on an event,
 after the list); the check waits for the value instead of the group. **Standing rule added in code:** every column that belongs to "this application" is cleared in `set_applied(false)`.
 **Not verified:** a real push on a phone (the tests stop at the payload; the first real one will be the first check-in a person is due), VoiceOver on the row questions, a real iPhone.
+
+### 2026-11-23 — Settings: removing a chip no longer yanks the page
+**What shipped.** On Settings, removing a role title (or skill) chip handed focus back to the add box with a plain `focus()`, and the browser scrolls a focused box into view. With the box above the
+fold, one click on a chip's × threw the page back up to the box (measured on the live page: 700px down, then 256 after one removal), so scrolling felt broken. `profile.js` now focuses with
+`preventScroll` for both remove and add; focus still returns to the box, the page stays put. New check `check_chip_scroll` in `quality_check.py`: 24 chips, scroll to the last, remove it, the scroll
+position must not move (it fails without the fix: 1292 before, 347 after).
+**Rework count:** 0 after the fix; finding the cause took longer than the fix. A fresh load scrolls fine at every size (checked in headless Chromium, the built-in browser and the live page in Chrome), so the
+cause was something that only happens after a click. **Root cause:** a behaviour that only shows after an interaction (focus moving) was not covered by any check, which only loaded pages. **Standing rule:** new
+code that calls `.focus()` after a click passes `{ preventScroll: true }` unless moving the view is the point (the other `.focus()` calls in `field-guide/js/` were not changed or checked here).
+**Also fixed (the check, not the page):** the phone check "place and pay are one line" failed on unmodified `main` against today's data (it passed 643/643 on older data). SC-75 says the pay drops to its own line
+*when the two don't fit*; the check asserted one line for whatever the first card said, so a long place name failed it. It now asserts one line only when the two measure as fitting. **Root cause:** a check that read
+live data and assumed its wording; same family as the other data-dependent checks.
+**Verification:** 786 unit tests; `quality_check.py` 644/644 on a fresh Neon branch of today's data (the place-and-pay check is skipped on a card where the two can't share a line).
+**Not verified:** this is the one scroll jump I could reproduce; if the page still feels off in another place, send the steps.
