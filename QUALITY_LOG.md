@@ -1743,7 +1743,8 @@ one a day per person, jobs due together grouped ("Any word on 3 applications?", 
 failed push is retried next run. A tap goes through Scout (`/a/<token>/checkin`), is counted as its own event (`opened_checkin`, not a posting opened) and lands on the row.
 Columns `heard_at`, `heard_not_yet_at`, `close_not_yet_at`, `checkin_pushes` on `user_postings`, `users.checkin_pushed_on`, `application_stage_log.source` (additive, applied to
 Neon first). New script `field-guide/js/applications.js` owns the list refresh and the row questions; `panel.js` uses it. Undoing "applied" now clears the answers and the push
-count. Verification: 786 unit tests (37 new: every day boundary, the one-a-day and 9 AM and paused rules, the message copy, the tap, the SQL).
+count. Verification: 786 unit tests (37 new: every day boundary, the one-a-day and 9 AM and paused rules, the message copy, the tap, the SQL); `quality_check.py`
+643/643 on the merged `main` against a warmed Neon branch with the schema applied twice (the first attempt crashed on a DNS error before any check ran, so it was rerun).
 **Rework count:** 2 caught by the real run before "done". (1) The quality check passed its first width and failed the second: unapplying left `heard_at` on the row, so a
 re-apply asked the wrong question. **Root cause:** state added to a row was not listed in the one place that resets the row (`set_applied`); a unit test that applies once
 cannot see it, a run that applies, undoes and applies again can. (2) A check of mine read the panel before it had redrawn after Undo (the panel now redraws on an event,
