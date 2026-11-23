@@ -54,7 +54,7 @@
     var input = row.querySelector("input[type=text]");
     if (!input) return;
     if (addChip(row.getAttribute("data-chip-list"), input.value)) input.value = "";
-    input.focus();
+    input.focus({ preventScroll: true });
     changed();
   }
 
@@ -74,7 +74,9 @@
     var list = chip && chip.parentNode;
     if (chip) chip.remove();
     var row = list && form.querySelector('.fg-add-row[data-chip-list="' + list.id + '"] input[type=text]');
-    if (row) row.focus();
+    /* Focus goes back to the add box, but the page stays where it is: a plain focus() scrolls the box into view,
+       which yanks the page away from the chips the person is working through. */
+    if (row) row.focus({ preventScroll: true });
     changed();
   });
 
